@@ -29,13 +29,13 @@ This task breakdown implements the User Microservice incrementally across 4 user
 
 ### Tasks
 
-- [ ] T001 Create project structure per implementation plan in `backend/user-service/` with directories: src/{config,controllers,services,models,middleware,utils,routes}
-- [ ] T002 [P] Create `backend/user-service/package.json` with dependencies: express@5.x, mongoose@7.x, bcryptjs@2.4.3, jsonwebtoken@9.x, dotenv@16.x, nodemon@3.x
-- [ ] T003 [P] Create `backend/user-service/.env.example` with template: MONGODB_URI, MONGODB_DB, NODE_ENV, PORT, AUTH_TOKEN_SECRET
-- [ ] T004 [P] Create `backend/user-service/.gitignore` with Node.js patterns: node_modules/, .env, .DS_Store, *.log
-- [ ] T005 Create `backend/user-service/src/index.js` as server entry point that initializes Express app and connects to MongoDB
-- [ ] T006 Create `Dockerfile` in `backend/user-service/` for containerized deployment (Node.js 18 alpine base)
-- [ ] T007 Create `docker-compose.yml` at repo root orchestrating user-service (port 4001), MongoDB (port 27017), with persistent volumes and environment variables
+- [x] T001 Create project structure per implementation plan in `backend/user-service/` with directories: src/{config,controllers,services,models,middleware,utils,routes}
+- [x] T002 [P] Create `backend/user-service/package.json` with dependencies: express@5.x, mongoose@7.x, bcryptjs@2.4.3, jsonwebtoken@9.x, dotenv@16.x, nodemon@3.x
+- [x] T003 [P] Create `backend/user-service/.env.example` with template: MONGODB_URI, MONGODB_DB, NODE_ENV, PORT, AUTH_TOKEN_SECRET
+- [x] T004 [P] Create `backend/user-service/.gitignore` with Node.js patterns: node_modules/, .env, .DS_Store, *.log
+- [x] T005 Create `backend/user-service/src/index.js` as server entry point that initializes Express app and connects to MongoDB
+- [x] T006 Create `Dockerfile` in `backend/user-service/` for containerized deployment (Node.js 18 alpine base)
+- [x] T007 Create `docker-compose.yml` at repo root orchestrating user-service (port 4001), MongoDB (port 27017), with persistent volumes and environment variables
 
 ---
 
@@ -48,16 +48,16 @@ This task breakdown implements the User Microservice incrementally across 4 user
 
 ### Tasks
 
-- [ ] T008 [P] Create `backend/user-service/src/config/database.js` to initialize MongoDB connection using Mongoose with `atoss_gpt_users` database
-- [ ] T009 [P] Create `backend/user-service/src/config/environment.js` to load and validate environment variables (MONGODB_URI, NODE_ENV, PORT, auth settings)
-- [ ] T010 [P] Create `backend/user-service/src/models/User.js` with complete Mongoose schema including all 11 fields (id, email, passwordHash, role, department, firstName, lastName, active, lastLogin, createdAt, updatedAt) and 5 indexes per data-model.md
-- [ ] T011 [P] Create `backend/user-service/src/utils/constants.js` with enumeration definitions (roles: Staff/Admin, departments: Dept1/Dept2/Dept3, error codes)
-- [ ] T012 Create `backend/user-service/src/utils/validators.js` with email format validation, enum validation functions per data-model.md validation rules
-- [ ] T013 Create `backend/user-service/src/utils/logger.js` with logging utility supporting timestamp, operation type, role, userId, status for audit trail
-- [ ] T014 [P] Create `backend/user-service/src/middleware/authMiddleware.js` parsing mock bearer tokens in format `Bearer <role>:<identifier>` and attaching auth data to req.auth
-- [ ] T015 [P] Create `backend/user-service/src/middleware/errorHandler.js` global error handling middleware returning unified response format {success, data, error, code}
-- [ ] T016 Create `backend/user-service/src/middleware/validationMiddleware.js` for input validation (email format, required fields, enum constraints) applied to POST/PUT endpoints
-- [ ] T017 Create `backend/user-service/src/services/AuthService.js` mock authentication service extracting role from bearer token with function `parseToken(bearerToken)` returning {role, identifier}
+- [x] T008 [P] Create `backend/user-service/src/config/database.js` to initialize MongoDB connection using Mongoose with `atoss_gpt_users` database
+- [x] T009 [P] Create `backend/user-service/src/config/environment.js` to load and validate environment variables (MONGODB_URI, NODE_ENV, PORT, auth settings)
+- [x] T010 [P] Create `backend/user-service/src/models/User.js` with complete Mongoose schema including all 11 fields (id, email, passwordHash, role, department, firstName, lastName, active, lastLogin, createdAt, updatedAt) and 5 indexes per data-model.md
+- [x] T011 [P] Create `backend/user-service/src/utils/constants.js` with enumeration definitions (roles: Staff/Admin, departments: Dept1/Dept2/Dept3, error codes)
+- [x] T012 Create `backend/user-service/src/utils/validators.js` with email format validation, enum validation functions per data-model.md validation rules
+- [x] T013 Create `backend/user-service/src/utils/logger.js` with logging utility supporting timestamp, operation type, role, userId, status for audit trail
+- [x] T014 [P] Create `backend/user-service/src/middleware/authMiddleware.js` parsing mock bearer tokens in format `Bearer <role>:<identifier>` and attaching auth data to req.auth
+- [x] T015 [P] Create `backend/user-service/src/middleware/errorHandler.js` global error handling middleware returning unified response format {success, data, error, code}
+- [x] T016 Create `backend/user-service/src/middleware/validationMiddleware.js` for input validation (email format, required fields, enum constraints) applied to POST/PUT endpoints
+- [x] T017 Create `backend/user-service/src/services/AuthService.js` mock authentication service extracting role from bearer token with function `parseToken(bearerToken)` returning {role, identifier}
 
 ---
 

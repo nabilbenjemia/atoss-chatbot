@@ -1,0 +1,53 @@
+/**
+ * Constants and enumerations for the User Service
+ */
+
+const ROLES = {
+  ADMIN: 'Admin',
+  STAFF: 'Staff',
+};
+
+const DEPARTMENTS = {
+  DEPT_1: 'Department 1',
+  DEPT_2: 'Department 2',
+  DEPT_3: 'Department 3',
+};
+
+const HTTP_STATUS = {
+  OK: 200,
+  CREATED: 201,
+  NO_CONTENT: 204,
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  CONFLICT: 409,
+  INTERNAL_SERVER_ERROR: 500,
+};
+
+const ERROR_CODES = {
+  INVALID_INPUT: 'INVALID_INPUT',
+  DUPLICATE_EMAIL: 'DUPLICATE_EMAIL',
+  USER_NOT_FOUND: 'USER_NOT_FOUND',
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  FORBIDDEN: 'FORBIDDEN',
+  DATABASE_ERROR: 'DATABASE_ERROR',
+  INVALID_AUTH_TOKEN: 'INVALID_AUTH_TOKEN',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+};
+
+const VALIDATION = {
+  EMAIL_REGEX: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  PASSWORD_MIN_LENGTH: 8,
+  NAME_MIN_LENGTH: 2,
+  NAME_MAX_LENGTH: 50,
+  EMAIL_MAX_LENGTH: 255,
+};
+
+export {
+  ROLES,
+  DEPARTMENTS,
+  HTTP_STATUS,
+  ERROR_CODES,
+  VALIDATION,
+};
