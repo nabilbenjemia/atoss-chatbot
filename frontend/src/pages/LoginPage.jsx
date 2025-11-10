@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: "", password: "", remember: true });
   const [errors, setErrors] = useState({});
   const [status, setStatus] = useState({ type: "idle", message: "" }); 
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -33,7 +36,8 @@ export default function LoginPage() {
       setStatus({ type: "error", message: "Unexpected error. Please try again." });
     } finally {
       setLoading(false);
-    }}
+    }
+  };
 
       
 
@@ -107,6 +111,16 @@ export default function LoginPage() {
                     : "border-tum-grey-7 focus:border-tum-blue focus:ring-tum-blue-light"}`}
               />
               {errors.password && <p className="mt-1 text-xs text-tum-red">{errors.password}</p>}
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => navigate("/forget-password")}
+                className="text-sm font-medium text-tum-blue hover:underline"
+              >
+                Forgot password?
+              </button>
             </div>
 
             <div className="flex items-center justify-between">
