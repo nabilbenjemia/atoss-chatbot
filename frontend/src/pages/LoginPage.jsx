@@ -31,6 +31,16 @@ export default function LoginPage() {
     try {
       setLoading(true);
       await new Promise((r) => setTimeout(r, 700));
+
+      const ok = form.email.endsWith("@tum.de");
+      if (ok) {
+        setStatus({ type: "success", message: "Login successful. Welcome to the TUM Klinikum chatbot." });
+      } else {
+        setStatus({
+          type: "error",
+          message: "Login failed. Please use your TUM Klinikum account or check your credentials.",
+        });
+      }
     }
     catch {
       setStatus({ type: "error", message: "Unexpected error. Please try again." });
