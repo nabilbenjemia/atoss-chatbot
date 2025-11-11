@@ -15,7 +15,7 @@
 │ email (String, unique, required)    │
 │ passwordHash (String, required)     │
 │ role (Enum: Staff|Admin)            │
-│ department (Enum: D1|D2|D3)         │
+│ department (Enum: Department 1|Department 2|Department 3) │
 │ firstName (String, optional)        │
 │ lastName (String, optional)         │
 │ active (Boolean, default: true)     │
@@ -130,7 +130,7 @@ db.users.createIndex({ createdAt: 1 });
 | `email` | Required, unique, lowercase, valid email format | `ERR_INVALID_EMAIL` or `ERR_EMAIL_EXISTS` |
 | `passwordHash` | Required, ≥60 chars (bcryptjs), non-empty | `ERR_INVALID_PASSWORD_HASH` |
 | `role` | Required, enum: Staff\|Admin | `ERR_INVALID_ROLE` |
-| `department` | Required, enum: Dept1\|Dept2\|Dept3 | `ERR_INVALID_DEPARTMENT` |
+| `department` | Required, enum: Department 1\|Department 2\|Department 3 | `ERR_INVALID_DEPARTMENT` |
 | `firstName` | Optional, string, max 100 chars | `ERR_INVALID_FIRSTNAME` |
 | `lastName` | Optional, string, max 100 chars | `ERR_INVALID_LASTNAME` |
 | `active` | Boolean, default true | `ERR_INVALID_ACTIVE_FLAG` |
@@ -259,7 +259,7 @@ query: { active: true }
 ### List Flow
 
 ```
-1. GET /users?role=Staff&department=Dept1&limit=10&offset=0
+1. GET /users?role=Staff&department=Department%201&limit=10&offset=0
    ↓
 2. Build query: { active: true, ...filters }
    ↓

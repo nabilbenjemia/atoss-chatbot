@@ -1,6 +1,6 @@
 # Feature Specification: User Microservice Implementation
 
-**Feature Branch**: `007-user-microservice`  
+**Feature Branch**: `feature/007-user-microservice`  
 **Created**: 2025-11-08  
 **Status**: Draft  
 **Input**: User description: "i am responsible for user microservices implementation. it will interact with auth services. in authREADME you find the notes by other developer and have a idea of already implemented feature. Here we want to implement independently, so mock auth, we focus on user microservices"
@@ -116,7 +116,7 @@ Delivers: Administrative user management capabilities
 
 ### Functional Requirements
 
-- **FR-001**: System MUST provide a POST `/users` endpoint to create new user profiles with required fields: email (unique), password (encrypted), role (Staff/Admin), department (Dept1/Dept2/Dept3)
+- **FR-001**: System MUST provide a POST `/users` endpoint to create new user profiles with required fields: email (unique), password (hashed), role (Staff/Admin), department (Department 1/Department 2/Department 3)
 - **FR-002**: System MUST provide a GET `/users/{userId}` endpoint to retrieve a single user's complete profile by ID
 - **FR-003**: System MUST provide a PUT `/users/{userId}` endpoint to update user profile fields (email, role, department, and other profile data)
 - **FR-004**: System MUST provide a DELETE `/users/{userId}` endpoint to mark a user profile as inactive (soft-delete, sets `active: false`)
@@ -129,7 +129,7 @@ Delivers: Administrative user management capabilities
 - **FR-011**: System MUST use MongoDB as the database with Mongoose ODM for data persistence
 - **FR-012**: System MUST run independently on port 4001 with mock authentication using role-simulated bearer tokens (format: `Bearer <role>:<identifier>` where role is admin or staff)
 - **FR-013**: System MUST implement authorization checks on all CRUD endpoints: verify authentication token, extract role from token, enforce role-based permissions
-- * 5**: System MUST return HTTP 403 Forbidden when an authenticated user lacks permissions for the requested operation
+- **FR-015**: System MUST return HTTP 403 Forbidden when an authenticated user lacks permissions for the requested operation
 - **FR-016**: System MUST log all CRUD operations with timestamp, operation type, user role, and target user ID for audit trail
 - **FR-017**: System MUST treat soft-deleted users (active: false) as non-existent in all GET operations; GET `/users/{userId}` returns 404 for inactive users
 

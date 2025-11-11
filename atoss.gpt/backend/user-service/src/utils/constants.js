@@ -7,10 +7,11 @@ const ROLES = {
   STAFF: 'Staff',
 };
 
+// Department enumeration standardized to full names for consistency with specification
 const DEPARTMENTS = {
-  DEPT_1: 'Department 1',
-  DEPT_2: 'Department 2',
-  DEPT_3: 'Department 3',
+  DEPARTMENT_1: 'Department 1',
+  DEPARTMENT_2: 'Department 2',
+  DEPARTMENT_3: 'Department 3',
 };
 
 const HTTP_STATUS = {

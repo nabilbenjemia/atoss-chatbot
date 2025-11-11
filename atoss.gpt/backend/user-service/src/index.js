@@ -3,6 +3,8 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import userRoutes from './routes/userRoutes.js';
+import errorHandler from './middleware/errorHandler.js';
 
 // Load environment variables
 dotenv.config();
@@ -52,13 +54,8 @@ app.get('/health', (req, res) => {
     });
 });
 
-// API Routes (placeholder - to be implemented in Phase 2)
-app.use('/api/v1/users', (req, res) => {
-    res.status(501).json({
-        error: 'Not Implemented',
-        message: 'User endpoints coming in Phase 2',
-    });
-});
+// API Routes
+app.use('/users', userRoutes);
 
 // 404 Handler
 app.use((req, res) => {
@@ -69,14 +66,8 @@ app.use((req, res) => {
     });
 });
 
-// Error Handler
-app.use((err, req, res, next) => {
-    console.error(`[ERROR]`, err.message);
-    res.status(err.status || 500).json({
-        error: err.message || 'Internal Server Error',
-        timestamp: new Date().toISOString(),
-    });
-});
+// Error Handler (unified)
+app.use(errorHandler);
 
 // Start Server
 const startServer = async () => {

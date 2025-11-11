@@ -1,6 +1,6 @@
 # Implementation Plan: User Microservice
 
-**Branch**: `007-user-microservice` | **Date**: 2025-11-08 | **Spec**: [User Microservice Specification](./spec.md)
+**Branch**: `feature/007-user-microservice` | **Date**: 2025-11-08 | **Spec**: [User Microservice Specification](./spec.md)
 
 **Input**: Feature specification from `/specs/007-user-microservice/spec.md`
 
@@ -24,7 +24,7 @@ The User Microservice is an independent Node.js/Express microservice that manage
 **Project Type**: Web application - backend microservice + frontend mock (React login/profile page)  
 **Performance Goals**: < 2 seconds end-to-end for create+retrieve; < 500ms per API call on 10k+ user datasets  
 **Constraints**: < 100ms auth token parsing; 99% availability for CRUD operations; soft-delete semantics (404 for inactive)  
-**Scale/Scope**: MVP targets 100 concurrent creates; list operations support 100k+ users; 7 user stories across 4 features (P1-P3)
+**Scale/Scope**: MVP targets 100 concurrent creates; list operations support 100k+ users; 4 user stories across 3 feature groups (P1–P3)
 
 ## Constitution Check
 
@@ -101,7 +101,7 @@ backend/user-service/
 │   │   ├── UserService.js           # Business logic: CRUD, authorization checks
 │   │   └── AuthService.js           # Mock auth: token parsing, role extraction
 │   ├── models/
-│   │   └── User.js                  # Mongoose schema: User profile with soft-delete
+│   │   └── User.js                  # Mongoose schema: User profile with soft-delete (UUID v4 business id)
 │   ├── middleware/
 │   │   ├── authMiddleware.js        # Mock authentication: validate bearer token, extract role
 │   │   ├── errorHandler.js          # Global error handling & response formatting
@@ -109,7 +109,7 @@ backend/user-service/
 │   ├── utils/
 │   │   ├── validators.js            # Email format, enumeration validation
 │   │   ├── logger.js                # Logging utility (timestamp, operation, role)
-│   │   └── constants.js             # Enumerations, error messages
+│   │   └── constants.js             # Enumerations (roles: Staff/Admin, departments: Department 1/2/3), error messages
 │   ├── routes/
 │   │   └── userRoutes.js            # Route definitions, middleware chaining
 │   └── index.js                     # Server entry point
@@ -182,6 +182,7 @@ tests/
 - **Mock Auth**: Middleware parses `Bearer admin:user123` or `Bearer staff:user456` for role extraction
 - **Error Response**: Unified format: `{success: false, error: "message", code: "ERROR_CODE"}`
 - **Logging**: All CRUD ops logged with `{timestamp, operation, role, userId, status}`
+- **Identifier Strategy**: Expose UUID v4 as the business identifier (`id` field). Internal Mongo `_id` remains ObjectId and is not used by clients.
 
 ### Phase 2: Task Breakdown (Next Phase: `/speckit.tasks`)
 
@@ -233,22 +234,30 @@ tests/
 services:
   user-service:
     build: ./backend/user-service
-    ports: 4001
+    ports:
+      - "4001:4001"
     env_file: .env
-    depends_on: mongodb
+    depends_on:
+      - mongodb
 
   mongodb:
     image: mongo:6.0
-    ports: 27017
-    volumes: 
+    ports:
+      - "27017:27017"
+    volumes:
       - mongo-data:/data/db
-    env:
+    environment:
       MONGO_INITDB_DATABASE: atoss_gpt_users
 
-  frontend-mock: (optional)
+  frontend-mock: # optional
     build: ./frontend/mock-auth
-    ports: 3000
-    environment: REACT_APP_API_URL=http://localhost:4001
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:4001
+
+volumes:
+  mongo-data:
 ```
 
 **Development Workflow**:

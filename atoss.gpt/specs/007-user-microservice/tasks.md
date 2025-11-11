@@ -3,7 +3,7 @@
 **Feature**: 007-user-microservice  
 **Generated**: 2025-11-08  
 **Branch**: `feature/007-user-microservice`  
-**Total Tasks**: 31 tasks organized across 7 phases  
+**Total Tasks**: 47 tasks organized across 7 phases  
 **Status**: Ready for implementation
 
 ---
@@ -51,7 +51,7 @@ This task breakdown implements the User Microservice incrementally across 4 user
 - [x] T008 [P] Create `backend/user-service/src/config/database.js` to initialize MongoDB connection using Mongoose with `atoss_gpt_users` database
 - [x] T009 [P] Create `backend/user-service/src/config/environment.js` to load and validate environment variables (MONGODB_URI, NODE_ENV, PORT, auth settings)
 - [x] T010 [P] Create `backend/user-service/src/models/User.js` with complete Mongoose schema including all 11 fields (id, email, passwordHash, role, department, firstName, lastName, active, lastLogin, createdAt, updatedAt) and 5 indexes per data-model.md
-- [x] T011 [P] Create `backend/user-service/src/utils/constants.js` with enumeration definitions (roles: Staff/Admin, departments: Dept1/Dept2/Dept3, error codes)
+- [x] T011 [P] Create `backend/user-service/src/utils/constants.js` with enumeration definitions (roles: Staff/Admin, departments: Department 1/Department 2/Department 3, error codes)
 - [x] T012 Create `backend/user-service/src/utils/validators.js` with email format validation, enum validation functions per data-model.md validation rules
 - [x] T013 Create `backend/user-service/src/utils/logger.js` with logging utility supporting timestamp, operation type, role, userId, status for audit trail
 - [x] T014 [P] Create `backend/user-service/src/middleware/authMiddleware.js` parsing mock bearer tokens in format `Bearer <role>:<identifier>` and attaching auth data to req.auth
@@ -77,12 +77,12 @@ This task breakdown implements the User Microservice incrementally across 4 user
 
 ### Tasks
 
-- [ ] T018 [P] [US1] Create `backend/user-service/src/services/UserService.js` implementing `createUser(email, password, role, department, firstName, lastName)` with email uniqueness check, password hashing (bcryptjs 10 rounds), UUID v4 ID generation
-- [ ] T019 [US1] Implement `UserService.getUser(userId)` returning user profile or null if not found; automatically filter by active=true (soft-delete semantics)
-- [ ] T020 [P] [US1] Create `backend/user-service/src/controllers/UserController.js` with `create(req, res)` handler: validate input, call UserService.createUser, return 201 with user data or 400/409 with error
-- [ ] T021 [P] [US1] Implement `UserController.get(req, res)` handler: extract userId from URL params, call UserService.getUser, return 200 with user or 404 if not found
-- [ ] T022 [US1] Create `backend/user-service/src/routes/userRoutes.js` defining routes: POST /users → UserController.create, GET /users/{userId} → UserController.get with auth middleware
-- [ ] T023 [US1] Update `backend/user-service/src/index.js` to mount userRoutes at /users path and start Express server listening on port 4001
+- [x] T018 [P] [US1] Create `backend/user-service/src/services/UserService.js` implementing `createUser(email, password, role, department, firstName, lastName)` with email uniqueness check, password hashing (bcryptjs 10 rounds), UUID v4 ID generation
+- [x] T019 [US1] Implement `UserService.getUser(userId)` returning user profile or null if not found; automatically filter by active=true (soft-delete semantics)
+- [x] T020 [P] [US1] Create `backend/user-service/src/controllers/UserController.js` with `create(req, res)` handler: validate input, call UserService.createUser, return 201 with user data or 400/409 with error
+- [x] T021 [P] [US1] Implement `UserController.get(req, res)` handler: extract userId from URL params, call UserService.getUser, return 200 with user or 404 if not found
+- [x] T022 [US1] Create `backend/user-service/src/routes/userRoutes.js` defining routes: POST /users → UserController.create, GET /users/{userId} → UserController.get with auth middleware
+- [x] T023 [US1] Update `backend/user-service/src/index.js` to mount userRoutes at /users path and start Express server listening on port 4001
 - [ ] T024 [US1] Test Phase 3 manually:
   - [ ] Start docker-compose up
   - [ ] POST /users with valid data → verify 201 and user ID returned
@@ -160,7 +160,7 @@ This task breakdown implements the User Microservice incrementally across 4 user
 **Independent Test**:
 1. Create 10 users with mixed roles and departments
 2. Call GET /users?role=Staff → 200 with all Staff users
-3. Call GET /users?department=Dept1 → 200 with all Department 1 users
+3. Call GET /users?department=Department%201 → 200 with all Department 1 users
 4. Call GET /users?limit=5&offset=0 → 200 with pagination metadata (total, limit, offset)
 5. Call GET /users with no params → 200 with all users paginated
 6. Verify soft-deleted users excluded from results
@@ -178,8 +178,8 @@ This task breakdown implements the User Microservice incrementally across 4 user
 - [ ] T040 [US4] Test Phase 6 manually:
   - [ ] POST /users create 10 users with varied roles/departments
   - [ ] GET /users?role=Staff → verify all returned have role=Staff
-  - [ ] GET /users?department=Dept1 → verify all returned have department=Dept1
-  - [ ] GET /users?role=Admin&department=Dept2 → verify AND logic (both conditions)
+  - [ ] GET /users?department=Department%201 → verify all returned have department=Department 1
+  - [ ] GET /users?role=Admin&department=Department%202 → verify AND logic (both conditions)
   - [ ] GET /users?limit=5&offset=5 → verify pagination works
   - [ ] DELETE one user, GET /users → verify deleted user not in results
   - [ ] GET /users with no params → verify paginated response with total count
@@ -368,7 +368,7 @@ Use this checklist to track progress:
 
 | Metric | Value |
 |--------|-------|
-| **Total Tasks** | 31 tasks |
+| **Total Tasks** | 47 tasks |
 | **Phase 1 (Setup)** | 7 tasks |
 | **Phase 2 (Foundation)** | 10 tasks |
 | **Phase 3 (US1 - MVP)** | 7 tasks |

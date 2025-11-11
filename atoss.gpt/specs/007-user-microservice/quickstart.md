@@ -92,17 +92,25 @@ Expected output (once Mongo is reachable):
 ### Test 1: Create User
 
 ```bash
-curl -X POST http://localhost:4001/users \
-  -H "Authorization: Bearer admin:admin123" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "john@example.com",
-    "password": "securePass123!",
-    "role": "Staff",
-    "department": "Department 1",
-    "firstName": "John",
-    "lastName": "Doe"
-  }'
+# Health check
+Invoke-RestMethod http://localhost:4001/health
+
+# Create user (201)
+$headers = @{ "Authorization" = "Bearer Admin:admin123"; "Content-Type" = "application/json" }
+$body = @{
+  email = "john@example.com"
+  password = "securePass123!"
+  role = "Staff"
+  department = "Department 1"
+  firstName = "John"
+  lastName = "Doe"
+} | ConvertTo-Json
+$create = Invoke-RestMethod -Method POST -Uri "http://localhost:4001/users" -Headers $headers -Body $body
+$create
+
+# Get user (200)
+$uid = $create.data.id
+Invoke-RestMethod -Method GET -Uri "http://localhost:4001/users/$uid" -Headers @{ "Authorization" = "Bearer Admin:admin123" }
 ```
 
 Expected: HTTP 201, user object with id
