@@ -17,4 +17,7 @@ router.put('/:userId', authMiddleware, validateUpdateUserRequest, UserController
 // DELETE /users/:userId - soft delete user (admin only)
 router.delete('/:userId', authMiddleware, UserController.delete);
 
+// GET /users - list users with optional filters and pagination
+router.get('/', authMiddleware, UserController.list);
+
 export default router;

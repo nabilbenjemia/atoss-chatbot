@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import User from '../models/User.js';
 import { ERROR_CODES, ROLES } from '../utils/constants.js';
+import { logCRUDOperation, logDatabaseError } from '../utils/logger.js';
 
 /**
  * User Service - business logic for user profile CRUD operations (US1 scope)
@@ -19,6 +20,7 @@ class UserService {
      * @returns {Promise<Object>} Created user (without passwordHash)
      */
     static async createUser({ email, password, role, department, firstName, lastName }) {
+        const start = Date.now();
         // Normalize email
         const normalizedEmail = email.toLowerCase();
 
@@ -33,18 +35,23 @@ class UserService {
 
         const passwordHash = await bcrypt.hash(password, 10); // 10 salt rounds per spec
 
-        const user = await User.create({
-            id: uuidv4(),
-            email: normalizedEmail,
-            passwordHash,
-            role,
-            department,
-            firstName,
-            lastName,
-            active: true,
-        });
-
-        return user.toJSON();
+        try {
+            const user = await User.create({
+                id: uuidv4(),
+                email: normalizedEmail,
+                passwordHash,
+                role,
+                department,
+                firstName,
+                lastName,
+                active: true,
+            });
+            logCRUDOperation('createUser', role, null, user.id, 'success', null, Date.now() - start);
+            return user.toJSON();
+        } catch (e) {
+            logDatabaseError('createUser', e);
+            throw e;
+        }
     }
 
     /**
@@ -54,9 +61,19 @@ class UserService {
      */
     static async getUser(userId) {
         if (!userId) return null;
-        const user = await User.findOne({ id: userId, active: true });
-        if (!user) return null;
-        return user.toJSON();
+        const start = Date.now();
+        try {
+            const user = await User.findOne({ id: userId, active: true });
+            if (!user) {
+                logCRUDOperation('getUser', null, null, userId, 'not_found', null, Date.now() - start);
+                return null;
+            }
+            logCRUDOperation('getUser', null, null, userId, 'success', null, Date.now() - start);
+            return user.toJSON();
+        } catch (e) {
+            logDatabaseError('getUser', e);
+            throw e;
+        }
     }
 
     /**
@@ -83,12 +100,14 @@ class UserService {
      * @returns {Promise<Object>} Updated user JSON
      */
     static async updateUser(userId, updateData = {}, authRole, authIdentifier) {
+        const start = Date.now();
         // Fetch existing active user
         const user = await User.findOne({ id: userId, active: true });
         if (!user) {
             const err = new Error('User not found');
             err.statusCode = 404;
             err.code = ERROR_CODES.USER_NOT_FOUND;
+            logCRUDOperation('updateUser', authRole, authIdentifier, userId, 'not_found', err.message, Date.now() - start);
             throw err;
         }
 
@@ -120,8 +139,14 @@ class UserService {
             }
         }
 
-        await user.save();
-        return user.toJSON();
+        try {
+            await user.save();
+            logCRUDOperation('updateUser', authRole, authIdentifier, userId, 'success', null, Date.now() - start);
+            return user.toJSON();
+        } catch (e) {
+            logDatabaseError('updateUser', e);
+            throw e;
+        }
     }
 
     /**
@@ -140,11 +165,13 @@ class UserService {
      * @returns {Promise<void>}
      */
     static async softDeleteUser(userId, authRole) {
+        const start = Date.now();
         const user = await User.findOne({ id: userId, active: true });
         if (!user) {
             const err = new Error('User not found');
             err.statusCode = 404;
             err.code = ERROR_CODES.USER_NOT_FOUND;
+            logCRUDOperation('softDeleteUser', authRole, null, userId, 'not_found', err.message, Date.now() - start);
             throw err;
         }
 
@@ -155,8 +182,42 @@ class UserService {
             throw err;
         }
 
-        user.active = false;
-        await user.save();
+        try {
+            user.active = false;
+            await user.save();
+            logCRUDOperation('softDeleteUser', authRole, null, userId, 'success', null, Date.now() - start);
+        } catch (e) {
+            logDatabaseError('softDeleteUser', e);
+            throw e;
+        }
+    }
+
+    /**
+     * List users with optional filters and pagination
+     * @param {Object} filters {role, department}
+     * @param {Object} pagination {limit, offset}
+     * @returns {Promise<{users: Object[], total:number, limit:number, offset:number}>}
+     */
+    static async listUsers(filters = {}, pagination = {}) {
+        const start = Date.now();
+        const { role, department } = filters;
+        let { limit = 50, offset = 0 } = pagination;
+        limit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100); // clamp 1..100
+        offset = Math.max(parseInt(offset, 10) || 0, 0);
+
+        const query = { active: true };
+        if (role) query.role = role;
+        if (department) query.department = department;
+
+        try {
+            const total = await User.countDocuments(query);
+            const users = await User.find(query).skip(offset).limit(limit).sort({ createdAt: -1 });
+            logCRUDOperation('listUsers', null, null, null, 'success', null, Date.now() - start);
+            return { users: users.map(u => u.toJSON()), total, limit, offset };
+        } catch (e) {
+            logDatabaseError('listUsers', e);
+            throw e;
+        }
     }
 
 

@@ -171,10 +171,10 @@ This task breakdown implements the User Microservice incrementally across 4 user
 
 ### Tasks
 
-- [ ] T036 [P] [US4] Implement `UserService.listUsers(filters, pagination)` accepting {role, department} filters and {limit, offset} pagination; always filter active=true; return {users: [], total, limit, offset}
-- [ ] T037 [US4] Implement filtering logic: build MongoDB query with $and conditions for optional role/department filters and active=true
-- [ ] T038 [P] [US4] Implement `UserController.list(req, res)` handler: extract query params (role, department, limit, offset), validate pagination params, call UserService.listUsers, return 200 with results or 400 for invalid params
-- [ ] T039 [US4] Update `backend/user-service/src/routes/userRoutes.js` adding route: GET /users → authMiddleware → UserController.list
+- [x] T036 [P] [US4] Implement `UserService.listUsers(filters, pagination)` accepting {role, department} filters and {limit, offset} pagination; always filter active=true; return {users: [], total, limit, offset}
+- [x] T037 [US4] Implement filtering logic: build MongoDB query with $and conditions for optional role/department filters and active=true
+- [x] T038 [P] [US4] Implement `UserController.list(req, res)` handler: extract query params (role, department, limit, offset), validate pagination params, call UserService.listUsers, return 200 with results or 400 for invalid params
+- [x] T039 [US4] Update `backend/user-service/src/routes/userRoutes.js` adding route: GET /users → authMiddleware → UserController.list
 - [ ] T040 [US4] Test Phase 6 manually:
   - [ ] POST /users create 10 users with varied roles/departments
   - [ ] GET /users?role=Staff → verify all returned have role=Staff
@@ -195,8 +195,8 @@ This task breakdown implements the User Microservice incrementally across 4 user
 
 ### Tasks
 
-- [ ] T041 [P] Enhance `backend/user-service/src/utils/logger.js` to log all CRUD operations: createUser, getUser, updateUser, softDeleteUser, listUsers with format {timestamp, operation, role, userId, targetUserId, status, error}
-- [ ] T042 Integrate logging into `UserService.js`: add logger calls in createUser, getUser, updateUser, softDeleteUser, listUsers methods
+- [x] T041 [P] Enhance `backend/user-service/src/utils/logger.js` to log all CRUD operations: createUser, getUser, updateUser, softDeleteUser, listUsers with format {timestamp, operation, role, userId, targetUserId, status, error}
+- [x] T042 Integrate logging into `UserService.js`: add logger calls in createUser, getUser, updateUser, softDeleteUser, listUsers methods
 - [ ] T043 [P] Create `tests/postman/User-Microservice.postman_collection.json` with 10+ pre-built requests covering all CRUD operations (auth headers with mock tokens, example payloads)
 - [ ] T044 Create `backend/user-service/README.md` documenting: setup instructions, environment config, running locally, testing with Postman, mock auth token format, troubleshooting
 - [ ] T045 [P] Validate `docker-compose.yml`: test docker-compose up -d, verify all services start, verify user-service connects to MongoDB, verify GET /users returns 200

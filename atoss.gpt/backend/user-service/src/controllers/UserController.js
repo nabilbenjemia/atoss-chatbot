@@ -62,6 +62,19 @@ class UserController {
             return next(err);
         }
     }
+
+    static async list(req, res, next) {
+        try {
+            const { role, department, limit, offset } = req.query;
+            const result = await UserService.listUsers(
+                { role, department },
+                { limit, offset }
+            );
+            return res.status(HTTP_STATUS.OK).json({ success: true, data: result });
+        } catch (err) {
+            return next(err);
+        }
+    }
 }
 
 export default UserController;
