@@ -197,8 +197,8 @@ This task breakdown implements the User Microservice incrementally across 4 user
 
 - [x] T041 [P] Enhance `backend/user-service/src/utils/logger.js` to log all CRUD operations: createUser, getUser, updateUser, softDeleteUser, listUsers with format {timestamp, operation, role, userId, targetUserId, status, error}
 - [x] T042 Integrate logging into `UserService.js`: add logger calls in createUser, getUser, updateUser, softDeleteUser, listUsers methods
-- [ ] T043 [P] Create `tests/postman/User-Microservice.postman_collection.json` with 10+ pre-built requests covering all CRUD operations (auth headers with mock tokens, example payloads)
-- [ ] T044 Create `backend/user-service/README.md` documenting: setup instructions, environment config, running locally, testing with Postman, mock auth token format, troubleshooting
+- [x] T043 [P] Create `tests/postman/User-Microservice.postman_collection.json` with 10+ pre-built requests covering all CRUD operations (auth headers with mock tokens, example payloads)
+- [x] T044 Create `backend/user-service/README.md` documenting: setup instructions, environment config, running locally, testing with Postman, mock auth token format, troubleshooting
 - [ ] T045 [P] Validate `docker-compose.yml`: test docker-compose up -d, verify all services start, verify user-service connects to MongoDB, verify GET /users returns 200
 - [ ] T046 Create `.specify/memory/007-implementation-notes.md` documenting implementation decisions, known issues, future extensions (JWT integration, permission matrix, hard-delete recovery)
 - [ ] T047 Run final quality checklist per `specs/007-user-microservice/checklists/requirements.md`
