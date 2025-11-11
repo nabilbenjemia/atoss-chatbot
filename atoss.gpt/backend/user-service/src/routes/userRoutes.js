@@ -1,6 +1,6 @@
 import express from 'express';
 import authMiddleware from '../middleware/authMiddleware.js';
-import { validateCreateUserRequest } from '../middleware/validationMiddleware.js';
+import { validateCreateUserRequest, validateUpdateUserRequest } from '../middleware/validationMiddleware.js';
 import UserController from '../controllers/UserController.js';
 
 const router = express.Router();
@@ -10,5 +10,11 @@ router.post('/', authMiddleware, validateCreateUserRequest, UserController.creat
 
 // GET /users/:userId - get user by UUID (requires auth)
 router.get('/:userId', authMiddleware, UserController.get);
+
+// PUT /users/:userId - update user (auth: Admin any user, Staff self-only)
+router.put('/:userId', authMiddleware, validateUpdateUserRequest, UserController.update);
+
+// DELETE /users/:userId - soft delete user (admin only)
+router.delete('/:userId', authMiddleware, UserController.delete);
 
 export default router;

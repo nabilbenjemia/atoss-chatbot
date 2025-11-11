@@ -109,10 +109,10 @@ This task breakdown implements the User Microservice incrementally across 4 user
 
 ### Tasks
 
-- [ ] T025 [P] [US2] Implement `UserService.updateUser(userId, updateData, authRole)` with authorization checks: admin can update any user, staff can only update self; validate email uniqueness excluding current user; apply updates; return updated user
-- [ ] T026 [US2] Implement `UserService.authorizeUpdate(userId, authRole)` helper function checking if role permits update (admin: all, staff: self-only)
-- [ ] T027 [P] [US2] Implement `UserController.update(req, res)` handler: extract userId and auth from request, call UserService.updateUser, return 200 with updated user or 400/403/404/409 with appropriate error
-- [ ] T028 [US2] Update `backend/user-service/src/routes/userRoutes.js` adding route: PUT /users/{userId} → authMiddleware → UserController.update
+- [x] T025 [P] [US2] Implement `UserService.updateUser(userId, updateData, authRole)` with authorization checks: admin can update any user, staff can only update self; validate email uniqueness excluding current user; apply updates; return updated user
+- [x] T026 [US2] Implement `UserService.authorizeUpdate(userId, authRole)` helper function checking if role permits update (admin: all, staff: self-only)
+- [x] T027 [P] [US2] Implement `UserController.update(req, res)` handler: extract userId and auth from request, call UserService.updateUser, return 200 with updated user or 400/403/404/409 with appropriate error
+- [x] T028 [US2] Update `backend/user-service/src/routes/userRoutes.js` adding route: PUT /users/{userId} → authMiddleware → UserController.update
 - [ ] T029 [US2] Test Phase 4 manually:
   - [ ] PUT /users/{userId} with admin token → verify 200 and fields updated
   - [ ] PUT /users/{userId} partial update (only role field) → verify 200 and other fields unchanged
@@ -139,10 +139,10 @@ This task breakdown implements the User Microservice incrementally across 4 user
 
 ### Tasks
 
-- [ ] T030 [P] [US3] Implement `UserService.softDeleteUser(userId, authRole)` with authorization checks (admin-only); set active=false; return 204 success or 403/404 error
-- [ ] T031 [US3] Implement `UserService.authorizeSoftDelete(userId, authRole)` helper checking if role permits delete (admin-only)
-- [ ] T032 [P] [US3] Implement `UserController.delete(req, res)` handler: extract userId and auth, call UserService.softDeleteUser, return 204 No Content or 403/404 error
-- [ ] T033 [US3] Update `backend/user-service/src/routes/userRoutes.js` adding route: DELETE /users/{userId} → authMiddleware → UserController.delete
+- [x] T030 [P] [US3] Implement `UserService.softDeleteUser(userId, authRole)` with authorization checks (admin-only); set active=false; return 204 success or 403/404 error
+- [x] T031 [US3] Implement `UserService.authorizeSoftDelete(userId, authRole)` helper checking if role permits delete (admin-only)
+- [x] T032 [P] [US3] Implement `UserController.delete(req, res)` handler: extract userId and auth, call UserService.softDeleteUser, return 204 No Content or 403/404 error
+- [x] T033 [US3] Update `backend/user-service/src/routes/userRoutes.js` adding route: DELETE /users/{userId} → authMiddleware → UserController.delete
 - [ ] T034 [US3] Update `UserController.get` to verify active=true before returning (T024 already filters, verify still works after soft-deletes)
 - [ ] T035 [US3] Test Phase 5 manually:
   - [ ] DELETE /users/{userId} with admin token → verify 204 No Content

@@ -38,6 +38,30 @@ class UserController {
             return next(err);
         }
     }
+
+    static async update(req, res, next) {
+        try {
+            const { userId } = req.params;
+            const authRole = req?.auth?.role;
+            const authIdentifier = req?.auth?.identifier; // mock assumption: identifier === userId for staff self-update
+            const updateData = req.body || {};
+            const updated = await UserService.updateUser(userId, updateData, authRole, authIdentifier);
+            return res.status(HTTP_STATUS.OK).json({ success: true, data: updated });
+        } catch (err) {
+            return next(err);
+        }
+    }
+
+    static async delete(req, res, next) {
+        try {
+            const { userId } = req.params;
+            const authRole = req?.auth?.role;
+            await UserService.softDeleteUser(userId, authRole);
+            return res.status(HTTP_STATUS.NO_CONTENT).send();
+        } catch (err) {
+            return next(err);
+        }
+    }
 }
 
 export default UserController;

@@ -89,14 +89,16 @@ Expected output (once Mongo is reachable):
 
 ## Testing (10 minutes)
 
-### Test 1: Create User
+### Test 1: Create User (PowerShell)
 
-```bash
+```powershell
 # Health check
-Invoke-RestMethod http://localhost:4001/health
+Invoke-RestMethod -Uri "http://localhost:4001/health" -Method GET
+
+$base = 'http://localhost:4001'
+$adminHeaders = @{ Authorization = 'Bearer Admin:admin123'; 'Content-Type' = 'application/json' }
 
 # Create user (201)
-$headers = @{ "Authorization" = "Bearer Admin:admin123"; "Content-Type" = "application/json" }
 $body = @{
   email = "john@example.com"
   password = "securePass123!"
@@ -105,88 +107,155 @@ $body = @{
   firstName = "John"
   lastName = "Doe"
 } | ConvertTo-Json
-$create = Invoke-RestMethod -Method POST -Uri "http://localhost:4001/users" -Headers $headers -Body $body
-$create
+$create = Invoke-RestMethod -Method POST -Uri "$base/users" -Headers $adminHeaders -Body $body
+$create | Format-List
 
 # Get user (200)
 $uid = $create.data.id
-Invoke-RestMethod -Method GET -Uri "http://localhost:4001/users/$uid" -Headers @{ "Authorization" = "Bearer Admin:admin123" }
+Invoke-RestMethod -Method GET -Uri "$base/users/$uid" -Headers @{ Authorization = 'Bearer Admin:admin123' }
 ```
 
-Expected: HTTP 201, user object with id
+### Test 1b: Duplicate Email → Expect 409 (PowerShell)
 
-### Test 2: Get User
+```powershell
+$base = 'http://localhost:4001'
+$headers = @{ Authorization = 'Bearer Admin:admin123'; 'Content-Type' = 'application/json' }
+$email = "dup_test_$([int](Get-Date -UFormat %s))@example.com"
+$payload = @{
+  email = $email
+  password = "Passw0rd!"
+  role = "Staff"
+  department = "Department 1"
+  firstName = "Dup"
+  lastName = "Test"
+} | ConvertTo-Json -Depth 10
 
-```bash
-# Replace {userId} with ID from previous response
-curl -X GET http://localhost:4001/users/{userId} \
-  -H "Authorization: Bearer admin:admin123"
+Write-Host "Creating first user: $email"
+try {
+  $created = Invoke-RestMethod -Method POST -Uri "$base/users" -Headers $headers -Body $payload -ErrorAction Stop
+  Write-Host "Create 1: OK (201). id=$($created.data.id)"
+} catch {
+  $resp = $_.Exception.Response
+  if ($resp) { Write-Host "Create 1 failed with status:" $resp.StatusCode.value__ } else { Write-Host "Create 1 error:" $_; exit 1 }
+  exit 1
+}
+
+Write-Host "Attempting duplicate create (expect 409)"
+try {
+  Invoke-RestMethod -Method POST -Uri "$base/users" -Headers $headers -Body $payload -ErrorAction Stop
+  Write-Host "FAIL: Duplicate was created unexpectedly."
+  exit 1
+} catch {
+  $resp = $_.Exception.Response
+  if (-not $resp) { Write-Host "FAIL: No HTTP response (network error)"; exit 1 }
+  $status = $resp.StatusCode.value__
+  if ($status -eq 409) { Write-Host "PASS: Duplicate create returned 409 Conflict"; exit 0 }
+  else { Write-Host "FAIL: Expected 409 but got $status"; exit 1 }
+}
+```
+
+
+
+### Test 2: Get User (PowerShell)
+
+```powershell
+$base = 'http://localhost:4001'
+$uid = '<replace-with-userId>'
+Invoke-RestMethod -Method GET -Uri "$base/users/$uid" -Headers @{ Authorization = 'Bearer Admin:admin123' }
 ```
 
 Expected: HTTP 200, same user data
 
-### Test 3: List Users
+### Test 3: List Users (PowerShell)
 
-```bash
-curl -X GET "http://localhost:4001/users?role=Staff" \
-  -H "Authorization: Bearer admin:admin123"
+```powershell
+$base = 'http://localhost:4001'
+Invoke-RestMethod -Method GET -Uri "$base/users?role=Staff" -Headers @{ Authorization = 'Bearer Admin:admin123' }
 ```
 
 Expected: HTTP 200, array with user(s)
 
-### Test 4: Update User
+### Test 4: Update User (PowerShell)
 
-```bash
-curl -X PUT http://localhost:4001/users/{userId} \
-  -H "Authorization: Bearer admin:admin123" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "firstName": "Jonathan"
-  }'
+```powershell
+$base = 'http://localhost:4001'
+$uid = 'fea307de-f6b0-46e4-a06a-8c5ab77ece77'
+$headers = @{ Authorization = 'Bearer Admin:admin123'; 'Content-Type' = 'application/json' }
+$update = @{ firstName = 'Jonathan' } | ConvertTo-Json
+Invoke-RestMethod -Method PUT -Uri "$base/users/$uid" -Headers $headers -Body $update
+
+# Staff attempting to update another user → 403
+$staffHeaders = @{ Authorization = 'Bearer Staff:someoneelse'; 'Content-Type' = 'application/json' }
+try {
+  Invoke-RestMethod -Method PUT -Uri "$base/users/$uid" -Headers $staffHeaders -Body $update -ErrorAction Stop
+  Write-Host 'FAIL: Staff updated another user unexpectedly.'; exit 1
+} catch {
+  $status = $_.Exception.Response.StatusCode.value__
+  if ($status -eq 403) { Write-Host 'PASS: Forbidden (403) for staff updating another user.' } else { Write-Host "FAIL: Expected 403 got $status"; exit 1 }
+}
 ```
 
-Expected: HTTP 200, updated user data
+Expected: HTTP 200 for admin update; 403 for staff unauthorized update
 
-### Test 5: Delete User (Soft-Delete)
+### Test 5: Delete User (Soft-Delete, PowerShell)
 
-```bash
-curl -X DELETE http://localhost:4001/users/{userId} \
-  -H "Authorization: Bearer admin:admin123"
+```powershell
+$base = 'http://localhost:4001'
+$uid = 'fea307de-f6b0-46e4-a06a-8c5ab77ece77'
+
+# Use Invoke-WebRequest to inspect status code 204
+$resp = Invoke-WebRequest -Method DELETE -Uri "$base/users/$uid" -Headers @{ Authorization = 'Bearer Admin:admin123' } -ErrorAction Stop
+if ($resp.StatusCode -eq 204) { Write-Host 'PASS: Delete returned 204 No Content' } else { Write-Host "FAIL: Expected 204 got $($resp.StatusCode)"; exit 1 }
+
+# Staff attempting delete → 403
+try {
+  Invoke-WebRequest -Method DELETE -Uri "$base/users/$uid" -Headers @{ Authorization = 'Bearer Staff:$uid' } -ErrorAction Stop | Out-Null
+  Write-Host 'FAIL: Staff deleted user unexpectedly.'; exit 1
+} catch {
+  $status = $_.Exception.Response.StatusCode.value__
+  if ($status -eq 403) { Write-Host 'PASS: Forbidden (403) for staff delete.' } else { Write-Host "FAIL: Expected 403 got $status"; exit 1 }
+}
 ```
 
-Expected: HTTP 204 No Content
+### Test 6: Verify Deletion (PowerShell)
 
-### Test 6: Verify Deletion
-
-```bash
-curl -X GET http://localhost:4001/users/{userId} \
-  -H "Authorization: Bearer admin:admin123"
+```powershell
+$base = 'http://localhost:4001'
+$uid = '<replace-with-userId>'
+try {
+  Invoke-RestMethod -Method GET -Uri "$base/users/$uid" -Headers @{ Authorization = 'Bearer Admin:admin123' } -ErrorAction Stop | Out-Null
+  Write-Host 'FAIL: Expected 404 after soft-delete but got 200'; exit 1
+} catch {
+  $status = $_.Exception.Response.StatusCode.value__
+  if ($status -eq 404) { Write-Host 'PASS: GET after delete returned 404 Not Found' } else { Write-Host "FAIL: Expected 404 got $status"; exit 1 }
+}
 ```
-
-Expected: HTTP 404 (user now inactive)
 
 ## Mock Auth Testing
 
-### Test Without Auth
+### Test Without Auth (PowerShell)
 
-```bash
-curl -X GET http://localhost:4001/users
-# Returns: 401 ERR_UNAUTHORIZED
+```powershell
+try {
+  Invoke-RestMethod -Method GET -Uri 'http://localhost:4001/users' -ErrorAction Stop | Out-Null
+  Write-Host 'FAIL: Expected 401 without auth'
+} catch {
+  $status = $_.Exception.Response.StatusCode.value__
+  if ($status -eq 401) { Write-Host 'PASS: 401 without auth' } else { Write-Host "FAIL: Expected 401 got $status" }
+}
 ```
 
-### Test with Different Roles
+### Test with Different Roles (PowerShell)
 
-```bash
+```powershell
 # Admin
-curl -X GET http://localhost:4001/users \
-  -H "Authorization: Bearer admin:admin123"
+Invoke-RestMethod -Method GET -Uri 'http://localhost:4001/users' -Headers @{ Authorization = 'Bearer Admin:admin123' }
 
 # Staff
-curl -X GET http://localhost:4001/users \
-  -H "Authorization: Bearer staff:user456"
+Invoke-RestMethod -Method GET -Uri 'http://localhost:4001/users' -Headers @{ Authorization = 'Bearer Staff:user456' }
 ```
 
-Both return users (authorization details deferred to implementation phase).
+Both should return data (list endpoint may require implementation in US4 phase).
 
 ## Mock Frontend Testing
 
@@ -382,22 +451,22 @@ docker compose up -d mongodb
 4. → Review `contracts/` for API specifications
 5. → Follow `tasks.md` for implementation phases
 
-## Performance Baselines
+### Performance Baselines
 
-Monitor locally:
+Monitor locally (PowerShell approximate):
 
-```bash
-# Response time for create
-time curl -X POST http://localhost:4001/users \
-  -H "Authorization: Bearer admin:admin123" \
-  -H "Content-Type: application/json" \
-  -d '...'
-# Target: < 2 seconds
+```powershell
+$base = 'http://localhost:4001'
+$headers = @{ Authorization = 'Bearer Admin:admin123'; 'Content-Type' = 'application/json' }
 
-# Response time for list (1000 users)
-time curl -X GET "http://localhost:4001/users?limit=100" \
-  -H "Authorization: Bearer admin:admin123"
-# Target: < 500ms
+$payload = @{ email='perf@example.com'; password='PerfPass123!'; role='Staff'; department='Department 1'; firstName='Perf'; lastName='Test' } | ConvertTo-Json
+$sw = [System.Diagnostics.Stopwatch]::StartNew()
+Invoke-RestMethod -Method POST -Uri "$base/users" -Headers $headers -Body $payload | Out-Null
+$sw.Stop(); Write-Host "Create time: $($sw.ElapsedMilliseconds) ms (target < 2000 ms)"
+
+$sw.Reset(); $sw.Start()
+Invoke-RestMethod -Method GET -Uri "$base/users?limit=100" -Headers @{ Authorization = 'Bearer Admin:admin123' } | Out-Null
+$sw.Stop(); Write-Host "List time: $($sw.ElapsedMilliseconds) ms (target < 500 ms)"
 ```
 
 ## Resources
