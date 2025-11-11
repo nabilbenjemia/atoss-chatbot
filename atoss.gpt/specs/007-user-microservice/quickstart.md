@@ -6,9 +6,9 @@
 
 ## Prerequisites
 
-- Node.js 18.x or later
+- Node.js 20.x LTS or later (local dev; container runs Node 20 even if host uses 25)
 - npm 9.x or later  
-- Docker & Docker Compose (for MongoDB)
+- Docker Desktop & Docker Compose (for MongoDB + service)
 - Git (for version control)
 - Postman (for API testing, optional)
 
@@ -21,11 +21,16 @@ cd /path/to/atoss.gpt
 git checkout feature/007-user-microservice
 ```
 
-### 2. Install Dependencies
+### 2. Install Dependencies (Local Dev)
 
-```bash
+```powershell
 cd backend/user-service
 npm install
+```
+
+For reproducible CI builds use:
+```powershell
+npm ci
 ```
 
 ### 3. Environment Configuration
@@ -49,27 +54,37 @@ LOG_LEVEL=debug
 
 ### 4. Start Services (Docker)
 
-```bash
+Ensure Docker Desktop is running first.
+
+```powershell
 # From repository root
 cd /path/to/atoss.gpt
-docker-compose up -d
+docker compose up -d mongodb
+
+# (Optional) build user-service image explicitly
+docker build -t atoss-user-service ./backend/user-service
+
+# Start user-service (will rebuild with dev deps via build args)
+docker compose up -d user-service
 
 # Verify MongoDB is running
-docker ps | grep mongodb
+docker ps --format "table {{.Names}}\t{{.Status}}" | findstr atoss_gpt_mongodb
 ```
 
-### 5. Start User Service
+Image tag change note: switched from `mongo:6.0-alpine` (no longer published) to `mongo:6.0`.
 
-```bash
+### 5. Start User Service (Alternative Local Mode)
+
+If you prefer not to use Docker for the service (only Mongo in container):
+```powershell
 cd backend/user-service
 npm run dev
 ```
 
-Expected output:
+Expected output (once Mongo is reachable):
 ```
-✓ Database connected to mongodb://localhost:27017/atoss_gpt_users
-✓ Server running on http://localhost:4001
-✓ Ready for requests
+[SUCCESS] MongoDB connected: atoss_gpt_users
+[SUCCESS] User Service running on http://localhost:4001
 ```
 
 ## Testing (10 minutes)
@@ -316,25 +331,22 @@ backend/user-service/
 
 ### Port Already in Use
 
-```bash
-# Find process using port 4001
-lsof -i :4001
-
-# Kill process
-kill -9 <PID>
+```powershell
+netstat -ano | findstr :4001
+taskkill /PID <PID> /F
 ```
 
 ### MongoDB Connection Failed
 
-```bash
+```powershell
 # Check if MongoDB container is running
-docker ps | grep mongodb
+docker ps --format "table {{.Names}}\t{{.Status}}" | findstr atoss_gpt_mongodb
 
 # Restart MongoDB
-docker-compose restart mongodb
+docker compose restart mongodb
 
 # Check logs
-docker-compose logs mongodb
+docker compose logs -f mongodb
 ```
 
 ### Invalid Token Error
@@ -349,9 +361,9 @@ Authorization: Bearer admin:admin123
 ### Database Empty
 
 Reset database:
-```bash
-docker-compose down -v
-docker-compose up -d mongodb
+```powershell
+docker compose down -v
+docker compose up -d mongodb
 ```
 
 ## Next Steps

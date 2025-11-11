@@ -1,0 +1,32 @@
+# Dependency directories
+node_modules
+
+# Logs
+*.log
+logs/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Git & VCS
+.git
+.gitignore
+
+# OS / editor artifacts
+.DS_Store
+Thumbs.db
+.vscode
+
+# Test output / coverage
+coverage
+
+# npm cache / debug
+npm-debug.log*
+
+# Docker specific
+Dockerfile*
+
+# Build artifacts (if any later)
+dist

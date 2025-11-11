@@ -32,10 +32,8 @@ const connectDB = async () => {
         const mongoURI = `${MONGODB_URI}/${MONGODB_DB}`;
         console.log(`[INFO] Connecting to MongoDB: ${mongoURI}`);
 
-        await mongoose.connect(mongoURI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        });
+        // Mongoose 8+: no need for useNewUrlParser/useUnifiedTopology
+        await mongoose.connect(mongoURI);
 
         console.log(`[SUCCESS] MongoDB connected: ${MONGODB_DB}`);
     } catch (error) {

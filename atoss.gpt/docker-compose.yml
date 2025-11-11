@@ -1,9 +1,7 @@
-version: '3.9'
-
 services:
   # MongoDB Database
   mongodb:
-    image: mongo:6.0-alpine
+    image: mongo:6.0
     container_name: atoss_gpt_mongodb
     ports:
       - "27017:27017"
@@ -27,6 +25,11 @@ services:
     build:
       context: ./backend/user-service
       dockerfile: Dockerfile
+      args:
+        # Include devDependencies (nodemon) for compose-based dev runs
+        INSTALL_DEV: "true"
+        # Pin Node LTS inside container regardless of host version
+        NODE_VERSION: 20-alpine
     container_name: atoss_user_service
     ports:
       - "4001:4001"
