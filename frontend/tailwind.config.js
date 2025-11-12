@@ -76,6 +76,15 @@ export default {
           "grey-9": "#FBF9FA",
         },
       },
+
+      fontFamily: {
+        inter: ['Inter', 'sans-serif'],
+        jakarta: ['"Plus Jakarta Sans"', 'sans-serif'],
+        opensans: ['"Open Sans"', 'sans-serif'],
+        vendsans: ['"Vend Sans"', 'sans-serif'],
+        notosans: ['"Noto Sans"', 'sans-serif'],
+        montserrat: ['Montserrat', 'sans-serif'],
+      },
     },
   },
   plugins: [],
