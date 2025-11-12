@@ -16,8 +16,14 @@ export default function LoginPage() {
 
   const validate = () => {
     const next = {};
-    if (!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) next.email = "Enter a valid email.";
-    if (form.password.length < 6) next.password = "At least 6 characters.";
+    if (!form.email || !form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      next.email = "Enter a valid email.";
+    } else if (!form.email.endsWith("@tum.de") && !form.email.endsWith("@mytum.de")) {
+      next.email = "Please use your TUM email address (@tum.de or @mytum.de).";
+    }
+    if (!form.password || form.password.length < 6) {
+      next.password = "At least 6 characters.";
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -32,7 +38,7 @@ export default function LoginPage() {
       setLoading(true);
       await new Promise((r) => setTimeout(r, 700));
 
-      const ok = form.email.endsWith("@tum.de");
+      const ok = form.email.endsWith("@tum.de") || form.email.endsWith("@mytum.de");
       if (ok) {
         setStatus({ type: "success", message: "Login successful. Welcome to the TUM Klinikum chatbot." });
       } else {
@@ -90,7 +96,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} noValidate className="space-y-5">
             <div>
               <label className="mb-1 block text-sm font-medium text-tum-grey-3">Email</label>
               <input
