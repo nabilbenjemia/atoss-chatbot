@@ -1,7 +1,11 @@
+import { useRef } from 'react'
 import Sidebar from '../components/Sidebar'
 import MessageInput from '../components/MessageInput'
+import Conversation from '../components/Conversation'
 
 export default function ChatbotLayout() {
+    const conversationRef = useRef(null);
+
     const handleSendMessage = (messageText) => {
         if (conversationRef.current) {
             conversationRef.current.addMessage(messageText);
@@ -12,6 +16,7 @@ export default function ChatbotLayout() {
         <div className="flex h-screen">
             <Sidebar />  
             <div className="flex flex-col flex-1 overflow-hidden">
+                <Conversation ref={conversationRef} />
                 <MessageInput onSendMessage={handleSendMessage} />
             </div>
         </div>
