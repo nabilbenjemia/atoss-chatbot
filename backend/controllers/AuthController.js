@@ -152,6 +152,64 @@ class AuthController {
 			});
 		}
 	}
+
+	/**
+	 * Handle email verification request
+	 * POST /auth/verify-email
+	 */
+	async verifyEmail(req, res) {
+		try {
+			const { token } = req.body;
+
+			if (!token) {
+				return res.status(400).json({
+					success: false,
+					message: 'Verification token is required'
+				});
+			}
+
+			const result = await authService.verifyEmail(token);
+
+			res.status(200).json({
+				success: true,
+				message: result.message || 'Email verified successfully'
+			});
+		} catch (error) {
+			res.status(400).json({
+				success: false,
+				message: error.message || 'Email verification failed'
+			});
+		}
+	}
+
+	/**
+	 * Handle resend verification email request
+	 * POST /auth/resend-verification
+	 */
+	async resendVerificationEmail(req, res) {
+		try {
+			const { email } = req.body;
+
+			if (!email) {
+				return res.status(400).json({
+					success: false,
+					message: 'Email is required'
+				});
+			}
+
+			const result = await authService.resendVerificationEmail(email);
+
+			res.status(200).json({
+				success: true,
+				message: result.message || 'Verification email sent successfully'
+			});
+		} catch (error) {
+			res.status(400).json({
+				success: false,
+				message: error.message || 'Failed to send verification email'
+			});
+		}
+	}
 }
 
 module.exports = new AuthController();
