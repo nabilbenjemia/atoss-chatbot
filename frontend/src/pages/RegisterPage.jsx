@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { authAPI } from "../services/api";
+import { validateTUMEmail, validatePassword, validatePasswordConfirmation } from "../utils/validation";
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ 
@@ -26,20 +27,31 @@ export default function RegisterPage() {
 
   const validate = () => {
     const next = {};
-    if (!form.email || !form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      next.email = "Enter a valid email.";
-    } else if (!form.email.endsWith("@tum.de") && !form.email.endsWith("@mytum.de")) {
-      next.email = "Please use your TUM email address (@tum.de or @mytum.de).";
+    
+    // Validate email
+    const emailValidation = validateTUMEmail(form.email);
+    if (!emailValidation.valid) {
+      next.email = emailValidation.message;
     }
-    if (!form.password || form.password.length < 6) {
-      next.password = "At least 6 characters.";
+    
+    // Validate password
+    const passwordValidation = validatePassword(form.password);
+    if (!passwordValidation.valid) {
+      next.password = passwordValidation.message;
     }
-    if (form.password !== form.confirmPassword) {
-      next.confirmPassword = "Passwords do not match.";
+    
+    // Validate password confirmation
+    if (passwordValidation.valid) {
+      const confirmValidation = validatePasswordConfirmation(form.password, form.confirmPassword);
+      if (!confirmValidation.valid) {
+        next.confirmPassword = confirmValidation.message;
+      }
     }
+    
     if (!form.department) {
       next.department = "Please select a department.";
     }
+    
     setErrors(next);
     return Object.keys(next).length === 0;
   };
