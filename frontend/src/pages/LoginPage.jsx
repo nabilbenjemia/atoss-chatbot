@@ -46,9 +46,9 @@ export default function LoginPage() {
       
       if (result.success) {
         setStatus({ type: "success", message: "Login successful. Welcome to the TUM Klinikum chatbot." });
-        // Redirect to dashboard/chat after successful login
+        // Redirect to chatbot layout after successful login
         setTimeout(() => {
-          navigate("/chat"); // Adjust this route to your main app route
+          navigate("/chatbot");
         }, 1000);
       } else {
         setStatus({
