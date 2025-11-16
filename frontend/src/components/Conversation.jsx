@@ -26,14 +26,19 @@ const Conversation = forwardRef((props, ref) => {
     };
 
     const addMessage = (messageText) => {
-        // Add user message
-        setMessages(prev => [...prev, { type: 'user', content: messageText }]);
+        // Add user message with timestamp
+        setMessages(prev => [...prev, { 
+            type: 'user', 
+            content: messageText,
+            timestamp: new Date().toISOString()
+        }]);
         
         // Mock AI response after a delay
         setTimeout(() => {
             setMessages(prev => [...prev, { 
                 type: 'ai', 
-                content: 'This is a mock AI response. I received your message: "' + messageText + '"'
+                content: 'This is a mock AI response. I received your message: "' + messageText + '"',
+                timestamp: new Date().toISOString()
             }]);
         }, 1000);
     };
@@ -63,8 +68,8 @@ const Conversation = forwardRef((props, ref) => {
         <div ref={containerRef} className="flex-1 overflow-y-auto px-16 py-4">
             {messages.map((msg, index) => (
                 msg.type === 'user' 
-                    ? <UserMessage key={index} message={msg.content} />
-                    : <AIMessage key={index} message={msg.content} />
+                    ? <UserMessage key={index} message={msg.content} timestamp={msg.timestamp} />
+                    : <AIMessage key={index} message={msg.content} timestamp={msg.timestamp} />
             ))}
         </div>
     )
