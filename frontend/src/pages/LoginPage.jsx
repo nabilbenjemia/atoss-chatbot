@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { authAPI } from "../services/api";
+import { validateTUMEmail, validatePassword } from "../utils/validation";
 
 
 export default function LoginPage() {
@@ -16,14 +18,19 @@ export default function LoginPage() {
 
   const validate = () => {
     const next = {};
-    if (!form.email || !form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      next.email = "Enter a valid email.";
-    } else if (!form.email.endsWith("@tum.de") && !form.email.endsWith("@mytum.de")) {
-      next.email = "Please use your TUM email address (@tum.de or @mytum.de).";
+    
+    // Validate email
+    const emailValidation = validateTUMEmail(form.email);
+    if (!emailValidation.valid) {
+      next.email = emailValidation.message;
     }
-    if (!form.password || form.password.length < 6) {
-      next.password = "At least 6 characters.";
+    
+    // Validate password
+    const passwordValidation = validatePassword(form.password);
+    if (!passwordValidation.valid) {
+      next.password = passwordValidation.message;
     }
+    
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -33,23 +40,25 @@ export default function LoginPage() {
     setStatus({ type: "idle", message: "" });
     if (!validate()) return;
 
-    {/*Simualte delay*/}
     try {
       setLoading(true);
-      await new Promise((r) => setTimeout(r, 700));
-
-      const ok = form.email.endsWith("@tum.de") || form.email.endsWith("@mytum.de");
-      if (ok) {
+      const result = await authAPI.login(form.email, form.password);
+      
+      if (result.success) {
         setStatus({ type: "success", message: "Login successful. Welcome to the TUM Klinikum chatbot." });
+        // Redirect to dashboard/chat after successful login
+        setTimeout(() => {
+          navigate("/chat"); // Adjust this route to your main app route
+        }, 1000);
       } else {
         setStatus({
           type: "error",
-          message: "Login failed. Please use your TUM Klinikum account or check your credentials.",
+          message: result.message || "Login failed. Please check your credentials.",
         });
       }
-    }
-    catch {
-      setStatus({ type: "error", message: "Unexpected error. Please try again." });
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || "Unexpected error. Please try again.";
+      setStatus({ type: "error", message: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -129,7 +138,7 @@ export default function LoginPage() {
               {errors.password && <p className="mt-1 text-xs text-tum-red">{errors.password}</p>}
             </div>
 
-            <div>
+            <div className="flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => navigate("/forget-password")}
@@ -137,6 +146,12 @@ export default function LoginPage() {
               >
                 Forgot password?
               </button>
+              <Link
+                to="/register"
+                className="text-sm font-medium text-tum-blue hover:underline"
+              >
+                Create account
+              </Link>
             </div>
 
             <div className="flex items-center justify-between">

@@ -1,4 +1,5 @@
 const authService = require('../services/AuthService');
+const { validateTUMEmail, validatePassword } = require('../utils/validation');
 
 /**
  * AuthController
@@ -14,10 +15,19 @@ class AuthController {
 		try {
 			const { email, password } = req.body;
 
-			if (!email || !password) {
+			// Validate email format
+			const emailValidation = validateTUMEmail(email);
+			if (!emailValidation.valid) {
 				return res.status(400).json({
 					success: false,
-					message: 'Email and password are required'
+					message: emailValidation.message
+				});
+			}
+
+			if (!password) {
+				return res.status(400).json({
+					success: false,
+					message: 'Password is required'
 				});
 			}
 
@@ -102,10 +112,28 @@ class AuthController {
 		try {
 			const { email, password, role, department } = req.body;
 
-			if (!email || !password || !department) {
+			// Validate email
+			const emailValidation = validateTUMEmail(email);
+			if (!emailValidation.valid) {
 				return res.status(400).json({
 					success: false,
-					message: 'Email, password, and department are required'
+					message: emailValidation.message
+				});
+			}
+
+			// Validate password
+			const passwordValidation = validatePassword(password);
+			if (!passwordValidation.valid) {
+				return res.status(400).json({
+					success: false,
+					message: passwordValidation.message
+				});
+			}
+
+			if (!department) {
+				return res.status(400).json({
+					success: false,
+					message: 'Department is required'
 				});
 			}
 
@@ -149,6 +177,66 @@ class AuthController {
 			res.status(401).json({
 				success: false,
 				message: error.message || 'Token verification failed'
+			});
+		}
+	}
+
+	/**
+	 * Handle email verification request
+	 * POST /auth/verify-email
+	 */
+	async verifyEmail(req, res) {
+		try {
+			const { token } = req.body;
+
+			if (!token) {
+				return res.status(400).json({
+					success: false,
+					message: 'Verification token is required'
+				});
+			}
+
+			const result = await authService.verifyEmail(token);
+
+			res.status(200).json({
+				success: true,
+				message: result.message || 'Email verified successfully'
+			});
+		} catch (error) {
+			res.status(400).json({
+				success: false,
+				message: error.message || 'Email verification failed'
+			});
+		}
+	}
+
+	/**
+	 * Handle resend verification email request
+	 * POST /auth/resend-verification
+	 */
+	async resendVerificationEmail(req, res) {
+		try {
+			const { email } = req.body;
+
+			// Validate email format
+			const emailValidation = validateTUMEmail(email);
+			if (!emailValidation.valid) {
+				return res.status(400).json({
+					success: false,
+					message: emailValidation.message
+				});
+			}
+
+			const result = await authService.resendVerificationEmail(email);
+
+			res.status(200).json({
+				success: true,
+				message: result.message || 'Verification email sent successfully'
+			});
+		} catch (error) {
+			res.status(400).json({
+				success: false,
+				message: error.message || 'Failed to send verification email'
 			});
 		}
 	}

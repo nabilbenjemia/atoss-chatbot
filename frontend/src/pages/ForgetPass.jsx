@@ -1,10 +1,25 @@
 import { useState } from "react";
+import { validateTUMEmail } from "../utils/validation";
 
 export default function ForgetPass() {
   const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setError("");
+    setStatus("");
+
+    // Validate email
+    const emailValidation = validateTUMEmail(email);
+    if (!emailValidation.valid) {
+      setError(emailValidation.message);
+      return;
+    }
+
+    // TODO: Implement password reset API call
+    setStatus(`Password reset link would be sent to ${email}`);
     alert(`Password reset link sent to ${email}`);
   };
 
@@ -26,11 +41,20 @@ export default function ForgetPass() {
               type="email"
               id="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError("");
+              }}
               required
-              className="mt-1 block w-full rounded-lg border border-gray-300 p-2 focus:border-tum-blue focus:ring-tum-blue"
-              placeholder="you@example.com"
+              className={`mt-1 block w-full rounded-lg border p-2 focus:ring-2 ${
+                error
+                  ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                  : "border-gray-300 focus:border-tum-blue focus:ring-tum-blue"
+              }`}
+              placeholder="you@tum.de"
             />
+            {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+            {status && <p className="mt-1 text-xs text-green-600">{status}</p>}
           </div>
           <button
             type="submit"
