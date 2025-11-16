@@ -1,0 +1,8 @@
+export { default as new_chat_logo } from './new_chat_logo.png';
+export { default as search_logo } from './search_logo.png';
+export { default as tum_klinikum_logo } from './tum_klinikum_logo.png';
+export { default as minimize_logo } from './minimize_logo.png';
+export { default as maximize_logo } from './maximize_logo.png';
+export { default as profile_photo_mock } from './profile_photo_mock.jpg';
+export { default as expand_up_logo } from './expand_up_logo.png';
+export { default as expand_down_logo } from './expand_down_logo.png';
