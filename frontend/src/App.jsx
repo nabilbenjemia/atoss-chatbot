@@ -1,17 +1,18 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
-import ChatbotLayout from './layouts/ChatbotLayout'
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import LoginPage from "./pages/LoginPage.jsx";
+import ForgetPass from "./pages/ForgetPass.jsx";
+import ChatbotLayout from "./components/ChatbotLayout.jsx";
 
-function App() {
-  const [count, setCount] = useState(0)
 
+export default function App() {
   return (
-    <>
-      <ChatbotLayout />
-    </>
-  )
+    <Router>
+      <Routes>
+        <Route path="/" element={<LoginPage />} />
+        <Route path="/forget-password" element={<ForgetPass />} />
+        <Route path="chatbot" element={<ChatbotLayout />} />
+      </Routes>
+    </Router>
+  );
 }
 
-export default App
