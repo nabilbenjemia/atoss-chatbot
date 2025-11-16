@@ -61,7 +61,7 @@ export default function Sidebar() {
             Chats {isHistoryVisible ? <img src={expand_up_logo} alt="Collapse" className="w-3 h-3 ml-1 mt-1" /> : <img src={expand_down_logo} alt="Expand" className="w-3 h-3 ml-1 mt-1" />}
           </button>
 
-          {isHistoryVisible && (<nav className="mt-2 mr-2 flex-1 overflow-y-auto">
+          {isHistoryVisible && (<nav className="mt-2 mr-2 flex-1 overflow-y-auto pr-3">
               <ul>
                   {conversations.map((conv) => (
                       <li key={conv.id} className="flex items-center p-1 mb-1 cursor-pointer rounded hover:bg-tum-blue-light-2">
