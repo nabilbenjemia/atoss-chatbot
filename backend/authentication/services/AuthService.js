@@ -2,7 +2,6 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const UserCredentials = require('../models/UserCredentials');
 const axios = require('axios');
-const emailService = require('./EmailService');
 
 /**
  * AuthService
@@ -41,11 +40,6 @@ class AuthService {
 			
 			if (!isPasswordValid) {
 				throw new Error('Invalid email or password');
-			}
-
-			// Check if email is verified
-			if (!userCredentials.emailVerified) {
-				throw new Error('Please verify your email address before logging in. Check your inbox for the verification email.');
 			}
 
 			// Generate JWT token
@@ -208,137 +202,21 @@ class AuthService {
 			const saltRounds = 10;
 			const passwordHash = await bcrypt.hash(password, saltRounds);
 
-			// Generate email verification token
-			const verificationToken = emailService.generateVerificationToken();
-			const verificationTokenExpires = new Date();
-			verificationTokenExpires.setHours(verificationTokenExpires.getHours() + 24); // 24 hours expiry
-
 			// Create user credentials
 			const userCredentials = new UserCredentials({
 				email: email.toLowerCase(),
 				passwordHash,
 				role: role || 'Staff',
-				department,
-				emailVerified: false,
-				emailVerificationToken: verificationToken,
-				emailVerificationTokenExpires: verificationTokenExpires
+				department
 			});
 
 			await userCredentials.save();
-
-			// Send verification email
-			try {
-				await emailService.sendVerificationEmail(email, verificationToken);
-			} catch (emailError) {
-				console.error('Failed to send verification email:', emailError);
-				// Don't fail registration if email fails, but log it
-			}
 
 			return {
 				id: userCredentials.id,
 				email: userCredentials.email,
 				role: userCredentials.role,
-				department: userCredentials.department,
-				emailVerified: false,
-				message: 'Registration successful. Please check your email to verify your account.'
-			};
-		} catch (error) {
-			throw error;
-		}
-	}
-
-	/**
-	 * Verify email address using verification token
-	 * @param {string} token - Email verification token
-	 * @returns {Promise<Object>}
-	 */
-	async verifyEmail(token) {
-		try {
-			if (!token || token.trim() === '') {
-				throw new Error('Verification token is required');
-			}
-
-			// First, try to find user by token
-			let userCredentials = await UserCredentials.findOne({
-				emailVerificationToken: token.trim()
-			});
-
-			// If not found by token, the token is invalid, expired, or already used
-			if (!userCredentials) {
-				throw new Error('Invalid or expired verification token. The link may have already been used or expired. Please request a new verification email.');
-			}
-
-			// Check if token has expired
-			if (userCredentials.emailVerificationTokenExpires && userCredentials.emailVerificationTokenExpires < new Date()) {
-				// Clear expired token
-				userCredentials.emailVerificationToken = null;
-				userCredentials.emailVerificationTokenExpires = null;
-				await userCredentials.save();
-				throw new Error('Verification token has expired. Please request a new verification email.');
-			}
-
-			// Check if already verified
-			if (userCredentials.emailVerified) {
-				// Clear the token since it's already been used
-				userCredentials.emailVerificationToken = null;
-				userCredentials.emailVerificationTokenExpires = null;
-				await userCredentials.save();
-				return {
-					success: true,
-					message: 'Email already verified. You can now log in.'
-				};
-			}
-
-			// Mark email as verified
-			userCredentials.emailVerified = true;
-			userCredentials.emailVerificationToken = null;
-			userCredentials.emailVerificationTokenExpires = null;
-			await userCredentials.save();
-
-			return {
-				success: true,
-				message: 'Email verified successfully'
-			};
-		} catch (error) {
-			throw error;
-		}
-	}
-
-	/**
-	 * Resend verification email
-	 * @param {string} email - User email
-	 * @returns {Promise<Object>}
-	 */
-	async resendVerificationEmail(email) {
-		try {
-			const userCredentials = await UserCredentials.findOne({ email: email.toLowerCase() });
-
-			if (!userCredentials) {
-				throw new Error('User not found');
-			}
-
-			if (userCredentials.emailVerified) {
-				return {
-					success: true,
-					message: 'Email already verified'
-				};
-			}
-
-			// Generate new verification token
-			const verificationToken = emailService.generateVerificationToken();
-			const verificationTokenExpires = new Date();
-			verificationTokenExpires.setHours(verificationTokenExpires.getHours() + 24);
-
-			userCredentials.emailVerificationToken = verificationToken;
-			userCredentials.emailVerificationTokenExpires = verificationTokenExpires;
-			await userCredentials.save();
-
-			// Send verification email
-			await emailService.sendVerificationEmail(email, verificationToken);
-
-			return {
-				success: true,
-				message: 'Verification email sent successfully'
+				department: userCredentials.department
 			};
 		} catch (error) {
 			throw error;

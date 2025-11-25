@@ -45,19 +45,6 @@ const userCredentialsSchema = new mongoose.Schema({
 		type: String,
 		default: null
 	},
-	// Email verification fields
-	emailVerified: {
-		type: Boolean,
-		default: false
-	},
-	emailVerificationToken: {
-		type: String,
-		default: null
-	},
-	emailVerificationTokenExpires: {
-		type: Date,
-		default: null
-	},
 	lastLogin: {
 		type: Date,
 		default: null

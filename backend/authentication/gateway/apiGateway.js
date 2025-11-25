@@ -19,8 +19,6 @@ const createApiGateway = (app) => {
 		'/auth/register',
 		'/auth/refresh',
 		'/auth/verify',
-		'/auth/verify-email',
-		'/auth/resend-verification',
 		'/api/health'
 	];
 
