@@ -4,14 +4,14 @@ const messageService = require('../services/messageService');
 //POST /api/conversations
 const createConversation = async (req, res) => {
   try {
-    const { userId, title } = req.body;
-    console.log('Received request:', { userId, title }); // Debug log
+    const { userId } = req.body;
+    console.log('Received request from:', { userId }); // Debug log
     
-    if (!userId || !title) {
-      return res.status(400).json({ error: "userId and title are required" });
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
     }
     
-    const conversation = await conversationService.createConversation({ userId, title });
+    const conversation = await conversationService.createConversation({ userId, title: "Untitled" });
     console.log('Created conversation:', conversation); // Debug log
     
     res.status(201).json(conversation);

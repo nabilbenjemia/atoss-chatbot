@@ -1,4 +1,5 @@
 const messageService = require('../services/messageService');
+const conversationService = require('../services/conversationService');
 const mongoose = require('mongoose');
 const Conversation = require('../models/Conversation');
 
@@ -20,9 +21,40 @@ const createMessage = async (req, res) => {
     }
     if (!sender || !content) {
       return res.status(400).json({ error: "sender and content are required" });
-    }           
-    const message = await messageService.createMessage({ conversationId, sender, content });
-    res.status(201).json(message);
+    }
+
+    // TODO call genai service to get title if first message
+    if (conversation.title === "Untitled") {
+      // Simulate GenAI title choices
+      const titleChoices = [
+        "Chat about your appointment",
+        "Medical Inquiry",
+        "General Conversation"
+      ];
+      const suggestedTitle = titleChoices[Math.floor(Math.random() * titleChoices.length)];
+      await conversationService.updateConversationTitle(conversationId, suggestedTitle);
+    }
+
+    // Create user message
+    const userMessage = await messageService.createMessage({ conversationId, sender, content });
+    if (!userMessage) {
+      return res.status(500).json({ error: "Failed to create and store user message" });
+    }
+
+    // Generate and store AI response
+    const AIResponse = "This is a placeholder response to your message: " + content;
+    const AIMessage = await messageService.createMessage({ conversationId, sender: "ai", content: AIResponse });
+    if (!AIMessage) {
+      return res.status(500).json({ error: "Failed to create and store AI response message" });
+    }
+
+    return res.status(201).json({
+      aiMessage: {
+        conversationId: AIMessage.conversationId,
+        sender: AIMessage.sender,
+        content: AIMessage.content
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: "Failed to create message", details: error.message });
   }
