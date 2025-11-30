@@ -11,7 +11,7 @@ The backend consists of:
 ## Project Structure
 
 ```
-backend/
+backend/authentication/
 ├── config/
 │   └── database.js          # MongoDB connection configuration
 ├── controllers/

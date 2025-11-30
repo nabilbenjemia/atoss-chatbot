@@ -7,7 +7,7 @@ export default function AIMessage({ message, timestamp }) {
     return (
         <div className="flex justify-start mb-4 group">
             <div className="relative max-w-[60%]">
-                <div className="bg-gray-200 text-gray-800 px-4 py-2 rounded-2xl">
+                <div className="bg-gray-200 text-gray-800 px-4 py-2 rounded-2xl break-words">
                     {message}
                 </div>
                 {timestamp && (
