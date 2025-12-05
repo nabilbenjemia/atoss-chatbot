@@ -33,8 +33,8 @@ const Conversation = ({ messages }) => {
         <div ref={containerRef} className="flex-1 overflow-y-auto px-16 py-4">
             {messages.map((msg, index) => (
                 msg.sender === 'user'
-                    ? <UserMessage key={index} message={msg.content} timestamp={msg.timestamp} />
-                    : <AIMessage key={index} message={msg.content} timestamp={msg.timestamp} />
+                    ? <UserMessage key={index} message={msg.content} createdAt={msg.createdAt} />
+                    : <AIMessage key={index} message={msg.content} createdAt={msg.createdAt} />
             ))}
         </div>
     );
