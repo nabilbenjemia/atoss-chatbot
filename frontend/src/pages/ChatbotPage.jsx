@@ -1,14 +1,26 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 import MessageInput from '../components/MessageInput'
 import Conversation from '../components/Conversation'
+import { getCurrentUser } from '../services/api'
 
 export default function ChatbotPage() {
-    const exampleUserId = "exampleUserId"; // TODO: replace with actual user ID from auth context
+    const navigate = useNavigate();
+    const currentUser = getCurrentUser();
+    const userId = currentUser?.id;
+    
     const [conversationId, setConversationId] = useState(null);
     const [messages, setMessages] = useState([]);
     const [conversationTitles, setConversationTitles] = useState([]);
     const [isFirstMessage, setIsFirstMessage] = useState(false);
+
+    // Redirect to login if user is not authenticated
+    useEffect(() => {
+        if (!userId) {
+            navigate('/');
+        }
+    }, [userId, navigate]);
 
     const fetchMessages = async () => {
         try {
@@ -24,8 +36,9 @@ export default function ChatbotPage() {
     };
 
     const fetchConversationTitles = async () => {
+        if (!userId) return;
         try {
-            const response = await fetch(`http://localhost:4004/api/conversations/user/${exampleUserId}`, {
+            const response = await fetch(`http://localhost:4004/api/conversations/user/${userId}`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -37,8 +50,10 @@ export default function ChatbotPage() {
     };
 
     useEffect(() => {
-        fetchConversationTitles();
-    }, []);
+        if (userId) {
+            fetchConversationTitles();
+        }
+    }, [userId]);
 
     useEffect(() => {
         console.log("conversationId changed:", conversationId);
@@ -58,6 +73,11 @@ export default function ChatbotPage() {
 
 
     const handleSendMessage = async (messageText) => {
+    if (!userId) {
+        console.error('User not authenticated');
+        return;
+    }
+    
     try {
         // If no conversation exists, create one
         let convId = conversationId;
@@ -67,7 +87,7 @@ export default function ChatbotPage() {
                 const res = await fetch('http://localhost:4004/api/conversations', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: exampleUserId })
+                    body: JSON.stringify({ userId: userId })
                 });
                 const data = await res.json();
                 convId = data._id;
@@ -99,7 +119,7 @@ export default function ChatbotPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                userId: exampleUserId,
+                userId: userId,
                 content: messageText,
                 sender: 'user'
             })
@@ -117,7 +137,7 @@ export default function ChatbotPage() {
         }
 
         // Refresh conversation titles
-        const titlesRes = await fetch(`http://localhost:4004/api/conversations/user/${exampleUserId}`, {
+        const titlesRes = await fetch(`http://localhost:4004/api/conversations/user/${userId}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
         });
@@ -131,9 +151,14 @@ export default function ChatbotPage() {
 };
 
 
+    // Don't render if user is not authenticated
+    if (!userId) {
+        return null;
+    }
+
     return (
         <div className="flex h-screen">
-            <Sidebar conversationTitles={conversationTitles} setConversationTitles={setConversationTitles} setConversationId={setConversationId} userId={exampleUserId}/>  
+            <Sidebar conversationTitles={conversationTitles} setConversationTitles={setConversationTitles} setConversationId={setConversationId} userId={userId}/>  
             <div className="flex flex-col flex-1 overflow-hidden">
                 <Conversation messages={messages} />
                 <MessageInput onSendMessage={handleSendMessage} />
