@@ -15,25 +15,24 @@ const createMessage = async (req, res) => {
     }
 
     // Check that conversation exists
+    
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
       return res.status(404).json({ error: "Conversation not found" });
     }
+      
     if (!sender || !content) {
       return res.status(400).json({ error: "sender and content are required" });
     }
 
     // TODO call genai service to get title if first message
+    
     if (conversation.title === "Untitled") {
       // Simulate GenAI title choices
-      const titleChoices = [
-        "Chat about your appointment",
-        "Medical Inquiry",
-        "General Conversation"
-      ];
-      const suggestedTitle = titleChoices[Math.floor(Math.random() * titleChoices.length)];
+      const suggestedTitle = "Conv at " + new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString();
       await conversationService.updateConversationTitle(conversationId, suggestedTitle);
     }
+    
 
     // Create user message
     const userMessage = await messageService.createMessage({ conversationId, sender, content });
@@ -48,13 +47,8 @@ const createMessage = async (req, res) => {
       return res.status(500).json({ error: "Failed to create and store AI response message" });
     }
 
-    return res.status(201).json({
-      aiMessage: {
-        conversationId: AIMessage.conversationId,
-        sender: AIMessage.sender,
-        content: AIMessage.content
-      }
-    });
+    return res.status(201).json({aiMessage: AIMessage});
+     
   } catch (error) {
     res.status(500).json({ error: "Failed to create message", details: error.message });
   }
