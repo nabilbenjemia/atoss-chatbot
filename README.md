@@ -16,10 +16,12 @@ Implement a strictly on-premise Retrieval-Augmented Generation (RAG) system pair
 
 1. Engine Ollama
    * Run ollama serve
-   * Pull models: ollama pull qwen2.5:7b and ollama pull snowflake-arctic-embed2
+   * Pull models: ollama pull qwen2.5:7b 
+   * for the embedding sentence_transformers package was used -> SentenceTransformer(HF_MODEL, trust_remote_code=True)
 
 2. Vector Database 
    * ChromaDB -> stores mathematical representation created by the snowflake model
+   * pdf parsing with PyMuPDF -> pip install pymupdf
 
 3. Frontend & Backend
    * MERN stack
@@ -27,7 +29,6 @@ Implement a strictly on-premise Retrieval-Augmented Generation (RAG) system pair
 ### Why Ollama?
 
 * Data sovereignity: operates entirely offline
-* Unified pipeline: can run both LLM and the embedding model
 * More efficient on worse hardware due to quantization 
 * Ollama eliminates the complexity of raw model deployment
 
