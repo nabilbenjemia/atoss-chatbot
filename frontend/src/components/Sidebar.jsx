@@ -1,34 +1,40 @@
 import React, { useState } from 'react';
 import { tum_klinikum_logo, new_chat_logo, search_logo, minimize_logo, maximize_logo, profile_photo_mock, expand_down_logo,  expand_up_logo } from '../assets'
 
-export default function Sidebar() {
+export default function Sidebar({ conversationTitles, setConversationTitles, setConversationId, userId }) {
   const [isMinimized, setIsMinimized] = useState(false);
   const [isHistoryVisible, setIsHistoryVisible] = useState(true);
 
-  const conversations = [
-    { id: 1, title: '🤖  This is the title of Conversation 1' },
-    { id: 2, title: '💬 This is the title of Conv 2' },
-    { id: 3, title: '🎉 This is the title of Conversation 3' },
-    { id: 4, title: '🎉 This is the title of Conversation 4' },
-    { id: 5, title: '💬 Conversation 5' },
-    { id: 4, title: '💬 Conversation 6' },
-    { id: 7, title: '💬 This is the title of Conver. 7' },
-    { id: 8, title: '📱 Mobile app development discussion' },
-    { id: 9, title: '🎨 Design feedback and suggestions' },
-    { id: 10, title: '🔧 Troubleshooting backend issues' },
-    { id: 11, title: '📊 Q3 Performance metrics review' },
-    { id: 12, title: '🌟 Feature request: Dark mode' },
-    { id: 13, title: '🐛 Bug report: Login validation error' },
-    { id: 14, title: '💡 Brainstorming new product ideas' },
-    { id: 15, title: '📚 Documentation update needed' },
-    { id: 16, title: '🚀 Planning the next sprint goals' },
-    { id: 17, title: '🔐 Security audit findings' },
-    { id: 18, title: '⚡ API performance optimization' },
-    { id: 19, title: '🎯 Marketing campaign strategy' },
-    { id: 20, title: '👥 Team onboarding process' },
-    { id: 21, title: '📈 Analytics dashboard improvements' },
-    { id: 22, title: '🛠️ DevOps pipeline configuration' },
-  ];
+  const handleCreateNewConversation = async () => {
+    console.log("handleCreateNewConversation is called");
+    try {
+        //Create new conversation
+        const res = await fetch('http://localhost:4004/api/conversations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: userId })          
+        });
+        const data = await res.json();
+
+        //Update selected conversation ID
+        setConversationId(data._id);
+        console.log("Created new conversation:", data);
+
+        // Refresh conversation titles
+        const titlesRes = await fetch(`http://localhost:4004/api/conversations/user/${userId}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        const titlesData = await titlesRes.json();
+        setConversationTitles(titlesData); // update sidebar
+        console.log("Updated conversation titles:", titlesData);
+
+    } catch (error) {
+        console.error("Failed to create conversation or fetch titles:", error);
+    }
+};
+
+
 
   return ( 
     <div className={`bg-tum-blue-light-4 ${isMinimized ? 'w-12' : 'w-64'} text-black h-screen p-2 rounded-r-2xl flex flex-col transition-all duration-300`}>
@@ -45,7 +51,9 @@ export default function Sidebar() {
       {!isMinimized && (
         <>
           <ul>
-              <li className="flex items-center p-0 cursor-pointer rounded hover:bg-tum-blue-light-2">
+              <li className="flex items-center p-0 cursor-pointer rounded hover:bg-tum-blue-light-2" 
+                onClick={() => {console.log("New chat clicked");
+                                handleCreateNewConversation();}}>
                 <img src={new_chat_logo} alt="New Chat Logo" className="h-4 text-sm" />
                 <span className="ml-3">New chat</span>
               </li>
@@ -63,9 +71,15 @@ export default function Sidebar() {
 
           {isHistoryVisible && (<nav className="mt-2 mr-2 flex-1 overflow-y-auto pr-3">
               <ul>
-                  {conversations.map((conv) => (
-                      <li key={conv.id} className="flex items-center p-1 mb-1 cursor-pointer rounded hover:bg-tum-blue-light-2">
-                          <span className="truncate text-sm font-montserrat">{conv.title}</span>
+                  {conversationTitles.map((conv) => (
+                      <li key={conv._id} className="flex items-center p-1 mb-1 cursor-pointer rounded hover:bg-tum-blue-light-2"
+                          onClick={() => {
+                            console.log("Selected conversation ID:", conv._id);
+                            setConversationId(conv._id);
+                            }}>
+                          <span className="truncate text-sm font-montserrat" >
+                            {conv.title}
+                          </span>
                       </li>
                   ))}
               </ul>
@@ -94,7 +108,9 @@ export default function Sidebar() {
         <>
             <nav className="mt-1">
               <ul>
-                  <li className="flex items-center p-2 cursor-pointer rounded hover:bg-tum-blue-light-2 justify-center">
+                  <li className="flex items-center p-2 cursor-pointer rounded hover:bg-tum-blue-light-2 justify-center" 
+                    onClick={() => {console.log("New chat clicked");
+                                    handleCreateNewConversation();}}>
                     <img src={new_chat_logo} alt="New Chat Logo" className="h-4" />
                   </li>
                   <li className="flex items-center p-2 cursor-pointer rounded hover:bg-tum-blue-light-2 justify-center">
