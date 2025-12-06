@@ -21,6 +21,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
         console.log("Created new conversation:", data);
 
         // Refresh conversation titles
+        /*
         const titlesRes = await fetch(`http://localhost:4004/api/conversations/user/${userId}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
@@ -28,6 +29,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
         const titlesData = await titlesRes.json();
         setConversationTitles(titlesData); // update sidebar
         console.log("Updated conversation titles:", titlesData);
+        */
 
     } catch (error) {
         console.error("Failed to create conversation or fetch titles:", error);
