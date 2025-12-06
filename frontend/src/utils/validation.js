@@ -20,11 +20,11 @@ export const validateTUMEmail = (email) => {
   }
 
   // Check for TUM domain
-  const tumDomains = ['@tum.de', '@mytum.de'];
+  const tumDomains = ['@tum.de', '@mytum.de', '@mri.tum.de'];
   const hasTUMDomain = tumDomains.some(domain => email.toLowerCase().endsWith(domain));
   
   if (!hasTUMDomain) {
-    return { valid: false, message: 'Please use your TUM email address (@tum.de or @mytum.de).' };
+    return { valid: false, message: 'Please use your TUM email address' };
   }
 
   // Validate TUM email format: should have a local part before @
