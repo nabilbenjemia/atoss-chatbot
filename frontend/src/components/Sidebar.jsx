@@ -1,9 +1,43 @@
-import React, { useState } from 'react';
-import { tum_klinikum_logo, new_chat_logo, search_logo, minimize_logo, maximize_logo, profile_photo_mock, expand_down_logo,  expand_up_logo } from '../assets'
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { tum_klinikum_logo, new_chat_logo, search_logo, minimize_logo, maximize_logo, profile_photo_mock, expand_down_logo,  expand_up_logo } from '../assets';
+import { authAPI, getCurrentUser } from '../services/api';
 
 export default function Sidebar({ conversationTitles, setConversationTitles, setConversationId, userId }) {
+  const navigate = useNavigate();
+  const currentUser = getCurrentUser();
   const [isMinimized, setIsMinimized] = useState(false);
   const [isHistoryVisible, setIsHistoryVisible] = useState(true);
+  const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowLogoutDropdown(false);
+      }
+    };
+
+    if (showLogoutDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showLogoutDropdown]);
+
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+      navigate('/?logout=success');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Even if logout API fails, clear local storage and redirect
+      navigate('/?logout=success');
+    }
+  };
 
   const handleCreateNewConversation = async () => {
     console.log("handleCreateNewConversation is called");
@@ -88,20 +122,41 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
           </nav>
         )}
 
-          <div className="flex items-center gap-3 p-1 border-gray-700 mt-auto">
-            <div className="w-8 h-8 rounded-full bg-gray-500 overflow-hidden">
-              <img
-                src={profile_photo_mock} 
-                alt="User Avatar"
-                className="w-full h-full object-cover"
-              />
+          <div className="relative mt-auto" ref={dropdownRef}>
+            <div 
+              className="flex items-center gap-3 p-1 border-gray-700 cursor-pointer rounded hover:bg-tum-blue-light-2"
+              onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+            >
+              <div className="w-8 h-8 rounded-full bg-gray-500 overflow-hidden">
+                <img
+                  src={profile_photo_mock} 
+                  alt="User Avatar"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+
+              {/* User info */}
+              <div className="flex flex-col flex-1">
+                <span className="text-sm font-medium text-tum-black">
+                  {currentUser?.email?.split('@')[0] || 'User'}
+                </span>
+                <span className="text-xs text-gray-400">
+                  {currentUser?.role || 'TUM Klinikum Staff'}
+                </span>
+              </div>
             </div>
 
-            {/* User info */}
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-tum-black">Max Mustermann</span>
-              <span className="text-xs text-gray-400">TUM Klinikum Staff</span>
-            </div>
+            {/* Logout dropdown */}
+            {showLogoutDropdown && (
+              <div className="absolute bottom-full left-0 right-0 mb-2 bg-tum-white border border-tum-grey-7 rounded-lg shadow-lg z-10">
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left px-4 py-2 text-sm text-tum-black bg-tum-white hover:bg-tum-blue-light-2 rounded-lg transition-colors"
+                >
+                  Log out
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -120,13 +175,30 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
                   </li>
               </ul>
           </nav>
-          <div className="w-8 h-8 mt-auto rounded-full bg-gray-500 overflow-hidden">
+          <div className="relative mt-auto" ref={dropdownRef}>
+            <div 
+              className="w-8 h-8 rounded-full bg-gray-500 overflow-hidden cursor-pointer hover:ring-2 hover:ring-tum-blue"
+              onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+              title="Click to logout"
+            >
               <img
                 src={profile_photo_mock} 
                 alt="User Avatar"
                 className="w-full h-full object-cover"
               />
             </div>
+            {/* Logout dropdown for minimized state */}
+            {showLogoutDropdown && (
+              <div className="absolute bottom-full left-0 mb-2 bg-tum-white border border-tum-grey-7 rounded-lg shadow-lg z-10 whitespace-nowrap">
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left px-4 py-2 text-sm text-tum-black bg-tum-white hover:bg-tum-blue-light-2 rounded-lg transition-colors"
+                >
+                  Log out
+                </button>
+              </div>
+            )}
+          </div>
         </>
       )}
     </div>
