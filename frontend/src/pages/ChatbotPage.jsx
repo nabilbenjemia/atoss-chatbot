@@ -18,6 +18,7 @@ export default function ChatbotPage() {
     // Redirect to login if user is not authenticated
     useEffect(() => {
         if (!userId) {
+            console.log("User not authenticated, redirecting to login.");
             navigate('/');
         }
     }, [userId, navigate]);
