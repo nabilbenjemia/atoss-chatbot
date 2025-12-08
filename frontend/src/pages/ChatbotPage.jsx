@@ -42,6 +42,15 @@ export default function ChatbotPage() {
             // Get the last user message (most recent)
             const lastUserMsg = messages.at(-1);
             if (lastUserMsg?.sender === 'user') {
+                // Add the partial AI message to messages before saving
+                const aiMsg = {
+                    sender: 'ai',
+                    content: streamingMessage,
+                    createdAt: new Date().toISOString()
+                };
+                setMessages(prev => [...prev, aiMsg]);
+                
+                // Save to DB
                 await saveMessages(lastUserMsg.content, streamingMessage);
             }
         }
@@ -147,7 +156,7 @@ export default function ChatbotPage() {
                 createdAt: new Date().toISOString(),
                 isPending: true  // Mark as pending
             };
-            setMessages(prev => [...prev, userMsg]);
+            setMessages(prev => [...prev, userMsg]); // 
 
             // Prepare conversation history for context
             const history = messages.map(m => ({

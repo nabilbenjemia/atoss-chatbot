@@ -99,6 +99,46 @@ const streamMessage = async (req, res) => {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
+    // ============================================
+    // MOCK MODE: Simulate streaming AI response
+    // Remove this block when FastAPI is ready
+    // ============================================
+    const USE_MOCK = true;  // Set to false when FastAPI is ready
+    
+    if (USE_MOCK) {
+        const mockResponse = `Hello! I'm a mock AI response. You asked: "${query}"
+
+Here's a simulated streaming response to test the frontend functionality. Each word is sent with a small delay to simulate real-time token streaming from an LLM.
+
+This helps verify that:
+1. The streaming message displays correctly
+2. The typing indicator works
+3. The Stop button can interrupt the stream
+4. Messages are saved after completion
+
+Feel free to test the interrupt functionality by clicking Stop!`;
+
+        const words = mockResponse.split(' ');
+        let index = 0;
+
+        const sendNextWord = () => {
+            if (index < words.length) {
+                res.write(`data: ${words[index]} \n\n`);
+                index++;
+                setTimeout(sendNextWord, 100);  // 100ms delay between words
+            } else {
+                res.write('data: [DONE]\n\n');
+                res.end();
+            }
+        };
+
+        sendNextWord();
+        return;
+    }
+    // ============================================
+    // END MOCK MODE
+    // ============================================
+
     try {
         // Proxy to FastAPI
         const response = await axios({
@@ -127,9 +167,10 @@ const streamMessage = async (req, res) => {
 /** POST /api/conversations/:conversationId/messages/batch */
 const createMessageBatch = async (req, res) => {
     try {
+        const { conversationId } = req.params;  // ADD: Get conversationId from params
         const { userMessage, aiMessage, userId, isNewConversation } = req.body;
 
-        let convId = null;
+        let convId = conversationId;  // FIX: Use conversationId from params
 
         // Create conversation if new
         if (isNewConversation || conversationId === 'new') {
