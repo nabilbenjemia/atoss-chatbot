@@ -9,4 +9,10 @@ router.get('/:id', conversationController.getConversationById);
 router.put('/:id', conversationController.updateConversationTitle);
 router.delete('/:id', conversationController.deleteConversation);
 
+// ADD: Streaming endpoint
+router.get('/:conversationId/stream', messageController.streamMessage);
+
+// MODIFY: Batch save messages after stream completes
+router.post('/:conversationId/messages/batch', messageController.createMessageBatch);
+
 module.exports = router;

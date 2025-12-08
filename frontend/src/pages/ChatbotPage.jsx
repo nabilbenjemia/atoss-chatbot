@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 import MessageInput from '../components/MessageInput'
@@ -10,10 +10,74 @@ export default function ChatbotPage() {
     const currentUser = getCurrentUser();
     const userId = currentUser?.id;
     
+    // Existing state
     const [conversationId, setConversationId] = useState(null);
     const [messages, setMessages] = useState([]);
     const [conversationTitles, setConversationTitles] = useState([]);
-    const [isFirstMessage, setIsFirstMessage] = useState(false);
+
+   // NEW: Streaming states
+    const [isStreaming, setIsStreaming] = useState(false);
+    const [streamingMessage, setStreamingMessage] = useState("");
+    const eventSourceRef = useRef(null);
+
+    // NEW: Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (eventSourceRef.current) {
+                eventSourceRef.current.close();
+            }
+        };
+    }, []);
+
+    // NEW: Handle interrupt
+    const handleInterrupt = async () => {
+        if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+        }
+        setIsStreaming(false);
+        
+        // Save the partial response if there's content
+        if (streamingMessage && messages.length > 0) {
+            // Get the last user message (most recent)
+            const lastUserMsg = messages.at(-1);
+            if (lastUserMsg?.sender === 'user') {
+                await saveMessages(lastUserMsg.content, streamingMessage);
+            }
+        }
+        setStreamingMessage("");
+    };
+
+    // NEW: Save messages to DB
+    const saveMessages = async (userMsg, aiMsg) => {
+        const isNew = !conversationId;
+        
+        try {
+            const response = await fetch(
+                `http://localhost:4004/api/conversations/${conversationId || 'new'}/messages/batch`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userMessage: userMsg,
+                        aiMessage: aiMsg,
+                        userId: userId,
+                        isNewConversation: isNew
+                    })
+                }
+            );
+            
+            const data = await response.json();
+            
+            if (isNew) {
+                setConversationId(data.conversationId);
+            }
+            
+            await fetchConversationTitles();
+        } catch (error) {
+            console.error('Failed to save messages:', error);
+        }
+    };
 
     // Redirect to login if user is not authenticated
     useEffect(() => {
@@ -23,7 +87,7 @@ export default function ChatbotPage() {
         }
     }, [userId, navigate]);
 
-    const fetchMessages = async () => {
+    const fetchMessages = useCallback(async () => {
         try {
             const response = await fetch(`http://localhost:4004/api/conversations/${conversationId}/messages`, {
                 method: 'GET',
@@ -34,9 +98,9 @@ export default function ChatbotPage() {
         } catch (error) {
             console.error('Failed to fetch messages:', error);
         }
-    };
+    }, [conversationId]);
 
-    const fetchConversationTitles = async () => {
+    const fetchConversationTitles = useCallback(async () => {
         if (!userId) return;
         try {
             const response = await fetch(`http://localhost:4004/api/conversations/user/${userId}`, {
@@ -48,109 +112,104 @@ export default function ChatbotPage() {
         } catch (error) {
             console.error('Failed to fetch conversation titles:', error);
         }
-    };
+    }, [userId]);
 
     useEffect(() => {
         if (userId) {
             fetchConversationTitles();
         }
-    }, [userId]);
+    }, [userId, fetchConversationTitles]);
 
     useEffect(() => {
-        console.log("conversationId changed:", conversationId);
-        if (!conversationId) return;
-        // Fetch previous messages when conversationId changes  
-        if (!isFirstMessage) {
-            fetchMessages();
-        }  
-        if (isFirstMessage) {
-            setIsFirstMessage(false);
-        }
-        
-        
-    }, [conversationId]);
+    console.log("conversationId changed:", conversationId);
+    if (!conversationId || conversationId === 'new') return; // Skip for new conversations
+    
+    // Fetch previous messages for existing conversations
+    fetchMessages();
+}, [conversationId, fetchMessages]);
 
     
 
 
+    // MODIFIED: handleSendMessage with streaming
     const handleSendMessage = async (messageText) => {
-    if (!userId) {
-        console.error('User not authenticated');
-        return;
-    }
-    
-    try {
-        // If no conversation exists, create one
-        let convId = conversationId;
-        if (!convId) {
-            try {
-                setIsFirstMessage(true);
-                const res = await fetch('http://localhost:4004/api/conversations', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: userId })
-                });
-                const data = await res.json();
-                convId = data._id;
-                setConversationId(convId); // update state for UI
-                console.log("Created new conversation on mount:", data);
+        if (!userId || isStreaming) return;
 
-                // refresh conversation titles in sidebar
-                await fetchConversationTitles();
-            } catch (error) {
-                console.error("Failed to create conversation on mount:", error);
-            } 
-            
-        };
+        try {
+            setIsStreaming(true);
+            setStreamingMessage("");
 
-        const userMsg = {
-            conversationId: convId,
-            sender: 'user',
-            content: messageText,
-            createdAt: new Date().toISOString()
-        };
-
-        // Add user message to UI instantly
-        setMessages(prev => [...prev, userMsg]);
-        console.log("convId: ", convId);
-        console.log("Added user message:", messageText);
-
-        // Send the message to backend
-        const msgResponse = await fetch(`http://localhost:4004/api/conversations/${convId}/messages`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                userId: userId,
+            // Add user message to UI (not saved yet)
+            const userMsg = {
+                conversationId: conversationId,
+                sender: 'user',
                 content: messageText,
-                sender: 'user'
-            })
-        });
+                createdAt: new Date().toISOString(),
+                isPending: true  // Mark as pending
+            };
+            setMessages(prev => [...prev, userMsg]);
 
-        const replyData = await msgResponse.json();
+            // Prepare conversation history for context
+            const history = messages.map(m => ({
+                role: m.sender === 'user' ? 'user' : 'assistant',
+                content: m.content
+            }));
 
-        
-        if (replyData?.aiMessage) {
-            // Add AI reply to UI
-            setMessages(prev => [...prev, replyData.aiMessage]);
-            console.log("AI reply added: ", replyData.aiMessage);
-        } else {
-            console.warn("No aiMessage returned:", replyData);
+            // Create EventSource for streaming
+            const convId = conversationId || 'new';
+            const url = new URL(`http://localhost:4004/api/conversations/${convId}/stream`);
+            url.searchParams.append('query', messageText);
+            url.searchParams.append('history', JSON.stringify(history));
+
+            const eventSource = new EventSource(url);
+            eventSourceRef.current = eventSource;
+
+            let fullResponse = "";
+
+            eventSource.onmessage = (event) => {
+                const data = event.data;
+                
+                if (data === '[DONE]') {
+                    eventSource.close();
+                    eventSourceRef.current = null;
+                    setIsStreaming(false);
+                    
+                    // Add final AI message to state
+                    const aiMsg = {
+                        sender: 'ai',
+                        content: fullResponse,
+                        createdAt: new Date().toISOString()
+                    };
+                    setMessages(prev => [...prev, aiMsg]);
+                    setStreamingMessage("");
+                    
+                    // NOW save both messages to DB
+                    saveMessages(messageText, fullResponse);
+                    
+                } else if (data.startsWith('[ERROR]')) {
+                    console.error('Stream error:', data);
+                    eventSource.close();
+                    setIsStreaming(false);
+                    
+                } else {
+                    // Append token to streaming message
+                    fullResponse += data;
+                    setStreamingMessage(fullResponse);
+                }
+            };
+
+            eventSource.onerror = (error) => {
+                console.error('EventSource error:', error);
+                eventSource.close();
+                eventSourceRef.current = null;
+                setIsStreaming(false);
+            };
+
+        } catch (error) {
+            console.error('Failed to send message:', error);
+            setIsStreaming(false);
         }
-
-        // Refresh conversation titles
-        const titlesRes = await fetch(`http://localhost:4004/api/conversations/user/${userId}`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-        });
-        const titlesData = await titlesRes.json();
-        setConversationTitles(titlesData); // update sidebar
-        console.log("Updated conversation titles:", titlesData);
-
-    } catch (error) {
-        console.error('Failed to send message:', error);
-    }
-};
-
+    };
 
     // Don't render if user is not authenticated
     if (!userId) {
@@ -161,8 +220,16 @@ export default function ChatbotPage() {
         <div className="flex h-screen">
             <Sidebar conversationTitles={conversationTitles} setConversationTitles={setConversationTitles} setConversationId={setConversationId} userId={userId}/>  
             <div className="flex flex-col flex-1 overflow-hidden">
-                <Conversation messages={messages} />
-                <MessageInput onSendMessage={handleSendMessage} />
+                <Conversation 
+                    messages={messages} 
+                    streamingMessage={streamingMessage}  // NEW prop
+                    isStreaming={isStreaming}            // NEW prop
+                />
+                <MessageInput 
+                    onSendMessage={handleSendMessage} 
+                    onInterrupt={handleInterrupt}        // NEW prop
+                    isStreaming={isStreaming}            // NEW prop
+                />
             </div>
         </div>
     )

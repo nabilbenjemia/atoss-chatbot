@@ -1,8 +1,9 @@
 import AIMessage from "./AIMessage";
 import UserMessage from "./UserMessage";
 import { useRef, useLayoutEffect, useEffect } from "react";
+import PropTypes from "prop-types";
 
-const Conversation = ({ messages }) => {
+const Conversation = ({ messages, streamingMessage, isStreaming }) => { // ADD: new props
     const containerRef = useRef(null);
 
     const scrollToBottom = () => {
@@ -16,6 +17,11 @@ const Conversation = ({ messages }) => {
     useLayoutEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    // ADD: Scroll when streaming message updates
+    useLayoutEffect(() => {
+        scrollToBottom();
+    }, [streamingMessage]);
 
     useEffect(() => {
         const observer = new ResizeObserver(() => {
@@ -31,13 +37,34 @@ const Conversation = ({ messages }) => {
 
     return (
         <div ref={containerRef} className="flex-1 overflow-y-auto px-16 py-4">
-            {messages.map((msg, index) => (
+            {messages.map((msg) => (
                 msg.sender === 'user'
-                    ? <UserMessage key={index} message={msg.content} createdAt={msg.createdAt} />
-                    : <AIMessage key={index} message={msg.content} createdAt={msg.createdAt} />
+                    ? <UserMessage key={msg._id || msg.createdAt} message={msg.content} createdAt={msg.createdAt} />
+                    : <AIMessage key={msg._id || msg.createdAt} message={msg.content} createdAt={msg.createdAt} />
             ))}
+            
+            {/* ADD: Show streaming AI message */}
+            {isStreaming && streamingMessage && (
+                <AIMessage 
+                    message={streamingMessage} 
+                    isStreaming={true}  // Show typing indicator
+                />
+            )}
         </div>
     );
+};
+
+Conversation.propTypes = {
+    messages: PropTypes.arrayOf(
+        PropTypes.shape({
+            _id: PropTypes.string,
+            sender: PropTypes.string.isRequired,
+            content: PropTypes.string.isRequired,
+            createdAt: PropTypes.string,
+        })
+    ).isRequired,
+    streamingMessage: PropTypes.string,
+    isStreaming: PropTypes.bool,
 };
 
 export default Conversation;

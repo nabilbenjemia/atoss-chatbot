@@ -13,12 +13,13 @@ This document describes the **proposed** flow for sending messages with streamin
 
 | Aspect | Current Flow | Proposed Flow |
 |--------|--------------|---------------|
-| Conversation creation | Immediately on first message | After AI completes response |
-| User message save | Before AI response | After AI completes |
-| AI message save | After generation | After stream completes or interrupt |
+| Conversation creation | Immediately on first message | Before stream starts (same timing) |
+| User message save | Saved to DB before AI response | Saved to DB after stream completes |
+| AI message save | After generation (partial response) | After stream completes or interrupt |
 | Send button | Always enabled | Disabled during streaming |
-| AI response display | All at once | Token-by-token streaming |
-| User can interrupt | No | Yes |
+| AI response display | All at once (waits for completion) | Token-by-token streaming (real-time) |
+| User can interrupt | No | Yes (saves partial response) |
+| DB efficiency | Multiple writes per exchange | Batch write after completion |
 
 ---
 
@@ -26,7 +27,7 @@ This document describes the **proposed** flow for sending messages with streamin
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                                    FRONTEND                                          │
+│                                    FRONTEND                                         │
 │   React + Vite (Port 5173)                                                          │
 └───────────────────────────────────────────┬─────────────────────────────────────────┘
                                             │
@@ -34,7 +35,7 @@ This document describes the **proposed** flow for sending messages with streamin
                                             │ POST for save
                                             ▼
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                              NODE.JS BACKEND                                         │
+│                              NODE.JS BACKEND                                        │
 │   Conversation Service (Port 4004)                                                  │
 │   - Proxies streaming from FastAPI                                                  │
 │   - Saves messages to MongoDB after completion                                      │
@@ -43,7 +44,7 @@ This document describes the **proposed** flow for sending messages with streamin
                                             │ SSE Stream
                                             ▼
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                              FASTAPI BACKEND (NEW)                                   │
+│                              FASTAPI BACKEND (NEW)                                  │
 │   AI Service (Port 8000)                                                            │
 │   - Receives user query                                                             │
 │   - Returns StreamingResponse                                                       │
@@ -77,57 +78,63 @@ This document describes the **proposed** flow for sending messages with streamin
      │             │               │        │       │              │             │            │
      │             │               │<───────┘       │              │             │            │
      │             │               │                │              │             │            │
-     │             │ 5. Disable    │                │              │             │            │
+     │             │               │ 5. Create conv │              │             │            │
+     │             │               │    (if needed) │              │             │            │
+     │             │               │───────────────────────────────────────────────────────────>│
+     │             │               │                │              │             │ Create conv│
+     │             │               │<──────────────────────────────────────────────────────────│
+     │             │               │                │              │             │            │
+     │             │ 6. Disable    │                │              │             │            │
      │             │    Send btn   │                │              │             │            │
      │             │<──────────────│                │              │             │            │
      │             │               │                │              │             │            │
-     │             │               │ 6. Add pending │              │             │            │
-     │             │               │    user msg    │              │             │            │
-     │             │               │    to UI       │              │             │            │
+     │             │               │ 7. Add user    │              │             │            │
+     │             │               │    msg to UI   │              │             │            │
+     │             │               │    (pending)   │              │             │            │
      │             │               │────────┐       │              │             │            │
      │             │               │        │       │              │             │            │
      │             │               │<───────┘       │              │             │            │
      │             │               │                │              │             │            │
-     │ 7. See user │               │                │              │             │            │
+     │ 8. See user │               │                │              │             │            │
      │    message  │               │                │              │             │            │
      │<────────────────────────────│                │              │             │            │
      │             │               │                │              │             │            │
-     │             │               │ 8. EventSource │              │             │            │
+     │             │               │ 9. EventSource │              │             │            │
      │             │               │    /stream     │              │             │            │
      │             │               │───────────────>│              │             │            │
      │             │               │                │              │             │            │
-     │             │               │                │ 9. POST      │             │            │
-     │             │               │                │    /generate │             │            │
+     │             │               │                │ 10. POST     │             │            │
+     │             │               │                │     /generate│             │            │
      │             │               │                │─────────────>│             │            │
      │             │               │                │              │             │            │
-     │             │               │                │              │ 10. Stream  │            │
+     │             │               │                │              │ 11. Stream  │            │
      │             │               │                │              │     request │            │
      │             │               │                │              │────────────>│            │
      │             │               │                │              │             │            │
-     │             │               │                │              │ 11. Token 1 │            │
+     │             │               │                │              │ 12. Token 1 │            │
      │             │               │                │              │<────────────│            │
      │             │               │                │              │             │            │
-     │             │               │                │ 12. SSE:     │             │            │
+     │             │               │                │ 13. SSE:     │             │            │
      │             │               │                │     Token 1  │             │            │
      │             │               │                │<─────────────│             │            │
      │             │               │                │              │             │            │
-     │             │               │ 13. SSE:       │              │             │            │
+     │             │               │ 14. SSE:       │              │             │            │
      │             │               │     Token 1    │              │             │            │
      │             │               │<───────────────│              │             │            │
      │             │               │                │              │             │            │
-     │             │               │ 14. Append to  │              │             │            │
+     │             │               │ 15. Append to  │              │             │            │
      │             │               │     streaming  │              │             │            │
      │             │               │     message    │              │             │            │
      │             │               │────────┐       │              │             │            │
      │             │               │        │       │              │             │            │
      │             │               │<───────┘       │              │             │            │
      │             │               │                │              │             │            │
-     │ 15. See AI  │               │                │              │             │            │
+     │ 16. See AI  │               │                │              │             │            │
      │     typing  │               │                │              │             │            │
      │<────────────────────────────│                │              │             │            │
      │             │               │                │              │             │            │
      │   ══════════╪═══════════════╪════════════════╪══════════════╪═════════════╪════════════╪═══
-     │   ║         │               │           REPEAT STEPS 11-15 FOR EACH TOKEN              ║
+     │   ║         │               │           REPEAT STEPS 12-16 FOR EACH TOKEN             ║
      │   ══════════╪═══════════════╪════════════════╪══════════════╪═════════════╪════════════╪═══
      │             │               │                │              │             │            │
      │             │               │                │              │ N. [DONE]   │            │
@@ -141,35 +148,33 @@ This document describes the **proposed** flow for sending messages with streamin
      │             │               │      [DONE]    │              │             │            │
      │             │               │<───────────────│              │             │            │
      │             │               │                │              │             │            │
-     │             │               │ N+3. setIsStreaming(false)    │             │            │
+     │             │               │ N+3. Add AI    │              │             │            │
+     │             │               │     msg to UI  │              │             │            │
      │             │               │────────┐       │              │             │            │
      │             │               │        │       │              │             │            │
      │             │               │<───────┘       │              │             │            │
      │             │               │                │              │             │            │
-     │             │ N+4. Enable   │                │              │             │            │
-     │             │     Send btn  │                │              │             │            │
-     │             │<──────────────│                │              │             │            │
-     │             │               │                │              │             │            │
-     │             │               │ N+5. POST /api/conversations  │             │            │
-     │             │               │      (create if needed)       │             │            │
+     │             │               │ N+4. POST      │              │             │            │
+     │             │               │  /messages/    │              │             │            │
+     │             │               │  batch         │              │             │            │
      │             │               │───────────────>│              │             │            │
      │             │               │                │              │             │            │
      │             │               │                │──────────────────────────────────────────>│
-     │             │               │                │              │             │ Create conv│
-     │             │               │                │<─────────────────────────────────────────│
-     │             │               │                │              │             │            │
-     │             │               │ N+6. POST      │              │             │            │
-     │             │               │  /messages     │              │             │            │
-     │             │               │  (user + AI)   │              │             │            │
-     │             │               │───────────────>│              │             │            │
-     │             │               │                │              │             │            │
-     │             │               │                │───────────────────────────────────────────>│
      │             │               │                │              │             │ Save both  │
      │             │               │                │              │             │ messages   │
      │             │               │                │<──────────────────────────────────────────│
      │             │               │                │              │             │            │
-     │             │               │ N+7. 201 OK    │              │             │            │
+     │             │               │ N+5. 201 OK    │              │             │            │
      │             │               │<───────────────│              │             │            │
+     │             │               │                │              │             │            │
+     │             │               │ N+6. setIsStreaming(false)    │             │            │
+     │             │               │────────┐       │              │             │            │
+     │             │               │        │       │              │             │            │
+     │             │               │<───────┘       │              │             │            │
+     │             │               │                │              │             │            │
+     │             │ N+7. Enable   │                │              │             │            │
+     │             │     Send btn  │                │              │             │            │
+     │             │<──────────────│                │              │             │            │
      │             │               │                │              │             │            │
      │             │               │ N+8. Refresh   │              │             │            │
      │             │               │      sidebar   │              │             │            │
@@ -237,8 +242,7 @@ const [conversationTitles, setConversationTitles] = useState([]);
 // NEW states for streaming
 const [isStreaming, setIsStreaming] = useState(false);           // Is AI currently streaming?
 const [streamingMessage, setStreamingMessage] = useState("");    // Current streaming content
-const [pendingUserMessage, setPendingUserMessage] = useState(null); // User msg waiting to be saved
-const [eventSource, setEventSource] = useState(null);            // SSE connection reference
+const eventSourceRef = useRef(null);                             // SSE connection reference (useRef for direct access)
 ```
 
 ---
@@ -391,22 +395,24 @@ async def generate_stream(query: str, history: list):
 
 #### 2.1 New route for SSE proxy
 ```javascript
-// backend/conversation/routes/messageRoutes.js
+// backend/conversation/routes/conversationRoutes.js
 
-// ADD: Streaming endpoint
-router.get('/:conversationId/stream', messageController.streamMessage);
+// ADD: Streaming endpoint (must come AFTER specific routes like /user/:userId)
+router.get('/:conversationId/stream', conversationController.streamMessage);
 
-// MODIFY: Batch save messages after stream completes
-router.post('/:conversationId/messages/batch', messageController.createMessageBatch);
+// ADD: Batch save messages after stream completes
+router.post('/:conversationId/messages/batch', conversationController.createMessageBatch);
 ```
 
 #### 2.2 New controller methods
 ```javascript
-// backend/conversation/controllers/messageController.js
+// backend/conversation/controllers/conversationController.js
 
 const axios = require('axios');
+const conversationService = require('../services/conversationService');
+const messageService = require('../services/messageService');
 
-/** GET /api/conversations/:conversationId/stream?query=... */
+/** GET /api/conversations/:conversationId/stream?query=...&history=... */
 const streamMessage = async (req, res) => {
     const { conversationId } = req.params;
     const { query, history } = req.query;
@@ -460,9 +466,11 @@ const createMessageBatch = async (req, res) => {
         }
 
         // Update title if first message
-        const conversation = await Conversation.findById(convId);
-        if (conversation.title === "Untitled") {
-            // TODO: Use AI to generate title from userMessage
+        const conversation = await conversationService.getConversationById(convId);
+        if (conversation && conversation.title === "Untitled") {
+             // TODO: Use AI to generate title from userMessage
+
+            // Extract first 30 chars from user message as title
             const suggestedTitle = userMessage.substring(0, 30) + "...";
             await conversationService.updateConversationTitle(convId, suggestedTitle);
         }
@@ -492,9 +500,11 @@ const createMessageBatch = async (req, res) => {
 };
 
 module.exports = {
-    createMessage,
-    getMessagesByConversationId,
-    deleteMessage,
+    createConversation,
+    getConversationById,
+    getUserConversations,
+    updateConversationTitle,
+    deleteConversation,
     streamMessage,        // NEW
     createMessageBatch,   // NEW
 };
@@ -509,11 +519,22 @@ module.exports = {
 // frontend/src/pages/ChatbotPage.jsx
 
 import { useEffect, useState, useRef } from 'react'
-// ... existing imports
+import { useNavigate } from 'react-router-dom'
+import Sidebar from '../components/Sidebar'
+import MessageInput from '../components/MessageInput'
+import Conversation from '../components/Conversation'
+import { getCurrentUser } from '../services/api'
 
 export default function ChatbotPage() {
-    // ... existing state
+    const navigate = useNavigate();
+    const currentUser = getCurrentUser();
+    const userId = currentUser?.id;
     
+    // Existing state
+    const [conversationId, setConversationId] = useState(null);
+    const [messages, setMessages] = useState([]);
+    const [conversationTitles, setConversationTitles] = useState([]);
+
     // NEW: Streaming states
     const [isStreaming, setIsStreaming] = useState(false);
     const [streamingMessage, setStreamingMessage] = useState("");
@@ -547,34 +568,31 @@ export default function ChatbotPage() {
     const saveMessages = async (userMsg, aiMsg) => {
         const isNew = !conversationId;
         
-        const response = await fetch(
-            `http://localhost:4004/api/conversations/${conversationId || 'new'}/messages/batch`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userMessage: userMsg,
-                    aiMessage: aiMsg,
-                    userId: userId,
-                    isNewConversation: isNew
-                })
+        try {
+            const response = await fetch(
+                `http://localhost:4004/api/conversations/${conversationId || 'new'}/messages/batch`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userMessage: userMsg,
+                        aiMessage: aiMsg,
+                        userId: userId,
+                        isNewConversation: isNew
+                    })
+                }
+            );
+            
+            const data = await response.json();
+            
+            if (isNew) {
+                setConversationId(data.conversationId);
             }
-        );
-        
-        const data = await response.json();
-        
-        if (isNew) {
-            setConversationId(data.conversationId);
+            
+            await fetchConversationTitles();
+        } catch (error) {
+            console.error('Failed to save messages:', error);
         }
-        
-        // Finalize messages in state
-        setMessages(prev => {
-            const updated = [...prev];
-            // Update the last two messages with DB IDs
-            return updated;
-        });
-        
-        await fetchConversationTitles();
     };
 
     // MODIFIED: handleSendMessage with streaming
@@ -678,52 +696,148 @@ export default function ChatbotPage() {
 ```
 
 #### 3.2 Update MessageInput.jsx
+
+**Current State:** The component already receives `onSendMessage`, `onInterrupt`, and `isStreaming` props, but doesn't use `isStreaming` to disable the textarea or conditionally show Stop/Send buttons.
+
+**Changes Required:**
+1. Disable textarea when `isStreaming` is true
+2. Add conditional styling for disabled state (gray background)
+3. Conditionally render Stop button (red) or Send button based on `isStreaming`
+4. Prevent sending when streaming is in progress
+
 ```javascript
 // frontend/src/components/MessageInput.jsx
 
-export default function MessageInput({ onSendMessage, onInterrupt, isStreaming }) {
-    // ... existing code
+import React, { useRef, useState } from "react";
 
-    return (
-        <div className="sticky bottom-0 ...">
-            <div className="flex items-center gap-1 ...">
-                <textarea
-                    // ... existing props
-                    disabled={isStreaming}  // Disable during streaming
-                    className={`... ${isStreaming ? 'bg-gray-100' : 'bg-transparent'}`}
-                />
-                
-                {isStreaming ? (
-                    <button 
-                        onClick={onInterrupt}
-                        className="self-end px-3 py-0 mb-2 bg-red-500 text-white rounded-xl 
-                                   hover:bg-red-600 transition-colors duration-200 font-semibold"
-                    >
-                        Stop
-                    </button>
-                ) : (
-                    <button 
-                        onClick={handleSend}
-                        disabled={!message.trim()}
-                        className="self-end px-3 py-0 mb-2 bg-tum-blue text-white rounded-xl 
-                                   hover:bg-tum-dark-blue transition-colors duration-200 font-semibold
-                                   disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    >
-                        Send
-                    </button>
-                )}
-            </div>
-        </div>
-    );
+export default function MessageInput({ onSendMessage, onInterrupt, isStreaming }) {
+  const textareaRef = useRef(null);
+  const [message, setMessage] = useState("");
+
+  const handleInput = (e) => {
+    const textarea = e.target;
+    setMessage(textarea.value);
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+  };
+
+  const handleSend = () => {
+    if (message.trim() && !isStreaming) {  // ADD: Check isStreaming
+      onSendMessage(message);
+      setMessage("");
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+        textareaRef.current.value = "";
+      }
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !isStreaming) {  // ADD: Check isStreaming
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  return (
+    <div className="sticky bottom-0 mt-auto w-full max-w-3xl h-auto mx-auto p-4 bg-white border-t border-tum-gray z-10">
+      <div className="flex items-center gap-1 bg-white rounded-2xl shadow-lg border border-tum-blue-light-2 p-1">
+        <textarea
+          ref={textareaRef}
+          placeholder={isStreaming ? "AI is responding..." : "Type your message..."}  // CHANGE: Dynamic placeholder
+          disabled={isStreaming}  // ADD: Disable during streaming
+          className={`flex-1 outline-none text-gray-700 placeholder-gray-400 resize-y min-h-[40px] max-h-[240px] overflow-y-auto pl-3 py-2 text-sm ${
+            isStreaming ? 'bg-gray-100 cursor-not-allowed' : 'bg-transparent'  // ADD: Conditional styling
+          }`}
+          rows={1}
+          onInput={handleInput}
+          onKeyPress={handleKeyPress}
+          value={message}
+        />
+        
+        {/* CHANGE: Conditional button rendering */}
+        {isStreaming ? (
+          <button 
+            onClick={onInterrupt}
+            className="self-end px-3 py-0 mb-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors duration-200 font-semibold"
+          >
+            Stop
+          </button>
+        ) : (
+          <button 
+            onClick={handleSend}
+            disabled={!message.trim()}
+            className="self-end px-3 py-0 mb-2 bg-tum-blue text-white rounded-xl hover:bg-tum-dark-blue transition-colors duration-200 font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
+          >
+            Send
+          </button>
+        )}
+      </div>
+      <p className="text-center text-xs text-tum-gray mt-2">
+        © Technische Universität München 2026
+      </p>
+    </div>
+  );
 }
 ```
 
+**Key Changes Summary:**
+| Location | Change |
+|----------|--------|
+| `handleSend()` | Add `&& !isStreaming` check |
+| `handleKeyPress()` | Add `&& !isStreaming` check |
+| `<textarea placeholder>` | Dynamic: "AI is responding..." when streaming |
+| `<textarea disabled>` | Set to `{isStreaming}` |
+| `<textarea className>` | Add conditional `bg-gray-100 cursor-not-allowed` when streaming |
+| Button section | Replace single Send button with conditional Stop/Send buttons |
+
 #### 3.3 Update Conversation.jsx
+
+**Current State:** The component only receives `messages` prop and renders them. It doesn't handle streaming message display.
+
+**Changes Required:**
+1. Accept `streamingMessage` and `isStreaming` props
+2. Render the streaming AI message below the messages list
+3. Update scroll behavior to account for streaming content
+
 ```javascript
 // frontend/src/components/Conversation.jsx
 
-const Conversation = ({ messages, streamingMessage, isStreaming }) => {
-    // ... existing code
+import AIMessage from "./AIMessage";
+import UserMessage from "./UserMessage";
+import { useRef, useLayoutEffect, useEffect } from "react";
+
+const Conversation = ({ messages, streamingMessage, isStreaming }) => {  // ADD: new props
+    const containerRef = useRef(null);
+
+    const scrollToBottom = () => {
+        if (containerRef.current) {
+            requestAnimationFrame(() => {
+                containerRef.current.scrollTop = containerRef.current.scrollHeight;
+            });
+        }
+    };
+
+    useLayoutEffect(() => {
+        scrollToBottom();
+    }, [messages]);
+
+    // ADD: Scroll when streaming message updates
+    useLayoutEffect(() => {
+        scrollToBottom();
+    }, [streamingMessage]);
+
+    useEffect(() => {
+        const observer = new ResizeObserver(() => {
+            scrollToBottom();
+        });
+
+        if (containerRef.current) {
+            observer.observe(containerRef.current);
+        }
+
+        return () => observer.disconnect();
+    }, []);
 
     return (
         <div ref={containerRef} className="flex-1 overflow-y-auto px-16 py-4">
@@ -733,7 +847,7 @@ const Conversation = ({ messages, streamingMessage, isStreaming }) => {
                     : <AIMessage key={index} message={msg.content} createdAt={msg.createdAt} />
             ))}
             
-            {/* Show streaming AI message */}
+            {/* ADD: Show streaming AI message */}
             {isStreaming && streamingMessage && (
                 <AIMessage 
                     message={streamingMessage} 
@@ -743,32 +857,64 @@ const Conversation = ({ messages, streamingMessage, isStreaming }) => {
         </div>
     );
 };
+
+export default Conversation;
 ```
 
+**Key Changes Summary:**
+| Location | Change |
+|----------|--------|
+| Props | Add `streamingMessage`, `isStreaming` |
+| `useLayoutEffect` | Add new hook to scroll when `streamingMessage` updates |
+| JSX | Add conditional rendering of streaming AIMessage |
+
 #### 3.4 Update AIMessage.jsx
+
+**Current State:** The component only receives `message` and `createdAt` props. No support for streaming indicator.
+
+**Changes Required:**
+1. Accept `isStreaming` prop
+2. Render a blinking cursor when streaming
+
 ```javascript
 // frontend/src/components/AIMessage.jsx
 
-export default function AIMessage({ message, createdAt, isStreaming }) {
-    // ... existing code
+export default function AIMessage({ message, createdAt, isStreaming }) {  // ADD: isStreaming prop
+    const formatTime = (isoString) => {
+        const date = new Date(isoString);
+        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    };
 
     return (
         <div className="flex justify-start mb-4 group">
             <div className="relative max-w-[60%]">
                 <div className="bg-gray-200 text-gray-800 px-4 py-2 rounded-2xl break-words">
                     {message}
+                    {/* ADD: Blinking cursor for streaming indicator */}
                     {isStreaming && (
                         <span className="inline-block w-2 h-4 ml-1 bg-gray-500 animate-pulse">
                             │
                         </span>
                     )}
                 </div>
-                {/* ... timestamp */}
+                {/* Only show timestamp when not streaming */}
+                {createdAt && !isStreaming && (
+                    <span className="absolute left-0 -bottom-5 text-xs text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {formatTime(createdAt)}
+                    </span>
+                )}
             </div>
         </div>
-    );
+    )
 }
 ```
+
+**Key Changes Summary:**
+| Location | Change |
+|----------|--------|
+| Props | Add `isStreaming` |
+| Message content | Add blinking cursor `│` with `animate-pulse` when streaming |
+| Timestamp | Hide timestamp when streaming (no `createdAt` yet) |
 
 ---
 
@@ -799,15 +945,15 @@ FASTAPI_URL=http://localhost:8000
 
 ## File Changes Summary
 
-| File | Action | Description |
-|------|--------|-------------|
-| `backend/ai-service/*` | CREATE | New FastAPI service for LLM streaming |
-| `backend/conversation/routes/messageRoutes.js` | MODIFY | Add streaming and batch save routes |
-| `backend/conversation/controllers/messageController.js` | MODIFY | Add stream proxy and batch save |
-| `frontend/src/pages/ChatbotPage.jsx` | MODIFY | Add streaming state, EventSource handling |
-| `frontend/src/components/MessageInput.jsx` | MODIFY | Add disable state, Stop button |
-| `frontend/src/components/Conversation.jsx` | MODIFY | Show streaming message |
-| `frontend/src/components/AIMessage.jsx` | MODIFY | Add typing indicator |
+| File | Action | Current State | Changes Required |
+|------|--------|---------------|------------------|
+| `backend/ai-service/*` | CREATE | Does not exist | New FastAPI service for LLM streaming |
+| `backend/conversation/routes/conversationRoutes.js` | MODIFY | Basic CRUD routes | Add `/stream` and `/messages/batch` routes |
+| `backend/conversation/controllers/conversationController.js` | MODIFY | Basic CRUD methods | Add `streamMessage` and `createMessageBatch` methods |
+| `frontend/src/pages/ChatbotPage.jsx` | ✅ DONE | Already has streaming logic | Streaming states, EventSource handling, saveMessages already implemented |
+| `frontend/src/components/MessageInput.jsx` | MODIFY | Has props but doesn't use `isStreaming` | Add disabled state, conditional Stop/Send button, prevent send during stream |
+| `frontend/src/components/Conversation.jsx` | MODIFY | Only renders `messages` | Accept `streamingMessage`/`isStreaming` props, render streaming AI message |
+| `frontend/src/components/AIMessage.jsx` | MODIFY | Only `message` and `createdAt` props | Accept `isStreaming` prop, add blinking cursor indicator |
 
 ---
 
