@@ -16,10 +16,12 @@ class Settings(BaseSettings):
 
     # Ollama Configuration
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "qwen3:0.6b"
-    OLLAMA_TEMPERATURE: float = 0.7
-    OLLAMA_TOP_P: float = 0.7
-    OLLAMA_NUM_CTX: int = 2048
+    OLLAMA_MODEL: str = "qwen3:1.7b"
+    OLLAMA_TEMPERATURE: float = 0.6  # Lower for more focused responses
+    OLLAMA_TOP_P: float = 0.8
+    OLLAMA_NUM_CTX: int = 4096  # Larger context window
+    OLLAMA_REPEAT_PENALTY: float = 1.2  # Moderate repetition penalty
+    OLLAMA_NUM_PREDICT: int = 1024  # Allow longer responses
 
     # Embedding Configuration
     EMBEDDING_MODEL: str = "Qwen/Qwen3-Embedding-0.6B"

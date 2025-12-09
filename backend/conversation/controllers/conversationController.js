@@ -6,14 +6,14 @@ const createConversation = async (req, res) => {
   try {
     const { userId } = req.body;
     console.log('Received request from:', { userId }); // Debug log
-    
+
     if (!userId) {
       return res.status(400).json({ error: "userId is required" });
     }
-    
+
     const conversation = await conversationService.createConversation({ userId, title: "Untitled" });
     console.log('Created conversation:', conversation); // Debug log
-    
+
     res.status(201).json(conversation);
   } catch (error) {
     console.error('Error creating conversation:', error); // Log the actual error
@@ -93,6 +93,17 @@ const streamMessage = async (req, res) => {
     const { conversationId } = req.params;
     const { query, history } = req.query;
 
+    console.log('Stream request received:', { conversationId, query: query?.substring(0, 50), historyLength: history?.length });
+
+    // Validate query parameter
+    if (!query) {
+        console.error('Missing query parameter');
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.write(`data: ${JSON.stringify({ error: 'Missing query parameter' })}\n\n`);
+        res.end();
+        return;
+    }
+
     // Set SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -101,33 +112,47 @@ const streamMessage = async (req, res) => {
 
     try {
         // Parse history and convert to ChatMessage format
-        const parsedHistory = JSON.parse(history || '[]');
+        let parsedHistory = [];
+        try {
+            const decoded = JSON.parse(history || '[]');
+            // Handle double-stringified history
+            parsedHistory = typeof decoded === 'string' ? JSON.parse(decoded) : decoded;
+        } catch (e) {
+            console.warn('Failed to parse history:', e.message);
+        }
+        
         const conversationHistory = parsedHistory.map(msg => ({
-            role: msg.sender === 'user' ? 'user' : 'assistant',
+            role: msg.role || (msg.sender === 'user' ? 'user' : 'assistant'),
             content: msg.content
         }));
+
+        console.log('Forwarding to LLM server with', conversationHistory.length, 'history messages');
 
         // Proxy to FastAPI stream endpoint
         const response = await axios({
             method: 'POST',
             url: 'http://localhost:8000/api/chat/stream',
-            data: { 
+            data: {
                 message: query,
                 conversation_id: conversationId,
                 conversation_history: conversationHistory
             },
-            responseType: 'stream'
+            responseType: 'stream',
+            timeout: 120000  // 2 minute timeout
         });
 
-        // Pipe the stream to client
+        // Pipe the SSE stream directly to the client
         response.data.pipe(res);
 
-        response.data.on('end', () => {
+        response.data.on('error', (err) => {
+            console.error('Stream error:', err);
+            res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
             res.end();
         });
 
     } catch (error) {
-        res.write(`data: [ERROR] ${error.message}\n\n`);
+        console.error('Stream endpoint error:', error.message);
+        res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
         res.end();
     }
 };
@@ -142,9 +167,9 @@ const createMessageBatch = async (req, res) => {
 
         // Create conversation if new
         if (isNewConversation || conversationId === 'new') {
-            const newConv = await conversationService.createConversation({ 
-                userId, 
-                title: "Untitled" 
+            const newConv = await conversationService.createConversation({
+                userId,
+                title: "Untitled"
             });
             convId = newConv._id;
         }

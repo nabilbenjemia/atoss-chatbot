@@ -3,7 +3,7 @@ Chat Controller
 Handles chat-related API requests
 """
 import logging
-from typing import Optional, List
+from typing import AsyncGenerator, Optional, List
 from pydantic import BaseModel, Field
 
 from services.rag_chain_service import rag_chain_service
@@ -101,7 +101,7 @@ class ChatController:
             logger.error("Error generating response: %s", e)
             raise
 
-    async def stream_response(self, request: ChatRequest):
+    async def stream_response(self, request: ChatRequest)-> AsyncGenerator[str, None]:
         """Stream a response for a chat request"""
         if not startup_service.is_loaded:
             raise RuntimeError("LLM service is not ready. Please wait for initialization.")

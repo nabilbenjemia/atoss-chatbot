@@ -9,7 +9,7 @@ export default function ChatbotPage() {
     const navigate = useNavigate();
     const currentUser = getCurrentUser();
     const userId = currentUser?.id;
-    
+
     // Existing state
     const [conversationId, setConversationId] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -36,7 +36,7 @@ export default function ChatbotPage() {
             eventSourceRef.current = null;
         }
         setIsStreaming(false);
-        
+
         // Save the partial response if there's content
         if (streamingMessage && messages.length > 0) {
             // Get the last user message (most recent)
@@ -49,7 +49,7 @@ export default function ChatbotPage() {
                     createdAt: new Date().toISOString()
                 };
                 setMessages(prev => [...prev, aiMsg]);
-                
+
                 // Save to DB
                 await saveMessages(lastUserMsg.content, streamingMessage);
             }
@@ -60,7 +60,7 @@ export default function ChatbotPage() {
     // NEW: Save messages to DB
     const saveMessages = async (userMsg, aiMsg) => {
         const isNew = !conversationId;
-        
+
         try {
             const response = await fetch(
                 `http://localhost:4004/api/conversations/${conversationId || 'new'}/messages/batch`,
@@ -75,13 +75,13 @@ export default function ChatbotPage() {
                     })
                 }
             );
-            
+
             const data = await response.json();
-            
+
             if (isNew) {
                 setConversationId(data.conversationId);
             }
-            
+
             await fetchConversationTitles();
         } catch (error) {
             console.error('Failed to save messages:', error);
@@ -123,6 +123,7 @@ export default function ChatbotPage() {
         }
     }, [userId]);
 
+    // when user click on different conversation from sidebar
     useEffect(() => {
         if (userId) {
             fetchConversationTitles();
@@ -132,17 +133,23 @@ export default function ChatbotPage() {
     useEffect(() => {
     console.log("conversationId changed:", conversationId);
     if (!conversationId || conversationId === 'new') return; // Skip for new conversations
-    
+
     // Fetch previous messages for existing conversations
     fetchMessages();
 }, [conversationId, fetchMessages]);
 
-    
+
 
 
     // MODIFIED: handleSendMessage with streaming
     const handleSendMessage = async (messageText) => {
         if (!userId || isStreaming) return;
+        if (!messageText || messageText.trim() === '') {
+            console.error('Empty message text');
+            return;
+        }
+
+        console.log('Sending message:', messageText);
 
         try {
             setIsStreaming(true);
@@ -156,10 +163,10 @@ export default function ChatbotPage() {
                 createdAt: new Date().toISOString(),
                 isPending: true  // Mark as pending
             };
-            setMessages(prev => [...prev, userMsg]); // 
+            setMessages(prev => [...prev, userMsg]); //
 
-            // Prepare conversation history for context
-            const history = messages.map(m => ({
+            // Prepare conversation history for context (last 4 messages for context)
+            const history = messages.slice(-4).map(m => ({
                 role: m.sender === 'user' ? 'user' : 'assistant',
                 content: m.content
             }));
@@ -170,40 +177,49 @@ export default function ChatbotPage() {
             url.searchParams.append('query', messageText);
             url.searchParams.append('history', JSON.stringify(history));
 
+            console.log('EventSource URL:', url.toString());
+
             const eventSource = new EventSource(url);
             eventSourceRef.current = eventSource;
 
             let fullResponse = "";
 
             eventSource.onmessage = (event) => {
-                const data = event.data;
-                
-                if (data === '[DONE]') {
-                    eventSource.close();
-                    eventSourceRef.current = null;
-                    setIsStreaming(false);
-                    
-                    // Add final AI message to state
-                    const aiMsg = {
-                        sender: 'ai',
-                        content: fullResponse,
-                        createdAt: new Date().toISOString()
-                    };
-                    setMessages(prev => [...prev, aiMsg]);
-                    setStreamingMessage("");
-                    
-                    // NOW save both messages to DB
-                    saveMessages(messageText, fullResponse);
-                    
-                } else if (data.startsWith('[ERROR]')) {
-                    console.error('Stream error:', data);
-                    eventSource.close();
-                    setIsStreaming(false);
-                    
-                } else {
-                    // Append token to streaming message
-                    fullResponse += data;
-                    setStreamingMessage(fullResponse);
+                try {
+                    const parsed = JSON.parse(event.data);
+
+                    if (parsed.done) {
+                        // Python sends {"done": true} when complete
+                        eventSource.close();
+                        eventSourceRef.current = null;
+                        setIsStreaming(false);
+
+                        // Add final AI message to state
+                        const aiMsg = {
+                            sender: 'ai',
+                            content: fullResponse,
+                            createdAt: new Date().toISOString()
+                        };
+                        setMessages(prev => [...prev, aiMsg]);
+                        setStreamingMessage("");
+
+                        // NOW save both messages to DB
+                        saveMessages(messageText, fullResponse);
+
+                    } else if (parsed.error) {
+                        console.error('Stream error:', parsed.error);
+                        eventSource.close();
+                        eventSourceRef.current = null;
+                        setIsStreaming(false);
+
+                    } else if (parsed.content !== undefined) {
+                        // Python sends {"content": "token"}
+                        fullResponse += parsed.content;
+                        setStreamingMessage(fullResponse);
+                    }
+                } catch (e) {
+                    // Fallback for non-JSON data
+                    console.warn('Non-JSON SSE data:', event.data);
                 }
             };
 
@@ -227,15 +243,15 @@ export default function ChatbotPage() {
 
     return (
         <div className="flex h-screen">
-            <Sidebar conversationTitles={conversationTitles} setConversationTitles={setConversationTitles} setConversationId={setConversationId} userId={userId}/>  
+            <Sidebar conversationTitles={conversationTitles} setConversationTitles={setConversationTitles} setConversationId={setConversationId} userId={userId}/>
             <div className="flex flex-col flex-1 overflow-hidden">
-                <Conversation 
-                    messages={messages} 
+                <Conversation
+                    messages={messages}
                     streamingMessage={streamingMessage}  // NEW prop
                     isStreaming={isStreaming}            // NEW prop
                 />
-                <MessageInput 
-                    onSendMessage={handleSendMessage} 
+                <MessageInput
+                    onSendMessage={handleSendMessage}
                     onInterrupt={handleInterrupt}        // NEW prop
                     isStreaming={isStreaming}            // NEW prop
                 />

@@ -1,10 +1,19 @@
 # Flow Diagram: Send Message Button Click
 
-This document describes the complete flow when a user types a message and clicks the "Send" button (or presses Enter) in the chatbox.
+This document describes the complete flow when a user types a message and clicks the "Send" button (or presses Enter) in the chatbox. **The streaming implementation is now complete.**
 
 ---
 
-## Sequence Diagram
+## Architecture Overview
+
+The send message flow involves three services:
+1. **Frontend (React)** - Port 5173
+2. **Conversation Service (Node.js)** - Port 4004
+3. **LLM Service (FastAPI)** - Port 8000
+
+---
+
+## Sequence Diagram (Streaming Flow)
 
 ```
 ┌─────────┐    ┌──────────────┐    ┌──────────────┐    ┌────────────┐    ┌──────────┐    ┌─────────┐
@@ -163,7 +172,7 @@ User types a message in the textarea and clicks "Send" button or presses Enter.
 #### Step 3: MessageInput.handleSend()
 ```javascript
 const handleSend = () => {
-    if (message.trim()) {
+    if (message.trim() && !isStreaming) {
         onSendMessage(message);      // Call parent's handler
         setMessage("");              // Clear input
         textareaRef.current.style.height = 'auto';  // Reset height
@@ -176,7 +185,7 @@ The `onSendMessage` prop calls `handleSendMessage(messageText)` in ChatbotPage.
 
 ---
 
-### Phase 2: Conversation Creation (Steps 5-10) - Only for New Conversations
+### Phase 2: Conversation Creation (Steps 5-6) - Only for New Conversations
 
 #### Step 5: Check Conversation State
 ```javascript
@@ -186,9 +195,8 @@ if (!convId) {
 }
 ```
 
-#### Steps 6a-10a: Create New Conversation (if needed)
+#### Steps 5-6: Create New Conversation (if needed)
 ```javascript
-setIsFirstMessage(true);
 const res = await fetch('http://localhost:4004/api/conversations', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -197,96 +205,196 @@ const res = await fetch('http://localhost:4004/api/conversations', {
 const data = await res.json();
 convId = data._id;
 setConversationId(convId);
-await fetchConversationTitles();  // Refresh sidebar
-```
-
-**Backend (conversationController.js):**
-```javascript
-const conversation = await conversationService.createConversation({ 
-    userId, 
-    title: "Untitled" 
-});
 ```
 
 ---
 
-### Phase 3: Optimistic UI Update (Steps 11-13)
+### Phase 3: Streaming Setup (Steps 7-10)
 
-#### Step 11-12: Add User Message Immediately
+#### Step 7: Set Streaming State and Add User Message
 ```javascript
+setIsStreaming(true);
+setStreamingMessage("");
+
 const userMsg = {
     conversationId: convId,
     sender: 'user',
     content: messageText,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    isPending: true
 };
-setMessages(prev => [...prev, userMsg]);  // User sees message instantly
+setMessages(prev => [...prev, userMsg]);
 ```
 
-This is an **optimistic update** - the message appears before the server confirms it.
+#### Step 9: Disable Send Button
+The `isStreaming` state automatically disables the send button and shows a "Stop" button instead.
 
----
-
-### Phase 4: Backend Message Processing (Steps 14-20)
-
-#### Step 14: Send to Backend
+#### Step 10: Connect to Streaming Endpoint
 ```javascript
-const msgResponse = await fetch(`http://localhost:4004/api/conversations/${convId}/messages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-        userId: userId,
-        content: messageText,
-        sender: 'user'
-    })
-});
-```
+const history = messages.map(m => ({
+    role: m.sender === 'user' ? 'user' : 'assistant',
+    content: m.content
+}));
 
-#### Steps 15-19: Backend Processing (messageController.js)
-```javascript
-// Step 15: Validate conversation exists
-const conversation = await Conversation.findById(conversationId);
+const url = new URL(`http://localhost:4004/api/conversations/${convId}/stream`);
+url.searchParams.append('query', messageText);
+url.searchParams.append('history', JSON.stringify(history));
 
-// Step 16: Update title if first message
-if (conversation.title === "Untitled") {
-    const suggestedTitle = "Conv at " + new Date().toLocaleDateString() + " " + 
-                          new Date().toLocaleTimeString();
-    await conversationService.updateConversationTitle(conversationId, suggestedTitle);
-}
-
-// Step 17: Save user message
-const userMessage = await messageService.createMessage({ 
-    conversationId, sender, content 
-});
-
-// Step 18-19: Generate and save AI response
-const AIResponse = "This is a placeholder response to your message: " + content;
-const AIMessage = await messageService.createMessage({ 
-    conversationId, 
-    sender: "ai", 
-    content: AIResponse 
-});
-
-// Step 20: Return AI message
-return res.status(201).json({aiMessage: AIMessage});
+const eventSource = new EventSource(url);
+eventSourceRef.current = eventSource;
 ```
 
 ---
 
-### Phase 5: Display AI Response (Steps 21-25)
+### Phase 4: Node.js Proxy to FastAPI (Step 11)
 
-#### Step 21-22: Add AI Message to UI
+**conversationController.js - streamMessage:**
 ```javascript
-if (replyData?.aiMessage) {
-    setMessages(prev => [...prev, replyData.aiMessage]);
-}
+const streamMessage = async (req, res) => {
+    const { conversationId } = req.params;
+    const { query, history } = req.query;
+
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    // Proxy to FastAPI
+    const response = await axios({
+        method: 'POST',
+        url: 'http://localhost:8000/api/chat/stream',
+        data: {
+            message: query,
+            conversation_id: conversationId,
+            conversation_history: conversationHistory
+        },
+        responseType: 'stream',
+        timeout: 120000
+    });
+
+    // Pipe the stream to client
+    response.data.pipe(res);
+};
 ```
 
-#### Steps 23-25: Refresh Sidebar
+---
+
+### Phase 5: FastAPI RAG Processing (Step 12)
+
+**rag_chain_service.py - stream_response:**
+```python
+async def stream_response(self, question: str, chat_history: str = ""):
+    # 1. Retrieve relevant documents
+    docs = await retriever_service.retrieve(question)
+    context = self._format_docs(docs)
+
+    # 2. Format the German RAG prompt
+    prompt_text = self._prompt.format(
+        context=context,
+        user_question=question,
+        chat_history=chat_history
+    )
+
+    # 3. Stream the response from Ollama
+    llm = llm_manager.get_streaming_llm()
+    async for chunk in llm.astream(prompt_text):
+        if hasattr(chunk, 'content') and chunk.content:
+            yield chunk.content
+```
+
+---
+
+### Phase 6: Streaming Response (Steps 13-16 repeated)
+
+**chat_routes.py - stream_response:**
+```python
+async def event_generator():
+    async for chunk in chat_controller.stream_response(request):
+        yield f"data: {json.dumps({'content': chunk})}\n\n"
+    yield f"data: {json.dumps({'done': True})}\n\n"
+
+return StreamingResponse(
+    event_generator(),
+    media_type="text/event-stream"
+)
+```
+
+**Frontend handling:**
 ```javascript
-const titlesRes = await fetch(`http://localhost:4004/api/conversations/user/${userId}`);
-const titlesData = await titlesRes.json();
-setConversationTitles(titlesData);  // Updates sidebar with new title
+eventSource.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+
+    if (data.done) {
+        eventSource.close();
+        setIsStreaming(false);
+
+        // Add AI message to messages
+        const aiMsg = {
+            sender: 'ai',
+            content: fullResponse,
+            createdAt: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, aiMsg]);
+        setStreamingMessage("");
+
+        // Save messages to DB
+        saveMessages(messageText, fullResponse);
+
+    } else if (data.content) {
+        fullResponse += data.content;
+        setStreamingMessage(fullResponse);
+    }
+};
+```
+
+---
+what
+### Phase 7: Save Messages to DB (Steps N+4 to N+6)
+
+**conversationController.js - createMessageBatch:**
+```javascript
+const createMessageBatch = async (req, res) => {
+    const { conversationId } = req.params;
+    const { userMessage, aiMessage, userId, isNewConversation } = req.body;
+
+    let convId = conversationId;
+
+    // Create conversation if new
+    if (isNewConversation || conversationId === 'new') {
+        const newConv = await conversationService.createConversation({
+            userId,
+            title: "Untitled"
+        });
+        convId = newConv._id;
+    }
+
+    // Update title if first message
+    const conversation = await conversationService.getConversationById(convId);
+    if (conversation && conversation.title === "Untitled") {
+        const suggestedTitle = userMessage.substring(0, 30) + "...";
+        await conversationService.updateConversationTitle(convId, suggestedTitle);
+    }
+
+    // Save both messages
+    const savedUserMsg = await messageService.createMessage({
+        conversationId: convId,
+        sender: 'user',
+        content: userMessage
+    });
+
+    const savedAiMsg = await messageService.createMessage({
+        conversationId: convId,
+        sender: 'ai',
+        content: aiMessage
+    });
+
+    res.status(201).json({
+        conversationId: convId,
+        userMessage: savedUserMsg,
+        aiMessage: savedAiMsg
+    });
+};
 ```
 
 ---
@@ -297,27 +405,48 @@ setConversationTitles(titlesData);  // Updates sidebar with new title
 ┌────────────────────────────────────────────────────────────────────────────────────┐
 │                                  FRONTEND                                          │
 │  ┌──────────────┐    ┌──────────────┐    ┌──────────────────────────────────────┐  │
-│  │ MessageInput │───>│ ChatbotPage  │───>│ messages state updated twice:        │  │
-│  │              │    │              │    │ 1. User message (optimistic)         │  │
-│  │ "Hello AI!"  │    │ handleSend   │    │ 2. AI message (from server)          │  │
-│  └──────────────┘    │ Message()    │    └──────────────────────────────────────┘  │
-└──────────────────────┼────────────────────────────────────────────────────────────-┘
+│  │ MessageInput │───>│ ChatbotPage  │───>│ State updates:                       │  │
+│  │              │    │              │    │ 1. isStreaming = true                │  │
+│  │ "Hello AI!"  │    │ handleSend   │    │ 2. User message added (pending)      │  │
+│  └──────────────┘    │ Message()    │    │ 3. streamingMessage updates          │  │
+│                      │              │    │ 4. AI message added (complete)       │  │
+│                      │              │    │ 5. isStreaming = false               │  │
+│                      │              │    └──────────────────────────────────────┘  │
+└──────────────────────┼─────────────────────────────────────────────────────────────┘
                        │
+                       │ EventSource GET /:convId/stream?query=...
                        ▼
 ┌────────────────────────────────────────────────────────────────────────────────────┐
-│                                  BACKEND                                           │
+│                           NODE.JS CONVERSATION SERVICE                             │
 │  ┌────────────────────────────────────────────────────────────────────────────────┐│
-│  │ messageController.createMessage()                                              ││
+│  │ conversationController.streamMessage()                                         ││
 │  │                                                                                ││
-│  │ 1. Validate conversation exists                                                ││
-│  │ 2. Update title if "Untitled" (first message)                                  ││
-│  │ 3. Save user message to DB                                                     ││
-│  │ 4. Generate AI response (placeholder currently)                                ││
-│  │ 5. Save AI message to DB                                                       ││
-│  │ 6. Return AI message to frontend                                               ││
+│  │ 1. Parse query and history from URL params                                     ││
+│  │ 2. Set SSE headers                                                             ││
+│  │ 3. Proxy POST to FastAPI /api/chat/stream                                      ││
+│  │ 4. Pipe SSE stream back to frontend                                            ││
+│  └────────────────────────────────────────────────────────────────────────────────┘│
+└───────────────────────────────────────────┬────────────────────────────────────────┘
+                                            │
+                                            │ POST /api/chat/stream
+                                            ▼
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│                              FASTAPI LLM SERVICE                                   │
+│  ┌────────────────────────────────────────────────────────────────────────────────┐│
+│  │ chat_controller.stream_response() → rag_chain_service.stream_response()       ││
+│  │                                                                                ││
+│  │ 1. Embed query (Qwen3-Embedding-0.6B)                                          ││
+│  │ 2. Search ChromaDB (k=16 documents)                                            ││
+│  │ 3. Rerank with Jina Reranker v3 (top_k=5)                                      ││
+│  │ 4. Format German RAG prompt with context                                       ││
+│  │ 5. Stream tokens from Ollama (qwen3:1.7b)                                      ││
+│  │ 6. Yield SSE events: {"content": "..."} for each token                         ││
+│  │ 7. Yield final event: {"done": true}                                           ││
 │  └────────────────────────────────────────────────────────────────────────────────┘│
 └────────────────────────────────────────────────────────────────────────────────────┘
                        │
+                       │ After stream completes:
+                       │ POST /:convId/messages/batch
                        ▼
 ┌────────────────────────────────────────────────────────────────────────────────────┐
 │                                  DATABASE                                          │
@@ -325,7 +454,7 @@ setConversationTitles(titlesData);  // Updates sidebar with new title
 │  │ Conversation        │    │ Messages                                            ││
 │  │ {                   │    │ [                                                   ││
 │  │   _id: "abc123",    │    │   { sender: "user", content: "Hello AI!", ... },    ││
-│  │   title: "Conv at.. │    │   { sender: "ai", content: "Placeholder...", ... }  ││
+│  │   title: "Hello AI!...",│   { sender: "ai", content: "RAG response...", ... }  ││
 │  │   userId: "user1"   │    │ ]                                                   ││
 │  │ }                   │    │                                                     ││
 │  └─────────────────────┘    └─────────────────────────────────────────────────────┘│
@@ -338,55 +467,75 @@ setConversationTitles(titlesData);  // Updates sidebar with new title
 
 | File | Role |
 |------|------|
-| `frontend/src/components/MessageInput.jsx` | Captures user input, calls onSendMessage |
-| `frontend/src/pages/ChatbotPage.jsx` | Orchestrates message flow, state management |
-| `frontend/src/components/Conversation.jsx` | Displays messages |
-| `backend/conversation/routes/messageRoutes.js` | Routes POST to controller |
-| `backend/conversation/controllers/messageController.js` | Business logic |
-| `backend/conversation/services/messageService.js` | Database operations |
-| `backend/conversation/models/Message.js` | Mongoose schema |
+| `frontend/src/components/MessageInput.jsx` | Captures user input, disables during streaming |
+| `frontend/src/pages/ChatbotPage.jsx` | Orchestrates streaming, state management |
+| `frontend/src/components/Conversation.jsx` | Displays messages + streaming message |
+| `frontend/src/components/AIMessage.jsx` | Renders AI message with streaming cursor |
+| `backend/conversation/routes/conversationRoutes.js` | Defines `/stream` and `/messages/batch` routes |
+| `backend/conversation/controllers/conversationController.js` | `streamMessage` proxies to FastAPI |
+| `backend/llm/routes/chat_routes.py` | FastAPI `/api/chat/stream` endpoint |
+| `backend/llm/controllers/chat_controller.py` | Handles streaming logic |
+| `backend/llm/services/rag_chain_service.py` | RAG chain with streaming |
+| `backend/llm/services/retriever_service.py` | Document retrieval + reranking |
 
 ---
 
 ## Important Notes
 
-### 1. Optimistic UI Pattern
-User messages appear immediately in the UI before server confirmation. This provides a snappy user experience.
+### 1. Streaming Pattern
+User messages appear immediately in the UI while the AI response streams token-by-token, providing real-time feedback.
 
-### 2. AI Response is Placeholder
-Currently, the AI response is hardcoded:
-```javascript
-const AIResponse = "This is a placeholder response to your message: " + content;
+### 2. SSE (Server-Sent Events)
+The streaming uses SSE format:
 ```
-There's a TODO to integrate with a real GenAI service.
-
-### 3. Conversation Title Generation
-On the first message, the title changes from "Untitled" to a timestamp-based title. There's a TODO to use AI for generating meaningful titles.
-
-### 4. Error Handling
-Errors are caught and logged but not displayed to the user in the current implementation:
-```javascript
-} catch (error) {
-    console.error('Failed to send message:', error);
-}
+data: {"content": "Token1"}
+data: {"content": "Token2"}
+...
+data: {"done": true}
 ```
+
+### 3. Message Persistence
+Messages are saved to MongoDB **after** streaming completes via the `/messages/batch` endpoint. This prevents partial/failed responses from being saved.
+
+### 4. Conversation Title
+On the first message, the title changes from "Untitled" to the first 30 characters of the user's message + "...".
+
+### 5. Error Handling
+Errors are caught at multiple levels:
+- EventSource `onerror` handler on frontend
+- SSE error events from Node.js proxy
+- Exception handling in FastAPI
 
 ---
 
-## Message State Transitions
+## State Transitions
 
 ```
 Initial State:
-messages = []
+  isStreaming: false
+  messages: []
+  streamingMessage: ""
 
-After user sends "Hello":
-messages = [
-    { sender: "user", content: "Hello", createdAt: "2025-12-08T10:30:00Z" }  ← Optimistic
-]
+User sends "Hello":
+  isStreaming: true
+  messages: [{ sender: "user", content: "Hello", isPending: true }]
+  streamingMessage: ""
 
-After AI responds:
-messages = [
-    { sender: "user", content: "Hello", createdAt: "2025-12-08T10:30:00Z" },
-    { sender: "ai", content: "Placeholder response...", createdAt: "2025-12-08T10:30:01Z" }  ← From server
-]
+Token 1 received:
+  streamingMessage: "Hallo"
+
+Token 2 received:
+  streamingMessage: "Hallo, wie"
+
+...
+
+Stream complete:
+  isStreaming: false
+  messages: [
+    { sender: "user", content: "Hello" },
+    { sender: "ai", content: "Hallo, wie kann ich Ihnen helfen?" }
+  ]
+  streamingMessage: ""
+
+Messages saved to DB ✓
 ```

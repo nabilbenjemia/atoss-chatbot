@@ -1,13 +1,13 @@
 # Stream Endpoint Analysis: `GET /api/conversations/:conversationId/stream?query=...`
 
 ## Overview
-The `streamMessage` endpoint is designed to handle **Server-Sent Events (SSE)** streaming of AI responses from the FastAPI backend to the frontend in real-time. It acts as a **proxy** between the frontend and the AI service.
+The `streamMessage` endpoint handles **Server-Sent Events (SSE)** streaming of AI responses from the FastAPI LLM backend to the frontend in real-time. It acts as a **proxy** between the frontend and the AI service.
 
 ---
 
-## Current Implementation Status
+## ✅ Current Implementation Status
 
-### ✅ Backend Implementation (conversationController.js)
+### ✅ Backend Implementation (conversationController.js) - COMPLETE
 ```javascript
 const streamMessage = async (req, res) => {
     const { conversationId } = req.params;
@@ -20,35 +20,57 @@ const streamMessage = async (req, res) => {
     res.flushHeaders();
 
     try {
+        // Parse history and convert to ChatMessage format
+        let parsedHistory = [];
+        try {
+            const decoded = JSON.parse(history || '[]');
+            parsedHistory = typeof decoded === 'string' ? JSON.parse(decoded) : decoded;
+        } catch (e) {
+            console.warn('Failed to parse history:', e.message);
+        }
+
+        const conversationHistory = parsedHistory.map(msg => ({
+            role: msg.role || (msg.sender === 'user' ? 'user' : 'assistant'),
+            content: msg.content
+        }));
+
         // Proxy to FastAPI
         const response = await axios({
             method: 'POST',
-            url: 'http://localhost:8000/api/generate',
-            data: { 
-                query, 
-                conversation_history: JSON.parse(history || '[]') 
+            url: 'http://localhost:8000/api/chat/stream',
+            data: {
+                message: query,
+                conversation_id: conversationId,
+                conversation_history: conversationHistory
             },
-            responseType: 'stream'
+            responseType: 'stream',
+            timeout: 120000  // 2 minute timeout
         });
 
         // Pipe the stream to client
         response.data.pipe(res);
 
-        response.data.on('end', () => {
+        response.data.on('error', (err) => {
+            console.error('Stream error:', err);
+            res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
             res.end();
         });
 
     } catch (error) {
-        res.write(`data: [ERROR] ${error.message}\n\n`);
+        console.error('Stream endpoint error:', error.message);
+        res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
         res.end();
     }
 };
 ```
 
-**Current Issues:**
-- ❌ **NOT connected to frontend** - ChatbotPage.jsx does not use this endpoint
-- ❌ **No routes defined** - Not exposed in conversationRoutes.js
-- ✅ Implementation logic is correct for SSE streaming
+**Implementation Status:**
+- ✅ **Route defined** - `router.get('/:conversationId/stream', conversationController.streamMessage)`
+- ✅ **SSE headers** - Proper headers for streaming
+- ✅ **History parsing** - Handles URL-encoded JSON history
+- ✅ **FastAPI proxy** - Posts to `/api/chat/stream` with 2-minute timeout
+- ✅ **Stream piping** - Pipes response directly to client
+- ✅ **Error handling** - Catches and forwards errors as SSE events
 
 ---
 
@@ -112,36 +134,22 @@ const streamMessage = async (req, res) => {
 
 ---
 
-## Data Flow Comparison
+## Data Flow: Current Streaming Implementation ✅
 
-### Current Implementation (NOT Using Stream)
 ```
 User Message
     ↓
-POST /api/conversations/:id/messages
-    ↓
-Backend calls FastAPI (waits for complete response)
-    ↓
-Returns full AI response at once
-    ↓
-Display in UI (instant, no streaming effect)
-    ↓
-Save both messages to DB
-```
-
-### Proposed Implementation (Using Stream) ✅
-```
-User Message
-    ↓
-Add user message to UI instantly (pending)
+Add user message to UI instantly (pending state)
     ↓
 EventSource → GET /api/conversations/:id/stream?query=...&history=...
     ↓
-Backend proxies POST to FastAPI with streaming response
+Node.js Backend proxies POST to FastAPI /api/chat/stream
+    ↓
+FastAPI RAG Chain generates response with Qwen 3 1.7B
     ↓
 FastAPI returns ServerSentEvent stream
     ↓
-Backend pipes stream to frontend via EventSource
+Node.js pipes stream directly to frontend via EventSource
     ↓
 Frontend receives tokens in real-time: "data: token\n\n"
     ↓
@@ -149,30 +157,35 @@ Display tokens appearing one-by-one (typing effect)
     ↓
 User can click "Stop" to interrupt stream [FUTURE]
     ↓
-After [DONE], save all messages to DB
+After [DONE], POST /:conversationId/messages/batch saves all messages to DB
 ```
 
 ---
 
-## Route Definition (Missing)
+## Route Definition ✅ IMPLEMENTED
 
 ### Current Routes (conversationRoutes.js)
 ```javascript
-// These endpoints exist:
-router.post('/', createConversation);              // POST
-router.get('/:id', getConversationById);          // GET by ID
-router.get('/user/:userId', getUserConversations); // GET by user
-router.put('/:id', updateConversationTitle);      // PUT
-router.delete('/:id', deleteConversation);        // DELETE
+const {
+    createConversation,
+    getConversationById,
+    getUserConversations,
+    updateConversationTitle,
+    deleteConversation,
+    streamMessage,           // ✅ Streaming proxy
+    createMessageBatch       // ✅ Batch save after stream
+} = require('../controllers/conversationController');
+
+router.post('/', createConversation);
+router.get('/user/:userId', getUserConversations);
+router.get('/:id', getConversationById);
+router.put('/:id', updateConversationTitle);
+router.delete('/:id', deleteConversation);
+router.get('/:conversationId/stream', streamMessage);           // ✅ SSE Stream
+router.post('/:conversationId/messages/batch', createMessageBatch); // ✅ Batch save
 ```
 
-### Required Addition
-```javascript
-// ADD THIS:
-router.get('/:conversationId/stream', streamMessage); // GET stream
-```
-
-⚠️ **Important:** This must come AFTER the specific routes (like `/user/:userId`) in route definition order to avoid conflicts.
+**Note:** The `/user/:userId` route is defined before `/:id` to avoid route conflicts.
 
 ---
 
@@ -184,7 +197,7 @@ router.get('/:conversationId/stream', streamMessage); // GET stream
 ```javascript
 const handleSendMessage = async (messageText) => {
     // ... existing code to create conversation if needed ...
-    
+
     const userMsg = {
         conversationId: convId,
         sender: 'user',
@@ -195,7 +208,7 @@ const handleSendMessage = async (messageText) => {
     // Step 1: Add user message to UI
     setMessages(prev => [...prev, userMsg]);
     setPendingUserMessage(userMsg);
-    
+
     // Step 2: Set streaming state
     setIsStreaming(true);
     setStreamingMessage("");
@@ -216,12 +229,12 @@ const handleSendMessage = async (messageText) => {
 
     eventSource.onmessage = (event) => {
         const data = event.data;
-        
+
         if (data === "[DONE]") {
             // Stream complete
             eventSource.close();
             setIsStreaming(false);
-            
+
             // Save both messages to DB
             saveMessagesToDB(convId, messageText, fullAIResponse);
         } else {
@@ -242,7 +255,7 @@ const handleSendMessage = async (messageText) => {
 ```
 
 ---
-    
+
 ## Summary Table
 
 | Aspect | New Conversation | Existing Conversation |
@@ -259,22 +272,26 @@ const handleSendMessage = async (messageText) => {
 
 ## Implementation Checklist
 
-- [ ] Add route to `conversationRoutes.js`: `router.get('/:conversationId/stream', streamMessage);`
-- [ ] Verify `streamMessage` controller correctly proxies to FastAPI
-- [ ] Update `ChatbotPage.jsx` to use EventSource instead of regular fetch
-- [ ] Handle `[DONE]` marker from FastAPI stream
-- [ ] Implement `createMessageBatch` endpoint call after stream completes
+- [x] Add route to `conversationRoutes.js`: `router.get('/:conversationId/stream', streamMessage);`
+- [x] Verify `streamMessage` controller correctly proxies to FastAPI
+- [x] Add `createMessageBatch` endpoint for saving messages after stream completes
+- [x] Handle conversation history parsing and formatting
+- [x] Set proper SSE headers in stream response
+- [x] Pipe FastAPI stream directly to frontend
+- [ ] Update frontend `ChatbotPage.jsx` to use EventSource for streaming UI
+- [ ] Handle `[DONE]` marker from FastAPI stream in frontend
+- [ ] Call `createMessageBatch` endpoint after stream completes in frontend
 - [ ] Add abort controller for "Stop" button interrupt functionality
 - [ ] Disable send button during streaming (`isStreaming` state)
 - [ ] Update conversation title from first message (using AI or substring)
-- [ ] Handle stream errors gracefully
+- [ ] Handle stream errors gracefully in frontend UI
 
 ---
 
 ## Error Scenarios
 
 1. **FastAPI not responding**
-   - Backend returns error via `data: [ERROR] message\n\n`
+   - Backend returns error via `data: {"error": "message"}\n\n`
    - Frontend catches and shows error toast
 
 2. **User closes tab during streaming**
@@ -284,3 +301,7 @@ const handleSendMessage = async (messageText) => {
 3. **Network interruption**
    - User can click "Stop" to abort (future)
    - Partial response shown with "Interrupted" label
+
+4. **Stream timeout**
+   - Backend has 2-minute (120000ms) timeout configured
+   - Frontend should handle timeout gracefully

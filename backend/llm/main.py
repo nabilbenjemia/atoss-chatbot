@@ -67,14 +67,14 @@ async def lifespan(app_instance: FastAPI):
 
     # Shutdown
     logger.info("Shutting down LLM Server...")
-    await startup_service.shutdown()
+    startup_service.shutdown()
     logger.info("LLM Server shutdown complete")
 # Create FastAPI application
 app = FastAPI(
     title="ATOSS GPT LLM Server",
     description="""
     LLM Server for ATOSS GPT chatbot application.
-    
+
     This server provides:
     - RAG-based question answering with document retrieval
     - Streaming response generation using Ollama

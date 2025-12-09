@@ -56,6 +56,8 @@ class LLMManager:
                 temperature=settings.OLLAMA_TEMPERATURE,
                 top_p=settings.OLLAMA_TOP_P,
                 num_ctx=settings.OLLAMA_NUM_CTX,
+                repeat_penalty=settings.OLLAMA_REPEAT_PENALTY,
+                num_predict=settings.OLLAMA_NUM_PREDICT,
             )
 
             logger.info("Ollama LLM loaded successfully")
@@ -78,13 +80,7 @@ class LLMManager:
         if not self._is_loaded:
             raise RuntimeError("LLM not loaded. Call load() first.")
 
-        return ChatOllama(
-            base_url=settings.OLLAMA_BASE_URL,
-            model=settings.OLLAMA_MODEL,
-            temperature=settings.OLLAMA_TEMPERATURE,
-            top_p=settings.OLLAMA_TOP_P,
-            # num_ctx=settings.OLLAMA_NUM_CTX,
-        )
+        return self.get_llm()
 
     async def generate(self, prompt: str) -> str:
         """Generate a response from the LLM"""

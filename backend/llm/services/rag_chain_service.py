@@ -118,9 +118,25 @@ class RAGChainService:
             llm = llm_manager.get_llm()
             response = await llm.ainvoke(prompt_text)
 
-            if isinstance(response.content, str):
-                return response.content
-            return str(response.content)
+            logger.info("LLM Response type: %s", type(response))
+            logger.info("LLM Response: %s", response)
+
+            if hasattr(response, 'content'):
+                content = response.content
+                logger.info("Response content type: %s, length: %s", type(content), len(str(content)) if content else 0)
+                if isinstance(content, str) and content:
+                    return content
+                elif isinstance(content, list) and content:
+                    # Handle list of content blocks (thinking mode)
+                    text_parts = []
+                    for item in content:
+                        if isinstance(item, str):
+                            text_parts.append(item)
+                        elif isinstance(item, dict) and 'text' in item:
+                            text_parts.append(item['text'])
+                    return ''.join(text_parts)
+
+            return str(response.content) if hasattr(response, 'content') else str(response)
 
         except (RuntimeError, OSError, ValueError) as e:
             logger.error("Error generating response: %s", e)
@@ -145,10 +161,12 @@ class RAGChainService:
 
             # Stream the response directly
             llm = llm_manager.get_streaming_llm()
+            chunk_count = 0
             async for chunk in llm.astream(prompt_text):
+                chunk_count += 1
                 if hasattr(chunk, 'content'):
                     content = chunk.content
-                    if isinstance(content, str):
+                    if isinstance(content, str) and content:
                         yield content
                     elif isinstance(content, list):
                         # Handle list of content blocks
@@ -157,8 +175,10 @@ class RAGChainService:
                                 yield item
                             elif isinstance(item, dict) and 'text' in item:
                                 yield str(item['text'])
-                else:
-                    yield str(chunk)
+                elif isinstance(chunk, str) and chunk:
+                    yield chunk
+
+            logger.info("Streaming completed with %d chunks", chunk_count)
 
         except (RuntimeError, OSError, ValueError) as e:
             logger.error("Error streaming response: %s", e)

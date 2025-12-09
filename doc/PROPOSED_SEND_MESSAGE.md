@@ -1,54 +1,63 @@
-# Proposed Flow: Send Message with Streaming AI Response
+# ✅ IMPLEMENTED: Send Message with Streaming AI Response
 
-This document describes the **proposed** flow for sending messages with streaming AI responses. The key changes from the current implementation:
+> **Status: IMPLEMENTED** - This document described the proposed streaming implementation. It has now been fully implemented. See `FLOW_SEND_MESSAGE.md` for the current implementation details.
 
-1. **No immediate DB save** - Messages are only saved after AI completes or user interrupts
-2. **Streaming AI response** - AI response streams in real-time using Server-Sent Events (SSE)
-3. **Disabled send button** - Send button is disabled while AI is streaming
-4. **Interrupt capability** - User can stop the AI mid-stream
+This document describes the streaming flow for sending messages with AI responses. The key features:
+
+1. **Streaming AI response** - AI response streams in real-time using Server-Sent Events (SSE)
+2. **Disabled send button** - Send button is disabled while AI is streaming
+3. **Batch DB save** - Messages are saved after AI completes streaming
+4. **Interrupt capability** - User can stop the AI mid-stream (Stop button)
 
 ---
 
-## Comparison: Current vs Proposed
+## Comparison: Previous vs Current Implementation
 
-| Aspect | Current Flow | Proposed Flow |
-|--------|--------------|---------------|
+| Aspect | Previous Flow | Current Implementation |
+|--------|--------------|------------------------|
 | Conversation creation | Immediately on first message | Before stream starts (same timing) |
 | User message save | Saved to DB before AI response | Saved to DB after stream completes |
-| AI message save | After generation (partial response) | After stream completes or interrupt |
+| AI message save | After generation (placeholder) | After stream completes |
 | Send button | Always enabled | Disabled during streaming |
-| AI response display | All at once (waits for completion) | Token-by-token streaming (real-time) |
-| User can interrupt | No | Yes (saves partial response) |
+| AI response display | Placeholder text | Token-by-token streaming (real-time) |
+| User can interrupt | No | Yes (Stop button) |
 | DB efficiency | Multiple writes per exchange | Batch write after completion |
+| LLM Integration | None (placeholder) | Full RAG pipeline with Ollama |
 
 ---
 
-## Architecture Overview
+## Architecture Overview (Implemented)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
 │                                    FRONTEND                                         │
 │   React + Vite (Port 5173)                                                          │
+│   - EventSource for SSE streaming                                                   │
+│   - isStreaming state for UI control                                                │
+│   - streamingMessage state for real-time display                                    │
 └───────────────────────────────────────────┬─────────────────────────────────────────┘
                                             │
-                                            │ SSE Stream (EventSource)
-                                            │ POST for save
+                                            │ GET /:convId/stream?query=...&history=...
                                             ▼
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
 │                              NODE.JS BACKEND                                        │
 │   Conversation Service (Port 4004)                                                  │
-│   - Proxies streaming from FastAPI                                                  │
+│   - Proxies SSE streaming from FastAPI                                              │
 │   - Saves messages to MongoDB after completion                                      │
+│   - Routes: /stream, /messages/batch                                                │
 └───────────────────────────────────────────┬─────────────────────────────────────────┘
                                             │
-                                            │ SSE Stream
+                                            │ POST /api/chat/stream
                                             ▼
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                              FASTAPI BACKEND (NEW)                                  │
+│                              FASTAPI LLM SERVICE                                    │
 │   AI Service (Port 8000)                                                            │
-│   - Receives user query                                                             │
-│   - Returns StreamingResponse                                                       │
-│   - Integrates with LLM (OpenAI, etc.)                                              │
+│   - RAG Chain with document retrieval                                               │
+│   - Qwen 3 1.7B via Ollama for generation                                           │
+│   - Qwen 3 Embedding 0.6B for embeddings                                            │
+│   - Jina Reranker v3 for reranking                                                  │
+│   - ChromaDB for vector storage                                                     │
+│   - StreamingResponse for SSE                                                       │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -302,202 +311,45 @@ const eventSourceRef = useRef(null);                             // SSE connecti
 
 ---
 
-## Implementation Plan
+## Implementation Status
 
-### Phase 1: FastAPI AI Service (New Backend)
+### ✅ Phase 1: FastAPI AI Service - COMPLETE
 
-#### 1.1 Create FastAPI project structure
 ```
-backend/
-├── ai-service/                    # NEW
-│   ├── main.py                    # FastAPI app entry
-│   ├── requirements.txt           # Python dependencies
-│   ├── routers/
-│   │   └── generate.py            # Streaming endpoint
-│   └── services/
-│       └── llm_service.py         # LLM integration
-```
-
-#### 1.2 FastAPI Streaming Endpoint
-```python
-# backend/ai-service/main.py
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from routers import generate
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:4004"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(generate.router, prefix="/api")
+backend/llm/
+├── main.py                  # FastAPI app with lifespan
+├── requirements.txt         # Python dependencies
+├── config/
+│   └── settings.py          # Pydantic settings (Ollama, embedding, etc.)
+├── routes/
+│   └── chat_routes.py       # /api/chat/stream endpoint
+├── controllers/
+│   └── chat_controller.py   # ChatController with streaming
+├── models/
+│   ├── embedding_model.py   # Qwen 3 Embedding 0.6B
+│   ├── llm_model.py         # ChatOllama (qwen3:1.7b)
+│   ├── vectorstore.py       # ChromaDB manager
+│   └── reranker_model.py    # Jina Reranker v3
+└── services/
+    ├── startup_service.py   # Component initialization
+    ├── retriever_service.py # Document retrieval + reranking
+    └── rag_chain_service.py # RAG chain with German prompt
 ```
 
-```python
-# backend/ai-service/routers/generate.py
-from fastapi import APIRouter
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-from services.llm_service import generate_stream
+### ✅ Phase 2: Node.js Backend Updates - COMPLETE
 
-router = APIRouter()
-
-class QueryRequest(BaseModel):
-    query: str
-    conversation_history: list = []
-
-@router.post("/generate")
-async def generate_response(request: QueryRequest):
-    return StreamingResponse(
-        generate_stream(request.query, request.conversation_history),
-        media_type="text/event-stream"
-    )
-```
-
-```python
-# backend/ai-service/services/llm_service.py
-import asyncio
-from openai import AsyncOpenAI
-
-client = AsyncOpenAI()
-
-async def generate_stream(query: str, history: list):
-    """Generator that yields SSE formatted tokens"""
-    try:
-        response = await client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                *history,
-                {"role": "user", "content": query}
-            ],
-            stream=True
-        )
-        
-        async for chunk in response:
-            if chunk.choices[0].delta.content:
-                token = chunk.choices[0].delta.content
-                yield f"data: {token}\n\n"
-        
-        yield "data: [DONE]\n\n"
-        
-    except Exception as e:
-        yield f"data: [ERROR] {str(e)}\n\n"
-```
-
----
-
-### Phase 2: Node.js Backend Updates
-
-#### 2.1 New route for SSE proxy
+**conversationRoutes.js:**
 ```javascript
-// backend/conversation/routes/conversationRoutes.js
-
-// ADD: Streaming endpoint (must come AFTER specific routes like /user/:userId)
+// Streaming endpoint
 router.get('/:conversationId/stream', conversationController.streamMessage);
 
-// ADD: Batch save messages after stream completes
+// Batch save messages after stream completes
 router.post('/:conversationId/messages/batch', conversationController.createMessageBatch);
 ```
 
-#### 2.2 New controller methods
-```javascript
-// backend/conversation/controllers/conversationController.js
-
-const axios = require('axios');
-const conversationService = require('../services/conversationService');
-const messageService = require('../services/messageService');
-
-/** GET /api/conversations/:conversationId/stream?query=...&history=... */
-const streamMessage = async (req, res) => {
-    const { conversationId } = req.params;
-    const { query, history } = req.query;
-
-    // Set SSE headers
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders();
-
-    try {
-        // Proxy to FastAPI
-        const response = await axios({
-            method: 'POST',
-            url: 'http://localhost:8000/api/generate',
-            data: { 
-                query, 
-                conversation_history: JSON.parse(history || '[]') 
-            },
-            responseType: 'stream'
-        });
-
-        // Pipe the stream to client
-        response.data.pipe(res);
-
-        response.data.on('end', () => {
-            res.end();
-        });
-
-    } catch (error) {
-        res.write(`data: [ERROR] ${error.message}\n\n`);
-        res.end();
-    }
-};
-
-/** POST /api/conversations/:conversationId/messages/batch */
-const createMessageBatch = async (req, res) => {
-    try {
-        const { conversationId } = req.params;
-        const { userMessage, aiMessage, userId, isNewConversation } = req.body;
-
-        let convId = conversationId;
-
-        // Create conversation if new
-        if (isNewConversation || conversationId === 'new') {
-            const newConv = await conversationService.createConversation({ 
-                userId, 
-                title: "Untitled" 
-            });
-            convId = newConv._id;
-        }
-
-        // Update title if first message
-        const conversation = await conversationService.getConversationById(convId);
-        if (conversation && conversation.title === "Untitled") {
-             // TODO: Use AI to generate title from userMessage
-
-            // Extract first 30 chars from user message as title
-            const suggestedTitle = userMessage.substring(0, 30) + "...";
-            await conversationService.updateConversationTitle(convId, suggestedTitle);
-        }
-
-        // Save both messages
-        const savedUserMsg = await messageService.createMessage({
-            conversationId: convId,
-            sender: 'user',
-            content: userMessage
-        });
-
-        const savedAiMsg = await messageService.createMessage({
-            conversationId: convId,
-            sender: 'ai',
-            content: aiMessage
-        });
-
-        res.status(201).json({
-            conversationId: convId,
-            userMessage: savedUserMsg,
-            aiMessage: savedAiMsg
-        });
-
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-};
+**conversationController.js:**
+- `streamMessage` - Proxies SSE from FastAPI
+- `createMessageBatch` - Batch saves user + AI messages;
 
 module.exports = {
     createConversation,
@@ -529,7 +381,7 @@ export default function ChatbotPage() {
     const navigate = useNavigate();
     const currentUser = getCurrentUser();
     const userId = currentUser?.id;
-    
+
     // Existing state
     const [conversationId, setConversationId] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -556,7 +408,7 @@ export default function ChatbotPage() {
             eventSourceRef.current = null;
         }
         setIsStreaming(false);
-        
+
         // Save the partial response if there's content
         if (streamingMessage) {
             await saveMessages(pendingUserMessage, streamingMessage);
@@ -567,7 +419,7 @@ export default function ChatbotPage() {
     // NEW: Save messages to DB
     const saveMessages = async (userMsg, aiMsg) => {
         const isNew = !conversationId;
-        
+
         try {
             const response = await fetch(
                 `http://localhost:4004/api/conversations/${conversationId || 'new'}/messages/batch`,
@@ -582,13 +434,13 @@ export default function ChatbotPage() {
                     })
                 }
             );
-            
+
             const data = await response.json();
-            
+
             if (isNew) {
                 setConversationId(data.conversationId);
             }
-            
+
             await fetchConversationTitles();
         } catch (error) {
             console.error('Failed to save messages:', error);
@@ -632,12 +484,12 @@ export default function ChatbotPage() {
 
             eventSource.onmessage = (event) => {
                 const data = event.data;
-                
+
                 if (data === '[DONE]') {
                     eventSource.close();
                     eventSourceRef.current = null;
                     setIsStreaming(false);
-                    
+
                     // Add final AI message to state
                     const aiMsg = {
                         sender: 'ai',
@@ -646,15 +498,15 @@ export default function ChatbotPage() {
                     };
                     setMessages(prev => [...prev, aiMsg]);
                     setStreamingMessage("");
-                    
+
                     // NOW save both messages to DB
                     saveMessages(messageText, fullResponse);
-                    
+
                 } else if (data.startsWith('[ERROR]')) {
                     console.error('Stream error:', data);
                     eventSource.close();
                     setIsStreaming(false);
-                    
+
                 } else {
                     // Append token to streaming message
                     fullResponse += data;
@@ -679,13 +531,13 @@ export default function ChatbotPage() {
         <div className="flex h-screen">
             <Sidebar ... />
             <div className="flex flex-col flex-1 overflow-hidden">
-                <Conversation 
-                    messages={messages} 
+                <Conversation
+                    messages={messages}
                     streamingMessage={streamingMessage}  // NEW prop
                     isStreaming={isStreaming}            // NEW prop
                 />
-                <MessageInput 
-                    onSendMessage={handleSendMessage} 
+                <MessageInput
+                    onSendMessage={handleSendMessage}
                     onInterrupt={handleInterrupt}        // NEW prop
                     isStreaming={isStreaming}            // NEW prop
                 />
@@ -754,17 +606,17 @@ export default function MessageInput({ onSendMessage, onInterrupt, isStreaming }
           onKeyPress={handleKeyPress}
           value={message}
         />
-        
+
         {/* CHANGE: Conditional button rendering */}
         {isStreaming ? (
-          <button 
+          <button
             onClick={onInterrupt}
             className="self-end px-3 py-0 mb-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors duration-200 font-semibold"
           >
             Stop
           </button>
         ) : (
-          <button 
+          <button
             onClick={handleSend}
             disabled={!message.trim()}
             className="self-end px-3 py-0 mb-2 bg-tum-blue text-white rounded-xl hover:bg-tum-dark-blue transition-colors duration-200 font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
@@ -846,11 +698,11 @@ const Conversation = ({ messages, streamingMessage, isStreaming }) => {  // ADD:
                     ? <UserMessage key={index} message={msg.content} createdAt={msg.createdAt} />
                     : <AIMessage key={index} message={msg.content} createdAt={msg.createdAt} />
             ))}
-            
+
             {/* ADD: Show streaming AI message */}
             {isStreaming && streamingMessage && (
-                <AIMessage 
-                    message={streamingMessage} 
+                <AIMessage
+                    message={streamingMessage}
                     isStreaming={true}  // Show typing indicator
                 />
             )}

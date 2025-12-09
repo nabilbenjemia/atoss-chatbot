@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides a comprehensive understanding of the ATOSS GPT chatbot application architecture. The application is a full-stack web application with a React frontend and Node.js/Express backend, using MongoDB as the database.
+This document provides a comprehensive understanding of the ATOSS GPT chatbot application architecture. The application is a full-stack web application with a React frontend, Node.js/Express backend for conversation management, and a FastAPI Python backend for LLM/RAG operations, using MongoDB as the database.
 
 ---
 
@@ -11,9 +11,10 @@ This document provides a comprehensive understanding of the ATOSS GPT chatbot ap
 1. [Project Architecture](#project-architecture)
 2. [Frontend Structure](#frontend-structure)
 3. [Backend Structure](#backend-structure)
-4. [Data Models](#data-models)
-5. [API Endpoints](#api-endpoints)
-6. [Component Hierarchy](#component-hierarchy)
+4. [LLM Service Structure](#llm-service-structure)
+5. [Data Models](#data-models)
+6. [API Endpoints](#api-endpoints)
+7. [Component Hierarchy](#component-hierarchy)
 
 ---
 
@@ -28,16 +29,30 @@ This document provides a comprehensive understanding of the ATOSS GPT chatbot ap
 │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘ │
 └─────────────────────────────────────────────────────────────────────┘
                                     │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         BACKEND SERVICES                             │
-│  ┌─────────────────────────────┐  ┌─────────────────────────────┐   │
-│  │   Authentication Service    │  │   Conversation Service       │   │
-│  │        Port: 4000           │  │        Port: 4004            │   │
-│  └─────────────────────────────┘  └─────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
+                    ┌───────────────┴───────────────┐
+                    ▼                               ▼
+┌─────────────────────────────────┐  ┌─────────────────────────────────┐
+│   Authentication Service         │  │   Conversation Service           │
+│        Port: 4000                │  │        Port: 4004                │
+│   (Node.js/Express)              │  │   (Node.js/Express)              │
+│   - Login/Register               │  │   - Conversation CRUD            │
+│   - JWT Authentication           │  │   - Message CRUD                 │
+│   - Email Verification           │  │   - SSE Stream Proxy             │
+└─────────────────────────────────┘  └───────────────┬─────────────────┘
+                                                      │
+                                                      ▼
+                                     ┌─────────────────────────────────┐
+                                     │   LLM Service (FastAPI)         │
+                                     │        Port: 8000               │
+                                     │   - RAG Chain                   │
+                                     │   - Ollama LLM (Qwen 3 1.7B)    │
+                                     │   - Embeddings (Qwen 3 0.6B)    │
+                                     │   - Reranker (Jina v3)          │
+                                     │   - ChromaDB Vector Store       │
+                                     │   - Streaming Responses         │
+                                     └─────────────────────────────────┘
+                                                      │
+                                                      ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         MongoDB Database                             │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────────┐  │
@@ -137,17 +152,45 @@ backend/conversation/
 ├── config/
 │   └── database.js          # MongoDB connection
 ├── controllers/
-│   ├── conversationController.js  # Conversation CRUD operations
-│   └── messageController.js       # Message handling + AI response
+│   ├── conversationController.js  # Conversation CRUD + Streaming proxy
+│   └── messageController.js       # Message handling
 ├── models/
 │   ├── Conversation.js      # Mongoose conversation schema
 │   └── Message.js           # Mongoose message schema
 ├── routes/
-│   ├── conversationRoutes.js    # Conversation API routes
+│   ├── conversationRoutes.js    # Conversation + Stream API routes
 │   └── messageRoutes.js         # Message API routes
 └── services/
     ├── conversationService.js   # Conversation business logic
     └── messageService.js        # Message business logic
+```
+
+### LLM Service (Port 8000) - FastAPI/Python
+
+```
+backend/llm/
+├── main.py                  # FastAPI server entry point
+├── requirements.txt         # Python dependencies
+├── config/
+│   └── settings.py          # Environment configuration
+├── controllers/
+│   └── chat_controller.py   # Chat request handling
+├── routes/
+│   └── chat_routes.py       # API route definitions
+├── models/
+│   ├── embedding_model.py   # Qwen 3 Embedding 0.6B manager
+│   ├── llm_model.py         # Ollama/ChatOllama manager
+│   ├── vectorstore.py       # ChromaDB manager
+│   └── reranker_model.py    # Jina Reranker v3 manager
+├── services/
+│   ├── startup_service.py   # Component initialization
+│   ├── retriever_service.py # Document retrieval + reranking
+│   └── rag_chain_service.py # RAG chain orchestration
+├── benchmark/
+│   └── benchmark_llm.py     # LLM benchmarking tools
+└── tests/
+    ├── test_llm.py          # LLM tests
+    └── check_vectorstore.py # Vector store diagnostics
 ```
 
 ### Authentication Service (Port 4000)
@@ -208,6 +251,8 @@ backend/authentication/
 |--------|----------|-------------|
 | POST | `/` | Create new conversation |
 | GET | `/user/:userId` | Get all conversations for a user |
+| GET | `/:conversationId/stream` | **SSE stream** - Proxy to LLM for streaming response |
+| POST | `/:conversationId/messages/batch` | Batch save user + AI messages after stream completes |
 | GET | `/:id` | Get single conversation by ID |
 | PUT | `/:id` | Update conversation title |
 | DELETE | `/:id` | Delete conversation and its messages |
@@ -216,9 +261,20 @@ backend/authentication/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/:conversationId/messages` | Create message & get AI response |
+| POST | `/:conversationId/messages` | Create message & get AI response (non-streaming) |
 | GET | `/:conversationId/messages` | Get all messages in conversation |
 | DELETE | `/messages/:messageId` | Delete single message |
+
+### LLM Endpoints (Base: `http://localhost:8000`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/` | Server info and available endpoints |
+| GET | `/health` | Global health check |
+| GET | `/api/chat/status` | Detailed status of all components |
+| GET | `/api/chat/health` | Simple health check |
+| POST | `/api/chat/generate` | Generate complete response |
+| POST | `/api/chat/stream` | **SSE stream** - Stream response token by token |
 
 ---
 
@@ -268,13 +324,30 @@ App
 - **Tailwind CSS** - Utility-first CSS framework
 - **Axios** - HTTP client for API calls
 
-### Backend
+### Backend (Node.js Services)
 - **Node.js** - Runtime environment
 - **Express.js** - Web framework
 - **MongoDB** - NoSQL database
 - **Mongoose** - MongoDB ODM
+- **Axios** - HTTP client for proxying to LLM service
 - **CORS** - Cross-origin resource sharing
 - **dotenv** - Environment variable management
+
+### Backend (LLM Service - Python)
+- **FastAPI** - High-performance async web framework
+- **Uvicorn** - ASGI server
+- **LangChain** - LLM orchestration framework
+- **LangChain-Ollama** - Ollama LLM integration
+- **ChromaDB** - Vector database for document storage
+- **Sentence-Transformers** - Embedding models
+- **Transformers** - Hugging Face model loading (for reranker)
+- **Pydantic** - Data validation and settings
+
+### LLM Stack
+- **Ollama** - Local LLM runtime
+- **Qwen 3 1.7B** - Main LLM model for response generation
+- **Qwen 3 Embedding 0.6B** - Document/query embedding model
+- **Jina Reranker v3** - Document reranking for improved retrieval
 
 ---
 
@@ -282,8 +355,19 @@ App
 
 1. **Authentication Flow**: Users must be logged in to access the chatbot. The `ChatbotPage` checks for `userId` and redirects to login if not authenticated.
 
-2. **AI Response Placeholder**: Currently, the AI response is a placeholder. The `messageController.js` contains a TODO comment for integrating with a real GenAI service.
+2. **Streaming AI Response**: The system uses Server-Sent Events (SSE) for real-time streaming:
+   - Frontend connects to `/:conversationId/stream` on the conversation service
+   - Conversation service proxies to FastAPI `/api/chat/stream`
+   - FastAPI streams tokens from Ollama LLM
+   - Messages are saved to DB after stream completes via `/messages/batch`
 
-3. **Conversation Titles**: New conversations start with "Untitled" and are renamed when the first message is sent (currently uses timestamp, but has TODO for AI-generated titles).
+3. **RAG Pipeline**: The LLM service implements a full RAG pipeline:
+   - Query embedding using Qwen 3 Embedding 0.6B
+   - Vector search in ChromaDB (k=16 initial documents)
+   - Reranking with Jina Reranker v3 (top k=5)
+   - Context formatting with German RAG prompt template
+   - Streaming response generation via Ollama
 
-4. **Real-time Updates**: The app uses polling/manual refresh rather than WebSockets for real-time updates.
+4. **Conversation Titles**: New conversations start with "Untitled" and are renamed from the first message content (first 30 characters).
+
+5. **Real-time Updates**: The app uses SSE for streaming responses. Messages are batch-saved after streaming completes.

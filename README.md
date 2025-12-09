@@ -1,6 +1,89 @@
 
 # ATOSS.GPT
 
+An AI-powered chatbot for ATOSS Workforce Management documentation using RAG (Retrieval-Augmented Generation).
+
+## Architecture
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│    Frontend     │────▶│  Conversation   │────▶│   LLM Server    │
+│  (React/Vite)   │     │    Service      │     │   (FastAPI)     │
+│   Port 5173     │     │   Port 4004     │     │   Port 8000     │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                               │
+                               ▼
+                        ┌─────────────────┐
+                        │ Authentication  │
+                        │    Service      │
+                        │   Port 4003     │
+                        └─────────────────┘
+```
+
+## Prerequisites
+
+- **Node.js** v18+
+- **Python** 3.10+
+- **Ollama** running locally with `qwen3:0.6b` model
+- **MongoDB** running locally
+
+### Install Ollama Model
+
+```bash
+ollama pull qwen3:0.6b
+```
+
+---
+
+## 🚀 Quick Start
+
+Open **4 terminal windows** and run each command:
+
+### 1. LLM Server (Python - Port 8000)
+
+```powershell
+cd backend/llm
+.\.venv\Scripts\Activate.ps1
+python main.py
+```
+
+### 2. Authentication Service (Node.js - Port 4003)
+
+```powershell
+cd backend/authentication
+npm start
+```
+
+### 3. Conversation Service (Node.js - Port 4004)
+
+```powershell
+cd backend/conversation
+node index.js
+```
+
+### 4. Frontend (Vite - Port 5173)
+
+```powershell
+cd frontend
+npm run dev
+```
+
+### 🌐 Access the App
+
+Open your browser: **http://localhost:5173**
+
+---
+
+## Services Overview
+
+| Service | Port | Technology | Description |
+|---------|------|------------|-------------|
+| Frontend | 5173 | React + Vite | User interface |
+| Conversation | 4004 | Node.js/Express | Chat & message management |
+| Authentication | 4003 | Node.js/Express | User auth & sessions |
+| LLM Server | 8000 | Python/FastAPI | RAG + Ollama integration |
+
+---
 
 ## Chatbot Strategy 
 
@@ -32,6 +115,75 @@ Implement a strictly on-premise Retrieval-Augmented Generation (RAG) system pair
 * Data sovereignity: operates entirely offline
 * More efficient on worse hardware due to quantization 
 * Ollama eliminates the complexity of raw model deployment
+
+---
+
+## Environment Variables
+
+### Backend LLM (`backend/llm/.env`)
+
+```env
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen3:0.6b
+```
+
+### Backend Services (`backend/authentication/.env`, `backend/conversation/.env`)
+
+```env
+MONGODB_URI=mongodb://localhost:27017/atoss_gpt
+JWT_SECRET=your-secret-key
+```
+
+---
+
+## Install Dependencies
+
+```powershell
+# Frontend
+cd frontend
+npm install
+
+# Authentication service
+cd backend/authentication
+npm install
+
+# Conversation service
+cd backend/conversation
+npm install
+
+# LLM service
+cd backend/llm
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+---
+
+## API Endpoints
+
+### Chat API (LLM Server - Port 8000)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/chat/stream` | Stream chat response (SSE) |
+| POST | `/api/chat/generate` | Generate complete response |
+| GET | `/api/chat/status` | Check service health |
+
+### Conversation API (Port 4004)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/conversations/user/:userId` | Get user conversations |
+| POST | `/api/conversations` | Create new conversation |
+| GET | `/api/conversations/:id/stream` | Stream AI response |
+| POST | `/api/conversations/:id/messages/batch` | Save messages |
+
+---
+
+## License
+
+Proprietary - ATOSS Software AG
 
 
 
