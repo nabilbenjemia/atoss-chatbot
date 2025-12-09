@@ -34,5 +34,13 @@ dist-ssr
 *.sln
 *.sw?
 
-.vscode
+# Python
+venv/
+.venv/
+*.pyc
+__pycache__/
+
+# VS Code
+.vscode/
+!.vscode/extensions.json
 

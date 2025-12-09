@@ -242,7 +242,7 @@ const handleSendMessage = async (messageText) => {
 ```
 
 ---
-
+    
 ## Summary Table
 
 | Aspect | New Conversation | Existing Conversation |
