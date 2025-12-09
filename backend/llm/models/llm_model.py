@@ -29,7 +29,7 @@ class LLMManager:
     _instance: Optional["LLMManager"] = None
     _llm: Optional[ChatOllama] = None
     _is_loaded: bool = False
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
@@ -40,7 +40,7 @@ class LLMManager:
             self._initialized = True
             self._llm = None
             self._is_loaded = False
-    
+
     def load(self) -> bool:
         """Load the Ollama LLM"""
         if self._is_loaded:
@@ -65,14 +65,14 @@ class LLMManager:
         except (RuntimeError, OSError, ValueError) as e:
             logger.error("Failed to load Ollama LLM: %s", e)
             self._is_loaded = False
-            raise
-    
+            return False
+
     def get_llm(self) -> ChatOllama:
         """Get the loaded LLM"""
         if not self._is_loaded or self._llm is None:
             raise RuntimeError("LLM not loaded. Call load() first.")
         return self._llm
-    
+
     def get_streaming_llm(self) -> ChatOllama:
         """Get a streaming version of the LLM"""
         if not self._is_loaded:
@@ -83,9 +83,9 @@ class LLMManager:
             model=settings.OLLAMA_MODEL,
             temperature=settings.OLLAMA_TEMPERATURE,
             top_p=settings.OLLAMA_TOP_P,
-            num_ctx=settings.OLLAMA_NUM_CTX,
+            # num_ctx=settings.OLLAMA_NUM_CTX,
         )
-    
+
     async def generate(self, prompt: str) -> str:
         """Generate a response from the LLM"""
         llm = self.get_llm()

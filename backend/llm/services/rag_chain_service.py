@@ -16,23 +16,35 @@ logger = logging.getLogger(__name__)
 
 ERROR_RAG_NOT_INITIALIZED = "RAG chain not initialized"
 
-# RAG Prompt Template
-RAG_PROMPT_TEMPLATE = """You are a helpful AI assistant for ATOSS workforce management solutions.
-Use the following context to answer the user's question. If you cannot find the answer in the context,
-say so honestly and provide general guidance based on your knowledge.
+# RAG Prompt Template (German)
+RAG_PROMPT_TEMPLATE = """Du bist ein hilfreicher KI-Assistent für ATOSS Workforce Management Lösungen.
+Deine Hauptaufgabe ist es, technische oder systemnahe Informationen aus dem internen Handbuch so umzuformulieren,
+dass sie für **Mitarbeiter, Teamleiter oder Planer** leicht verständlich und handlungsorientiert sind.
 
-Context:
+Nutze den folgenden Kontext, um die Frage des Benutzers zu beantworten. Der Kontext stammt aus dem offiziellen ATOSS-Handbuch.
+Wenn du Informationen aus dem Kontext verwendest, **zitiere die genaue Passage wörtlich** (als direktes Zitat),
+damit der Benutzer diese im PDF-Manual nachprüfen kann. Gib nach dem Zitat deine benutzerfreundliche Erklärung oder Anleitung.
+
+Chat-Verlauf:
+{chat_history}
+
+Kontext:
 {context}
 
-Question: {question}
+Frage: {user_question}
 
-Instructions:
-- Provide a clear, concise, and helpful answer
-- Reference specific information from the context when applicable
-- If the context doesn't contain relevant information, acknowledge this
-- Be professional and friendly in your response
+Anweisungen:
+- Gib eine **klare, praxisnahe Antwort** – idealerweise als Schritt-für-Schritt-Anleitung.
+- **Zitiere wörtlich**, sobald du Inhalte aus dem Kontext nutzt. Beispiel:
+  > „Nach 6 Stunden erfolgt ein Pausenabzug von 30 Minuten, nach 9 Stunden werden weitere 15 Minuten abgezogen.“
+  Das bedeutet: …
+- Vermeide technische Begriffe wie „Flag“, „Dialog V XXX“, „Schichtzyklus-ID“, es sei denn, die Frage zielt explizit darauf ab.
+- Falls der Kontext **keine relevanten Informationen** zur Frage enthält, antworte **nicht mit Spekulation**, sondern mit:
+  **„Auf diese Frage habe ich leider keine Antwort. Bitte wenden Sie sich an Ihre Personalabteilung oder den internen ATOSS-Support.“**
+- Sei professionell, freundlich und richte dich an Endanwender – nicht an Systemadministratoren.
+- Wenn mehrere Abschnitte im Kontext relevant sind, zitiere jeweils den passenden Teil.
 
-Answer:"""
+Antwort:"""
 
 
 class RAGChainService:
@@ -85,7 +97,7 @@ class RAGChainService:
 
         return "\n\n".join(formatted)
 
-    async def generate_response(self, question: str) -> str:
+    async def generate_response(self, question: str, chat_history: str = "") -> str:
         """Generate a complete response for a question"""
         if not self._is_ready:
             raise RuntimeError(ERROR_RAG_NOT_INITIALIZED)
@@ -96,7 +108,11 @@ class RAGChainService:
             context = self._format_docs(docs)
 
             # Format the prompt
-            prompt_text = self._prompt.format(context=context, question=question)
+            prompt_text = self._prompt.format(
+                context=context,
+                user_question=question,
+                chat_history=chat_history
+            )
 
             # Generate response
             llm = llm_manager.get_llm()
@@ -110,28 +126,39 @@ class RAGChainService:
             logger.error("Error generating response: %s", e)
             raise
 
-    async def stream_response(self, question: str) -> AsyncIterator[str]:
+    async def stream_response(self, question: str, chat_history: str = "") -> AsyncIterator[str]:
         """Stream a response for a question"""
         if not self._is_ready:
             raise RuntimeError(ERROR_RAG_NOT_INITIALIZED)
 
         try:
-            # Retrieve relevant documents
+            # Retrieve relevant documents (same as generate_response)
             docs = await retriever_service.retrieve(question)
             context = self._format_docs(docs)
 
             # Format the prompt
-            prompt_text = self._prompt.format(context=context, question=question)
+            prompt_text = self._prompt.format(
+                context=context,
+                user_question=question,
+                chat_history=chat_history
+            )
 
-            # Get streaming LLM
-            streaming_llm = llm_manager.get_streaming_llm()
-
-            # Stream the response
-            async for chunk in streaming_llm.astream(prompt_text):
-                if hasattr(chunk, 'content') and isinstance(chunk.content, str):
-                    yield chunk.content
-                elif isinstance(chunk, str):
-                    yield chunk
+            # Stream the response directly
+            llm = llm_manager.get_streaming_llm()
+            async for chunk in llm.astream(prompt_text):
+                if hasattr(chunk, 'content'):
+                    content = chunk.content
+                    if isinstance(content, str):
+                        yield content
+                    elif isinstance(content, list):
+                        # Handle list of content blocks
+                        for item in content:
+                            if isinstance(item, str):
+                                yield item
+                            elif isinstance(item, dict) and 'text' in item:
+                                yield str(item['text'])
+                else:
+                    yield str(chunk)
 
         except (RuntimeError, OSError, ValueError) as e:
             logger.error("Error streaming response: %s", e)

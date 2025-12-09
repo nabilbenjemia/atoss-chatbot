@@ -69,17 +69,19 @@ class ChatController:
             raise RuntimeError("LLM service is not ready. Please wait for initialization.")
 
         try:
-            # Convert conversation history to format expected by service
-            history = []
+            # Convert conversation history to formatted string
+            chat_history = ""
             if request.conversation_history:
-                history = [
-                    {"role": msg.role, "content": msg.content}
+                history_parts = [
+                    f"{msg.role}: {msg.content}"
                     for msg in request.conversation_history
                 ]
+                chat_history = "\n".join(history_parts)
 
             # Generate response
             response = await rag_chain_service.generate_response(
-                question=request.message
+                question=request.message,
+                chat_history=chat_history
             )
 
             # Get source documents for reference
@@ -105,17 +107,19 @@ class ChatController:
             raise RuntimeError("LLM service is not ready. Please wait for initialization.")
 
         try:
-            # Convert conversation history
-            history = []
+            # Convert conversation history to formatted string
+            chat_history = ""
             if request.conversation_history:
-                history = [
-                    {"role": msg.role, "content": msg.content}
+                history_parts = [
+                    f"{msg.role}: {msg.content}"
                     for msg in request.conversation_history
                 ]
+                chat_history = "\n".join(history_parts)
 
             # Stream response
             async for chunk in rag_chain_service.stream_response(
-                question=request.message
+                question=request.message,
+                chat_history=chat_history
             ):
                 yield chunk
 

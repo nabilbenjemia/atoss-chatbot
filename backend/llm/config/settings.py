@@ -1,47 +1,48 @@
 """
 LLM Server Configuration Settings
 """
-import os
+
 from pydantic_settings import BaseSettings
-from typing import Optional
+
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
-    
+
     # Server Configuration
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     DEBUG: bool = True
-    
+
     # Ollama Configuration
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "llama3.2"
+    OLLAMA_MODEL: str = "qwen3:0.6b"
     OLLAMA_TEMPERATURE: float = 0.7
-    OLLAMA_TOP_P: float = 0.9
-    OLLAMA_NUM_CTX: int = 4096
-    
+    OLLAMA_TOP_P: float = 0.7
+    OLLAMA_NUM_CTX: int = 2048
+
     # Embedding Configuration
-    EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+    EMBEDDING_MODEL: str = "Qwen/Qwen3-Embedding-0.6B"
     EMBEDDING_DEVICE: str = "cuda"  # or "cuda" for GPU
-    
+
     # ChromaDB Configuration
-    CHROMA_PERSIST_DIRECTORY: str = "./data/chroma_db"
-    CHROMA_COLLECTION_NAME: str = "atoss_documents"
-    
+    CHROMA_PERSIST_DIRECTORY: str = "./Chroma_ASES_Referenzhandbuch_db2"
+    CHROMA_COLLECTION_NAME: str = "ASES_Referenzhandbuch"
+
     # Reranker Configuration
-    RERANKER_MODEL: str = "ms-marco-MiniLM-L-12-v2"
+    RERANKER_MODEL: str = "jinaai/jina-reranker-v3"
     RERANKER_TOP_K: int = 5
-    
+    RERANKER_MAX_CHARS_PER_DOC: int = 256  # Truncate docs for faster reranking
+
     # Retrieval Configuration
-    RETRIEVER_K: int = 10  # Initial retrieval count before reranking
-    FINAL_K: int = 3  # Final documents after reranking
-    
+    RETRIEVER_K: int = 16  # Initial retrieval count before reranking
+
+
     # RAG Configuration
-    MAX_CONTEXT_LENGTH: int = 3000
-    CHUNK_SIZE: int = 500
-    CHUNK_OVERLAP: int = 50
-    
+    MAX_CONTEXT_LENGTH: int = 10000
+    CHUNK_SIZE: int = 1000
+    CHUNK_OVERLAP: int = 200
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

@@ -9,6 +9,7 @@ from typing import Callable, List, Optional
 from models.embedding_model import embedding_manager
 from models.vectorstore import vectorstore_manager
 from models.llm_model import llm_manager
+from models.reranker_model import reranker_manager
 from services.retriever_service import retriever_service
 from services.rag_chain_service import rag_chain_service
 
@@ -35,9 +36,10 @@ class StartupService:
             bool: True if all components loaded successfully
         """
         steps = [
-            ("Loading embedding model...", self._load_embeddings, 20),
-            ("Loading vector store...", self._load_vectorstore, 40),
-            ("Loading LLM (Ollama)...", self._load_llm, 60),
+            ("Loading embedding model...", self._load_embeddings, 15),
+            ("Loading vector store...", self._load_vectorstore, 30),
+            ("Loading LLM (Ollama)...", self._load_llm, 45),
+            ("Loading reranker model...", self._load_reranker, 60),
             ("Loading reranked retriever...", self._load_retriever, 80),
             ("Initializing RAG chain...", self._load_rag_chain, 100),
         ]
@@ -73,9 +75,13 @@ class StartupService:
         """Load the Ollama LLM"""
         await asyncio.to_thread(llm_manager.load)
 
+    async def _load_reranker(self):
+        """Load the reranker model"""
+        await asyncio.to_thread(reranker_manager.load)
+
     async def _load_retriever(self):
         """Load the reranked retriever"""
-        await retriever_service.load()
+        await asyncio.to_thread(retriever_service.load)
 
     async def _load_rag_chain(self):
         """Initialize the RAG chain"""
@@ -89,6 +95,7 @@ class StartupService:
                 "embedding_model": embedding_manager.is_loaded,
                 "vectorstore": vectorstore_manager.is_loaded,
                 "llm": llm_manager.is_loaded,
+                "reranker": reranker_manager.is_loaded,
                 "retriever": retriever_service.is_loaded,
                 "rag_chain": rag_chain_service.is_ready
             },
@@ -106,6 +113,7 @@ class StartupService:
 
         # Unload in reverse order
         retriever_service.unload()
+        reranker_manager.unload()
         llm_manager.unload()
         vectorstore_manager.unload()
         embedding_manager.unload()

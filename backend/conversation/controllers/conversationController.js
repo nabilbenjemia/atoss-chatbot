@@ -99,54 +99,22 @@ const streamMessage = async (req, res) => {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
-    // ============================================
-    // MOCK MODE: Simulate streaming AI response
-    // Remove this block when FastAPI is ready
-    // ============================================
-    const USE_MOCK = true;  // Set to false when FastAPI is ready
-    
-    if (USE_MOCK) {
-        const mockResponse = `Hello! I'm a mock AI response. You asked: "${query}"
-
-Here's a simulated streaming response to test the frontend functionality. Each word is sent with a small delay to simulate real-time token streaming from an LLM.
-
-This helps verify that:
-1. The streaming message displays correctly
-2. The typing indicator works
-3. The Stop button can interrupt the stream
-4. Messages are saved after completion
-
-Feel free to test the interrupt functionality by clicking Stop!`;
-
-        const words = mockResponse.split(' ');
-        let index = 0;
-
-        const sendNextWord = () => {
-            if (index < words.length) {
-                res.write(`data: ${words[index]} \n\n`);
-                index++;
-                setTimeout(sendNextWord, 100);  // 100ms delay between words
-            } else {
-                res.write('data: [DONE]\n\n');
-                res.end();
-            }
-        };
-
-        sendNextWord();
-        return;
-    }
-    // ============================================
-    // END MOCK MODE
-    // ============================================
-
     try {
-        // Proxy to FastAPI
+        // Parse history and convert to ChatMessage format
+        const parsedHistory = JSON.parse(history || '[]');
+        const conversationHistory = parsedHistory.map(msg => ({
+            role: msg.sender === 'user' ? 'user' : 'assistant',
+            content: msg.content
+        }));
+
+        // Proxy to FastAPI stream endpoint
         const response = await axios({
             method: 'POST',
-            url: 'http://localhost:8000/api/generate',
+            url: 'http://localhost:8000/api/chat/stream',
             data: { 
-                query, 
-                conversation_history: JSON.parse(history || '[]') 
+                message: query,
+                conversation_id: conversationId,
+                conversation_history: conversationHistory
             },
             responseType: 'stream'
         });

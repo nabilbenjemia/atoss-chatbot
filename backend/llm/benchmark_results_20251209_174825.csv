@@ -1,0 +1,55 @@
+timestamp,query,response,duration_ms,status,error,ollama_base_url,ollama_model,ollama_temperature,ollama_top_p,ollama_num_ctx,embedding_model,embedding_device,chroma_persist_directory,chroma_collection_name,reranker_model,reranker_top_k,reranker_max_chars_per_doc,retriever_k,max_context_length,chunk_size,chunk_overlap
+2025-12-09T17:48:31.325396,Wie beantrage ich Urlaub / Freizeitausgleich?,"Um Ihre Antrag für Urlaub oder Freizeitausgleich zu beantragen, folgen Sie diesen Schritten:
+
+1. **Turnus für Urlaubstage (numerisch, 3):**  
+   Füllen Sie die Felder **Turnus für Urlaubstage** und **Einsprung (numerisch, 16)** mit den gewünschten Turnus-Definitionen und den entsprechenden Längen aus. Der Einsprung sollte nach dem **Turnus der Urlaubstage** im Dialog ""Urlaubstage"" (V ACDAY) festgelegt sein.  
+   *Beispiel:* Wenn Sie ""1"" eingeben, beginnt der Turnus ab dem ersten zugewiesenen Stammsatz der Tabelle ""Urlaubstage"" (V ACDAY).
+
+2. **Länge (numerisch, 16):**  
+   Füllen Sie den Felder mit der Definition des Urlaubsabzugs und den entsprechenden Längen aus. Der Wert muss immer **""2""** sein.
+
+3. **Einsprung (numerisch, 2):**  
+   Gibt den Beginn des Turnus der Urlaubstage an. Wenn der Wert ""1"" eingetragen wird, beginnt der Turnus ab dem ersten zugewiesenen Stammsatz der Tabelle ""Urlaubstage"" (V ACDAY).
+
+4. **Monatliche Anspruchswerte (ja, nein):**  
+   Bei aktiviertem Kontrollkästchen werden Urlaubsanträge, die noch nicht genehmigt sind, bei der Berechnung des Resturlaubs mit berücksichtigt. Der monatliche Anspruch wird als Summe der monatlichen Ansprüche aus dem Dialog ""Installationsparameter"" (INST) und den monatlichen Ansprüchen aller Urlaubssalden berechnet.
+
+5. **Zeitdatenmanagement (DTIME):**  
+   Wenn Sie zusätzliche Zeit ermitteln möchten, geben Sie die **Zusatzanspruch** im Dialog ""Zeitdatenmanagement"" (DTIME) an. Dieser Feld muss nicht editierbar sein.
+
+**Hinweis:**  
+- Die numerischen Felder (Turnus, Länge, Einsprung) müssen **numerisch** und **3** sein.  
+- Falls die Kontexte keine relevanten Informationen liefert, sage bitte, dass ich die Anforderungen präzise interpretieren kann.",6654.23,success,,http://localhost:11434,qwen3:0.6b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T17:48:37.980124,Wie erstelle oder ändere ich einen Dienstplan?,"Um einen Dienstplan zu erstellen oder zu ändern, können Sie folgende Schritte durchführen:  
+
+1. **In der Planungsliste** (z. B. im Dialog ""Flexibler Mitarbeiterdienstplan"" oder ""Tagesdienstplan"") ändern Sie Felder wie Text, Farbe oder Position, ohne dass Einschränkungen auftreten.  
+2. **Verwenden Sie die Variante-Änderung-Funktion**: Ändern Sie Felder wie ""Kennzeichen"" oder ""Alternativwunsch"" nur, wenn sie im Planungszeitraum eingegeben werden.  
+3. **Prüfen Sie vor einer Änderung**: Falls eine Änderung in der Vergangenheit (am Vortag oder früher) vorliegt, erscheint eine Warnung, die die Unlesbarkeit der bereits festgeschriebenen Planung betont.  
+4. **Überprüfen Sie die Schichtzyklus-Änderung**: Bei einer Änderung des Schichtzyklus suchen Sie alle Mitarbeiter nach dem zugewiesenen Schichtzyklus, um sicherzustellen, dass keine dynamischen Berechnungen auf bereits festgeschriebene Planungsebenen verändert werden.  
+
+Diese Schritte garantieren eine präzise und unverzichtbaren Planung.",3987.61,success,,http://localhost:11434,qwen3:0.6b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T17:48:41.967732,Was ist bei Schichtzuschlägen / Pausenregelungen zu beachten?,"Bei Schichtzuschlägen oder Pausenregelungen zu beachten:
+
+- **Setze den Flag 'ja'**: Dies übernimmt alle festen und automatischen Pausen aus dem aktuellen Schichtzyklus. Wenn diese Pausen außerhalb der Rahmenzeit des neuen Arbeitsmusters liegen, werden sie ignoriert.  
+- **Automatische Pausen**: Wenn keine festen Pausen vorhanden sind, werden automatischen Pausen übernommen und in Planpausen umgewendet.  
+- **Planpausen**: In der Regel (Modus ""Planpausen mit Auswirkung auf Zeitwirtschaft"") werden automatische Pausen übernommen, Feste unbezahlte Pausen übernommen, automatischen Pausen sollen feste Pausen löschen und feste Pausen sollen automatischen Pausen löschen.  
+
+Diese Regeln bestimmen, wie Pausen in der Personaleinsatzplanung verarbeitet werden.",3488.99,success,,http://localhost:11434,qwen3:0.6b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T17:48:45.457220,Wofür stehen die Abkürzungen PLAN und MPDATA?,"Die Abkürzungen **PLAN** und **MPDATA** stehen für bestimmte Planungsstruktur- und Dienstplan-Definitionen.  
+- **PLAN** wird verwendet, um die **Planungsstruktur** (z. B. Name, Matchcodes) zu definieren und die **Planungskontexte** zu verknüpfen.  
+- **MPDATA** definiert die **Dienstplan-Abkürzungen** (z. B. Kurzname, Matchcodes) für Arbeitsmuster oder Fehlgründe.  
+
+Diese Abkürzungen ermöglichen eine schnelle Anzeigepflichtung im Dienstplan und im Wunschdienstplan, wobei sie in der Planungsstruktur mit Matchcodes definiert werden.",3292.31,success,,http://localhost:11434,qwen3:0.6b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T17:48:48.750031,Welchem Funktionsbereich ist der Dialog 'Korrektur von Kontierungen' (CRCOST) zugeordnet und welche Hauptaufgabe erfüllt er?,"Der Dialog ""Korrektur von Kontierungen"" (CRCOST) ist für die Korrekturen von Kostenstellen- und Zeitkonten zustimmt. In der Registerkarte ""Allgemein"" (CRCOST) wird die korrekte Verwendung der Kennzeichen ""o"" genutzt, um die Zeitkorrekturen in den Dialogen ""Tageskorrekturen"" (MPDATA) und ""Korrektur von Kontierungen"" (CRCOST) zu verbinden. Die Kennzeichen ""k"" (einschränkend) zeigt an, dass die Korrekturen über Änderungen oder Nacherfassungen im Modul entstanden sind, nicht direkt auf ein Zeiterfassungsgerät. 
+
+Für die Korrekturen der Auftragsbedarfe (XCORR) gibt es in der Registerkarte ""Auswahl"" (XCORR) die Optionen zur Auswahl des Funktionsbereichs und der Frage, was der CRCOST-Registerkarte zugeordnet ist. Die Bedienelemente beinhalten Bereiche und Matchcodes, die in der Referenzhandlung ""ASES_Referenzhandbuch.md"" beschrieben sind.",3649.38,success,,http://localhost:11434,qwen3:0.6b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T17:48:52.399911,Welche Exportformate sind standardmäßig für das Drucken von Reports freigegeben und wie verhält es sich mit den übrigen Formaten?,"Die standardisierten Exportformate für das Drucken von Reports in ATOSS Workforce Management sind:  
+- **PDF** als automatisiertes Format, wenn Jasper Report ausgewählt wird.  
+- **Excel**, **HTML**, und **CSV** als exportierbare Optionen im Dialog ""Exportieren"".  
+
+Die Standardauswahl für PDF ist **ja**, und die Exporteinstellungen können in den Formatoptionen **Excel**, **HTML**, und **CSV** festgelegt werden.  
+
+Für die Berechtigungen im Dialog ""Berechtigungen für Dialoge"" (USER) ist ein spezifisches Feld erforderlich, um Druckvorgänge in anderen Formatien (z.B. PDF) zu ermöglichen.  
+
+Diese Details basieren auf den genannten Hinweisen aus dem Kontext.",3190.74,success,,http://localhost:11434,qwen3:0.6b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T17:48:55.591155,Wie heißt Spongebobs bester Freund?,"Es ist nicht im Kontext festgelegt, was Spongebobs bester Freund heißt. Im ASES-Referenzhandbuch (z. B. in Beispiel 2, 3, 4, 5) gibt es keine relevanten Informationen über Spongebobs oder ihre Beziehungen. Falls Sie weitere Details benötigen, können Sie mir das Kontext-Verlauf nochmal prüfen. 😊",1826.89,success,,http://localhost:11434,qwen3:0.6b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
