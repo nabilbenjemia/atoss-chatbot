@@ -30,7 +30,7 @@ An AI-powered chatbot for ATOSS Workforce Management documentation using RAG (Re
 ### Install Ollama Model
 
 ```bash
-ollama pull qwen3:0.6b
+ollama pull qwen3:1.7b
 ```
 
 ---

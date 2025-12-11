@@ -6,6 +6,7 @@ import logging
 from typing import Optional, List
 from sentence_transformers import SentenceTransformer
 from torch import Tensor
+import importlib
 from langchain_core.embeddings import Embeddings
 
 from config.settings import settings
@@ -50,10 +51,11 @@ class EmbeddingManager:
 
         try:
             logger.info("Loading embedding model: %s", settings.EMBEDDING_MODEL)
-
+            device = self._resolve_device(settings.EMBEDDING_DEVICE)
+            logger.info("Using embedding device: %s", device)
             self._embeddings = SentenceTransformer(
                 model_name_or_path=settings.EMBEDDING_MODEL,
-                device=settings.EMBEDDING_DEVICE,
+                device=device,
                 similarity_fn_name="cosine"
             )
 
@@ -69,6 +71,46 @@ class EmbeddingManager:
             self._is_loaded = False
             return False
             
+    def _resolve_device(self, preferred: Optional[str]) -> str:
+        """Resolve the actual device to use based on system capabilities.
+
+        Order: cuda -> mps (Apple Silicon) -> cpu. Falls back safely if unavailable.
+        """
+        pref = (preferred or "auto").strip().lower()
+        try:
+            torch = importlib.import_module("torch")
+        except Exception as e:
+            logger.warning("Torch not available; defaulting to cpu (%s)", e)
+            return "cpu"
+
+        def has_mps() -> bool:
+            return hasattr(torch, "backends") and hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+
+        if pref == "auto":
+            if torch.cuda.is_available():
+                return "cuda"
+            if has_mps():
+                return "mps"
+            return "cpu"
+
+        if pref == "cuda":
+            if torch.cuda.is_available():
+                return "cuda"
+            logger.warning("CUDA requested but not available; falling back to auto detection")
+            return self._resolve_device("auto")
+
+        if pref == "mps":
+            if has_mps():
+                return "mps"
+            logger.warning("MPS requested but not available; falling back to auto detection")
+            return self._resolve_device("auto")
+
+        if pref == "cpu":
+            return "cpu"
+
+        logger.warning("Unknown device '%s'; falling back to auto", preferred)
+        return self._resolve_device("auto")
+
 
     def get_embeddings(self) -> SentenceTransformer:
         """Get the loaded embedding model"""

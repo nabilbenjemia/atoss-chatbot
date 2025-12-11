@@ -25,7 +25,8 @@ class Settings(BaseSettings):
 
     # Embedding Configuration
     EMBEDDING_MODEL: str = "Qwen/Qwen3-Embedding-0.6B"
-    EMBEDDING_DEVICE: str = "cuda"  # or "cuda" for GPU
+    # Device selection: "auto" (recommended), "cuda", "mps" (Apple Silicon), or "cpu"
+    EMBEDDING_DEVICE: str = "auto"
 
     # ChromaDB Configuration
     CHROMA_PERSIST_DIRECTORY: str = "./Chroma_ASES_Referenzhandbuch_db2"
@@ -34,7 +35,7 @@ class Settings(BaseSettings):
     # Reranker Configuration
     RERANKER_MODEL: str = "jinaai/jina-reranker-v3"
     RERANKER_TOP_K: int = 5
-    RERANKER_MAX_CHARS_PER_DOC: int = 256  # Truncate docs for faster reranking
+    RERANKER_MAX_CHARS_PER_DOC: int = 1024  # Truncate docs for faster reranking
 
     # Retrieval Configuration
     RETRIEVER_K: int = 16  # Initial retrieval count before reranking
