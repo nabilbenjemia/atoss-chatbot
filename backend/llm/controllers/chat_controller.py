@@ -2,6 +2,7 @@
 Chat Controller
 Handles chat-related API requests
 """
+
 import logging
 from typing import AsyncGenerator, Optional, List
 from pydantic import BaseModel, Field
@@ -14,14 +15,18 @@ logger = logging.getLogger(__name__)
 
 class ChatMessage(BaseModel):
     """Schema for a chat message"""
+
     role: str = Field(..., description="Role of the message sender (user/assistant)")
     content: str = Field(..., description="Content of the message")
 
 
 class ChatRequest(BaseModel):
     """Schema for chat request"""
+
     message: str = Field(..., description="User's message/question")
-    conversation_id: Optional[str] = Field(None, description="Conversation ID for context")
+    conversation_id: Optional[str] = Field(
+        None, description="Conversation ID for context"
+    )
     conversation_history: Optional[List[ChatMessage]] = Field(
         default=[], description="Previous messages in the conversation"
     )
@@ -29,13 +34,17 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     """Schema for chat response"""
+
     response: str = Field(..., description="AI's response")
     conversation_id: Optional[str] = Field(None, description="Conversation ID")
-    sources: Optional[List[dict]] = Field(default=[], description="Source documents used")
+    sources: Optional[List[dict]] = Field(
+        default=[], description="Source documents used"
+    )
 
 
 class StatusResponse(BaseModel):
     """Schema for status response"""
+
     status: str
     is_loaded: bool
     components: dict
@@ -60,66 +69,69 @@ class ChatController:
             status=status_str,
             is_loaded=status["is_loaded"],
             components=status["components"],
-            message=message
+            message=message,
         )
 
     async def generate_response(self, request: ChatRequest) -> ChatResponse:
         """Generate a complete response for a chat request"""
         if not startup_service.is_loaded:
-            raise RuntimeError("LLM service is not ready. Please wait for initialization.")
+            raise RuntimeError(
+                "LLM service is not ready. Please wait for initialization."
+            )
 
         try:
             # Convert conversation history to formatted string
             chat_history = ""
             if request.conversation_history:
                 history_parts = [
-                    f"{msg.role}: {msg.content}"
-                    for msg in request.conversation_history
+                    f"{msg.role}: {msg.content}" for msg in request.conversation_history
                 ]
                 chat_history = "\n".join(history_parts)
 
             # Generate response
             response = await rag_chain_service.generate_response(
-                question=request.message,
-                chat_history=chat_history
+                question=request.message, chat_history=chat_history
             )
 
             # Get source documents for reference
             docs = await rag_chain_service.get_relevant_documents(request.message)
             sources = [
-                {"source": doc.metadata.get("source", "Unknown"), "content": doc.page_content[:200]}
+                {
+                    "source": doc.metadata.get("source", "Unknown"),
+                    "content": doc.page_content[:200],
+                }
                 for doc in docs
             ]
 
             return ChatResponse(
                 response=response,
                 conversation_id=request.conversation_id,
-                sources=sources
+                sources=sources,
             )
 
         except (RuntimeError, OSError, ValueError) as e:
             logger.error("Error generating response: %s", e)
             raise
 
-    async def stream_response(self, request: ChatRequest)-> AsyncGenerator[str, None]:
+    async def stream_response(self, request: ChatRequest) -> AsyncGenerator[str, None]:
         """Stream a response for a chat request"""
         if not startup_service.is_loaded:
-            raise RuntimeError("LLM service is not ready. Please wait for initialization.")
+            raise RuntimeError(
+                "LLM service is not ready. Please wait for initialization."
+            )
 
         try:
             # Convert conversation history to formatted string
             chat_history = ""
             if request.conversation_history:
                 history_parts = [
-                    f"{msg.role}: {msg.content}"
-                    for msg in request.conversation_history
+                    f"{msg.role}: {msg.content}" for msg in request.conversation_history
                 ]
                 chat_history = "\n".join(history_parts)
 
             # Stream response
             async for chunk in rag_chain_service.stream_response(
-                question=request.message,
-                chat_history=chat_history
+                question=request.message, chat_history=chat_history
             ):
                 yield chunk
 
