@@ -2,24 +2,36 @@
 Vector Store Manager
 Handles ChromaDB vector store initialization and management
 """
+
 import asyncio
 import logging
 import os
 from typing import Optional, List, Dict, Any
-from langchain.schema import Document
+from dataclasses import dataclass
+
+
+import chromadb
+from chromadb.api.models.Collection import Collection
+
 
 from config.settings import settings
-from langchain_community.vectorstores import Chroma
-from models.embedding_model import embedding_manager, QueryOnlyEmbeddings
+from models.embedding_model import embedding_manager
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class Document:
+    page_content: str
+    metadata: Dict[str, Any]
 
 
 class VectorStoreManager:
     """Manages the ChromaDB vector store lifecycle"""
 
     _instance: Optional["VectorStoreManager"] = None
-    _vectorstore: Optional[Chroma] = None
+    _client: Optional[chromadb.PersistentClient] = None
+    _collection: Optional[Collection] = None
     _is_loaded: bool = False
 
     def __new__(cls):
@@ -27,11 +39,11 @@ class VectorStoreManager:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-
     def __init__(self):
-        if not hasattr(self, '_initialized'):
+        if not hasattr(self, "_initialized"):
             self._initialized = True
-            self._vectorstore = None
+            self._client = None
+            self._collection = None
             self._is_loaded = False
 
     async def load(self) -> bool:
@@ -48,19 +60,28 @@ class VectorStoreManager:
             if not embedding_manager.is_loaded:
                 raise RuntimeError("Embedding model must be loaded before vector store")
 
-            embeddings = embedding_manager.get_embeddings()
             persist_directory = settings.CHROMA_PERSIST_DIRECTORY
-            if not os.path.exists(persist_directory) or not os.listdir(persist_directory):
+            if not os.path.exists(persist_directory) or not os.listdir(
+                persist_directory
+            ):
                 logger.error("Vector store not found at: %s", persist_directory)
-                raise RuntimeError("Vector store not found. Please create it before loading.")
+                raise RuntimeError(
+                    "Vector store not found. Please run ingest.py first."
+                )
 
             logger.info("Loading vector store from: %s", persist_directory)
 
-            self._vectorstore = Chroma(
-                collection_name=settings.CHROMA_COLLECTION_NAME,
-                embedding_function=QueryOnlyEmbeddings(embeddings),
-                persist_directory=persist_directory
-            )
+            self._client = chromadb.PersistentClient(path=persist_directory)
+
+            try:
+                self._collection = self._client.get_collection(
+                    name=settings.CHROMA_COLLECTION_NAME
+                )
+            except ValueError:
+                raise RuntimeError(
+                    f"Collection '{settings.CHROMA_COLLECTION_NAME}' not found in DB."
+                )
+
             self._is_loaded = True
             logger.info("Vector store loaded successfully")
             return True
@@ -70,30 +91,45 @@ class VectorStoreManager:
             self._is_loaded = False
             raise
 
-
-    def get_vectorstore(self) -> Chroma:
-        """Get the loaded vector store"""
-        if not self._is_loaded or self._vectorstore is None:
+    async def search(self, query: str, k: int = 8) -> List[Document]:
+        """
+        Native Similarity Search:
+        1. Embeds the query using EmbeddingManager
+        2. Queries ChromaDB
+        3. Returns a list of Document objects
+        """
+        if not self._is_loaded or self._collection is None:
             raise RuntimeError("Vector store not loaded. Call load() first.")
-        return self._vectorstore
-    def similarity_search(self, query: str, k: int = 4) -> List[Document]:
-        """Perform similarity search on the vector store"""
-        return self.get_vectorstore().similarity_search(query, k=k)
 
-    def similarity_search_with_score(self, query: str, k: int = 4):
-        """Perform similarity search with relevance scores"""
-        return self.get_vectorstore().similarity_search_with_score(query, k=k)
+        # 1. Embed the user query
+        # This calls your native embedding_manager (no LangChain wrapper needed)
+        query_vector = embedding_manager.embed_query(query)
 
-    def add_documents(self, documents: List[Document]):
-        """Add documents to the vector store"""
-        self.get_vectorstore().add_documents(documents)
-        logger.info("Added %d documents to vector store", len(documents))
+        # 2. Query ChromaDB
+        # We perform this in a thread to keep the API async-friendly
+        results = await asyncio.to_thread(
+            self._collection.query,
+            query_embeddings=[query_vector],
+            n_results=k,
+            include=["documents", "metadatas", "distances"],
+        )
 
-    def get_retriever(self, search_kwargs: Optional[Dict[str, Any]] = None):
-        """Get a retriever from the vector store"""
-        if search_kwargs is None:
-            search_kwargs = {"k": settings.RETRIEVER_K}
-        return self.get_vectorstore().as_retriever(search_kwargs=search_kwargs)
+        # 3. Format results into Document objects
+        # Chroma returns a dictionary of lists (e.g., results['documents'][0][i])
+        documents = []
+
+        # Check if we got results
+        if results["ids"] and len(results["ids"][0]) > 0:
+            num_results = len(results["ids"][0])
+            for i in range(num_results):
+                content = results["documents"][0][i]
+                meta = results["metadatas"][0][i]
+
+                # Create a clean Document object
+                doc = Document(page_content=content, metadata=meta)
+                documents.append(doc)
+
+        return documents
 
     @property
     def is_loaded(self) -> bool:
@@ -102,7 +138,8 @@ class VectorStoreManager:
 
     def unload(self):
         """Unload the vector store"""
-        self._vectorstore = None
+        self._client = None
+        self._collection = None
         self._is_loaded = False
         logger.info("Vector store unloaded")
 
