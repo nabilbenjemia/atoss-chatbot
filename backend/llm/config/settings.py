@@ -5,7 +5,6 @@ LLM Server Configuration Settings
 from pydantic_settings import BaseSettings
 
 
-
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
 
@@ -16,35 +15,25 @@ class Settings(BaseSettings):
 
     # Ollama Configuration
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "qwen3:1.7b"
-    OLLAMA_TEMPERATURE: float = 0.6  # Lower for more focused responses
-    OLLAMA_TOP_P: float = 0.8
-    OLLAMA_NUM_CTX: int = 4096  # Larger context window
+    OLLAMA_MODEL: str = "qwen2.5:7b-instruct-q4_0"
+    OLLAMA_TEMPERATURE: float = 0
+    OLLAMA_NUM_CTX: int = 5000  # Larger context window
     OLLAMA_REPEAT_PENALTY: float = 1.2  # Moderate repetition penalty
-    OLLAMA_NUM_PREDICT: int = 1024  # Allow longer responses
+    OLLAMA_NUM_PREDICT: int = 500  # Precise Answers
 
     # Embedding Configuration
-    EMBEDDING_MODEL: str = "Qwen/Qwen3-Embedding-0.6B"
+    EMBEDDING_MODEL: str = "Snowflake/snowflake-arctic-embed-l-v2.0"
     # Device selection: "auto" (recommended), "cuda", "mps" (Apple Silicon), or "cpu"
     EMBEDDING_DEVICE: str = "auto"
 
     # ChromaDB Configuration
-    CHROMA_PERSIST_DIRECTORY: str = "./Chroma_ASES_Referenzhandbuch_db2"
-    CHROMA_COLLECTION_NAME: str = "ASES_Referenzhandbuch"
-
-    # Reranker Configuration
-    RERANKER_MODEL: str = "jinaai/jina-reranker-v3"
-    RERANKER_TOP_K: int = 5
-    RERANKER_MAX_CHARS_PER_DOC: int = 1024  # Truncate docs for faster reranking
-
-    # Retrieval Configuration
-    RETRIEVER_K: int = 16  # Initial retrieval count before reranking
-
+    CHROMA_PERSIST_DIRECTORY: str = "./chroma_db_snowflake_600chunks_300overlapping"
+    CHROMA_COLLECTION_NAME: str = "tum_docs"
 
     # RAG Configuration
     MAX_CONTEXT_LENGTH: int = 10000
-    CHUNK_SIZE: int = 1000
-    CHUNK_OVERLAP: int = 200
+    CHUNK_SIZE: int = 600
+    CHUNK_OVERLAP: int = 300
 
     class Config:
         env_file = ".env"
