@@ -2,27 +2,15 @@
 Embedding Model Manager
 Handles loading and managing the embedding model for vector representations
 """
+
 import logging
 from typing import Optional, List
 from sentence_transformers import SentenceTransformer
 from torch import Tensor
 import importlib
-from langchain_core.embeddings import Embeddings
-
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
-
-class QueryOnlyEmbeddings(Embeddings):
-    def __init__(self, model: SentenceTransformer):
-        self.model = model
-
-    def embed_documents(self, texts):
-        """Not used"""
-        pass
-
-    def embed_query(self, text):
-        return self.model.encode([text], convert_to_tensor=False)[0].tolist()
 
 
 class EmbeddingManager:
@@ -36,9 +24,9 @@ class EmbeddingManager:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def __init__(self):
-        if not hasattr(self, '_initialized'):
+        if not hasattr(self, "_initialized"):
             self._initialized = True
             self._embeddings = None
             self._is_loaded = False
@@ -56,7 +44,7 @@ class EmbeddingManager:
             self._embeddings = SentenceTransformer(
                 model_name_or_path=settings.EMBEDDING_MODEL,
                 device=device,
-                similarity_fn_name="cosine"
+                similarity_fn_name="cosine",
             )
 
             # Warm up the model with a test embedding
@@ -70,7 +58,7 @@ class EmbeddingManager:
             logger.error("Failed to load embedding model: %s", e)
             self._is_loaded = False
             return False
-            
+
     def _resolve_device(self, preferred: Optional[str]) -> str:
         """Resolve the actual device to use based on system capabilities.
 
@@ -84,7 +72,11 @@ class EmbeddingManager:
             return "cpu"
 
         def has_mps() -> bool:
-            return hasattr(torch, "backends") and hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+            return (
+                hasattr(torch, "backends")
+                and hasattr(torch.backends, "mps")
+                and torch.backends.mps.is_available()
+            )
 
         if pref == "auto":
             if torch.cuda.is_available():
@@ -96,13 +88,17 @@ class EmbeddingManager:
         if pref == "cuda":
             if torch.cuda.is_available():
                 return "cuda"
-            logger.warning("CUDA requested but not available; falling back to auto detection")
+            logger.warning(
+                "CUDA requested but not available; falling back to auto detection"
+            )
             return self._resolve_device("auto")
 
         if pref == "mps":
             if has_mps():
                 return "mps"
-            logger.warning("MPS requested but not available; falling back to auto detection")
+            logger.warning(
+                "MPS requested but not available; falling back to auto detection"
+            )
             return self._resolve_device("auto")
 
         if pref == "cpu":
@@ -111,20 +107,19 @@ class EmbeddingManager:
         logger.warning("Unknown device '%s'; falling back to auto", preferred)
         return self._resolve_device("auto")
 
+    def embed_query(self, text: str) -> List[float]:
+        """Generate embedding for a single query text."""
+        if not self._is_loaded or self._embeddings is None:
+            raise RuntimeError("Embedding model not loaded")
+
+        # Wichtig: .tolist() wandelt das Numpy-Array in eine Liste um
+        return self._embeddings.encode(text, normalize_embeddings=True).tolist()
 
     def get_embeddings(self) -> SentenceTransformer:
         """Get the loaded embedding model"""
         if not self._is_loaded or self._embeddings is None:
             raise RuntimeError("Embedding model not loaded. Call load() first.")
         return self._embeddings
-
-    def embed_query(self, text: str) -> Tensor:
-        """Embed a single query text"""
-        return self.get_embeddings().encode(text)
-
-    def embed_documents(self, texts: List[str]):
-        """Embed multiple documents"""
-        return self.get_embeddings().encode(texts)
 
     @property
     def is_loaded(self) -> bool:
