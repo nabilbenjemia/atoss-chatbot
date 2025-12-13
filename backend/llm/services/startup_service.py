@@ -2,6 +2,7 @@
 Startup Service
 Handles the initialization of all LLM components on server startup
 """
+
 import asyncio
 import logging
 from typing import Callable, List, Optional
@@ -9,8 +10,6 @@ from typing import Callable, List, Optional
 from models.embedding_model import embedding_manager
 from models.vectorstore import vectorstore_manager
 from models.llm_model import llm_manager
-from models.reranker_model import reranker_manager
-from services.retriever_service import retriever_service
 from services.rag_chain_service import rag_chain_service
 
 logger = logging.getLogger(__name__)
@@ -36,11 +35,9 @@ class StartupService:
             bool: True if all components loaded successfully
         """
         steps = [
-            ("Loading embedding model...", self._load_embeddings, 15),
-            ("Loading vector store...", self._load_vectorstore, 30),
-            ("Loading LLM (Ollama)...", self._load_llm, 45),
-            ("Loading reranker model...", self._load_reranker, 60),
-            ("Loading reranked retriever...", self._load_retriever, 80),
+            ("Loading embedding model...", self._load_embeddings, 30),
+            ("Loading vector store...", self._load_vectorstore, 60),
+            ("Loading LLM (Ollama)...", self._load_llm, 100),
             ("Initializing RAG chain...", self._load_rag_chain, 100),
         ]
 
@@ -71,21 +68,15 @@ class StartupService:
         """Load the vector store"""
         await vectorstore_manager.load()
 
+    async def _load_rag_chain(self):
+        """Verify RAG chain is ready (Missing method fixed here)"""
+        if not rag_chain_service.is_ready:
+            raise RuntimeError("RAG Chain dependencies failed to load")
+        logger.info("RAG chain check passed.")
+
     async def _load_llm(self):
         """Load the Ollama LLM"""
-        await asyncio.to_thread(llm_manager.load)
-
-    async def _load_reranker(self):
-        """Load the reranker model"""
-        await asyncio.to_thread(reranker_manager.load)
-
-    async def _load_retriever(self):
-        """Load the reranked retriever"""
-        await asyncio.to_thread(retriever_service.load)
-
-    async def _load_rag_chain(self):
-        """Initialize the RAG chain"""
-        await asyncio.to_thread(rag_chain_service.initialize)
+        await llm_manager.load()
 
     def get_status(self) -> dict:
         """Get the current status of all components"""
@@ -95,11 +86,9 @@ class StartupService:
                 "embedding_model": embedding_manager.is_loaded,
                 "vectorstore": vectorstore_manager.is_loaded,
                 "llm": llm_manager.is_loaded,
-                "reranker": reranker_manager.is_loaded,
-                "retriever": retriever_service.is_loaded,
-                "rag_chain": rag_chain_service.is_ready
+                "rag_chain": rag_chain_service.is_ready,
             },
-            "loading_progress": self._loading_progress
+            "loading_progress": self._loading_progress,
         }
 
     @property
@@ -112,8 +101,6 @@ class StartupService:
         logger.info("Shutting down LLM components...")
 
         # Unload in reverse order
-        retriever_service.unload()
-        reranker_manager.unload()
         llm_manager.unload()
         vectorstore_manager.unload()
         embedding_manager.unload()
