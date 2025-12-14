@@ -1,0 +1,49 @@
+"""
+LLM Server Configuration Settings
+"""
+
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    """Application settings loaded from environment variables"""
+
+    # Server Configuration
+    HOST: str = "0.0.0.0"
+    PORT: int = 8000
+    DEBUG: bool = True
+
+    # Ollama Configuration
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "qwen2.5:7b-instruct-q4_0"
+    OLLAMA_TEMPERATURE: float = 0.3  # Balanced creativity
+    OLLAMA_NUM_CTX: int = 5000  # Larger context window
+    OLLAMA_REPEAT_PENALTY: float = 1.2  # Moderate repetition penalty
+    OLLAMA_NUM_PREDICT: int = 500  # Precise Answers
+
+    # Embedding Configuration
+    EMBEDDING_MODEL: str = "Snowflake/snowflake-arctic-embed-l-v2.0"
+    # Device selection: "auto" (recommended), "cuda", "mps" (Apple Silicon), or "cpu"
+    EMBEDDING_DEVICE: str = "auto"
+
+    # ChromaDB Configuration
+    CHROMA_PERSIST_DIRECTORY: str = "./chroma_db_snowflake_600chunks_300overlapping"
+    CHROMA_COLLECTION_NAME: str = "tum_docs"
+
+    # RAG Configuration
+    MAX_CONTEXT_LENGTH: int = 10000
+    CHUNK_SIZE: int = 600
+    CHUNK_OVERLAP: int = 300
+
+    # Reranking Configuration
+    ENABLE_RERANKING: bool = False
+    RERANKING_MODEL: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
+    RERANKING_TOP_K: int = 5  # Number of documents to keep after reranking
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+
+
+# Singleton instance
+settings = Settings()

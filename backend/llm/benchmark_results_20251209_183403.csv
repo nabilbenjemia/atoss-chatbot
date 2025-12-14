@@ -1,0 +1,91 @@
+timestamp,query,response,duration_ms,status,error,ollama_base_url,ollama_model,ollama_temperature,ollama_top_p,ollama_num_ctx,embedding_model,embedding_device,chroma_persist_directory,chroma_collection_name,reranker_model,reranker_top_k,reranker_max_chars_per_doc,retriever_k,max_context_length,chunk_size,chunk_overlap
+2025-12-09T18:34:09.487305,Wie beantrage ich Urlaub / Freizeitausgleich?,"**Antwort:**  
+Leider enthält der Kontext keine Informationen darüber, wie Mitarbeiter Urlaub oder Freizeitausgleich im System beantragen können. Die beschriebenen Felder und Einstellungen betreffen die **technische Konfiguration** von Urlaubssalden und Berechnungen, nicht die Benutzeraktionen zur Antragstellung.  
+
+Für die Beantragung von Urlaub / Freizeitausgleich sollten Sie sich an Ihre Personalabteilung oder den internen ATOSS-Support wenden, da dies typischerweise über spezifische Formulare oder Module im System erfolgt, die im vorliegenden Handbuch nicht detailliert beschrieben sind.",14823.09,success,,http://localhost:11434,qwen3:8b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T18:34:24.310888,Wie erstelle oder ändere ich einen Dienstplan?,"**Wie erstelle oder ändere ich einen Dienstplan?**  
+
+1. **Dienstplan erstellen**  
+   - Öffnen Sie den **Hauptdialog für Dienstplanerstellung** (z. B. über das Menü „Dienstplan“).  
+   - Wählen Sie die gewünschten **Unterdialoge** (z. B. „EMSCHE“ für individuelle Planung oder „SCHEDUD“ für Standardpläne) und konfigurieren Sie die Details wie Arbeitsmuster, Pausen oder Schichtzeiten.  
+   > „In der Auswahlliste des Feldes werden nur die im betreffenden Zeitraum zulässigen Arbeitsmuster zur Auswahl angeboten.“  
+
+2. **Dienstplan ändern**  
+   - **Variante anpassen**:  
+     - Gehen Sie in den Dialog für **Arbeitsmuster oder Varianten**.  
+     - Ändern Sie Farbe, Text oder Position frei – diese Einstellungen wirken sich **nicht automatisch** auf bestehende Pläne aus.  
+     - **Achtung**: Bei Änderungen von anderen Parametern (z. B. Schichtzeiten) erhalten Sie eine Warnung, falls dies bestehende Pläne beeinflussen könnte.  
+   - **Schichtzyklus anpassen**:  
+     - Öffnen Sie den Dialog „Schichtzyklus“ (CYCLE).  
+     - Prüfen Sie, welche Mitarbeiter bereits diesem Zyklus zugeordnet sind, um unerwünschte Auswirkungen auf festgeschriebene Pläne zu vermeiden.  
+     - Bei Änderungen wird automatisch eine **Warnung** ausgegeben, falls künftige Pläne betroffen sind.  
+     > „Das Arbeitsmuster für einen künftigen Dienstplan wird im Normalfall anhand des Schichtzyklus dynamisch berechnet.“  
+
+3. **Speichern und überprüfen**  
+   - Speichern Sie den Plan und prüfen Sie, ob Warnungen angezeigt werden (z. B. bei Änderungen von Schichtzyklen).  
+   - Stellen Sie sicher, dass alle Änderungen im gesamten Planungszeitraum konsistent sind.  
+
+**Tipp**: Bei Unsicherheiten kontaktieren Sie den internen ATOSS-Support oder Ihre Personalabteilung, um Fehler zu vermeiden.",15996.38,success,,http://localhost:11434,qwen3:8b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T18:34:40.307766,Was ist bei Schichtzuschlägen / Pausenregelungen zu beachten?,"**Antwort:**  
+Bei Schichtzuschlägen und Pausenregelungen sind folgende Punkte zu beachten:  
+
+1. **Pausen aus dem Arbeitsmuster übernehmen**  
+   > „Pause gemäß Arbeitsmuster aus Schichtzyklus (ja, nein (Konversionstabelle flag)): Gibt an, ob bei Änderung eines Arbeitsmusters die festen und automatischen Pausen aus dem alten Arbeitsmuster des Schichtzyklus oder aus dem neuen Arbeitsmuster berechnet werden sollen. Bei 'ja' werden alle festen und automatischen Pausen aus dem Arbeitsmuster des Schichtzyklus übernommen. In diesem Fall werden die Pausen ignoriert, die außerhalb der Rahmenzeit des neuen Arbeitsmusters liegen.“  
+   → Wenn Sie „ja“ wählen, werden alle Pausen aus dem alten Arbeitsmuster übernommen, auch wenn sie außerhalb der neuen Rahmenzeit liegen. Dies kann zu Überschneidungen mit dem neuen Muster führen. Stellen Sie sicher, dass die Pausen im neuen Muster korrekt definiert sind.  
+
+2. **Feste Pausen werden in Planpausen umgewandelt**  
+   > „Die festen Pausen werden in Planpausen umgewandelt. Wenn das Arbeitsmuster laut Schichtzyklus keine festen Pausen hat, werden auch die automatischen Pausen übernommen. Diese werden aber mit Planpausen ersetzt, sobald das individuelle Arbeitsmuster Pausen bekommt.“  
+   → Feste Pausen werden automatisch zu „Planpausen“ konvertiert. Automatische Pausen werden nur übernommen, wenn keine festen Pausen im alten Muster vorhanden sind. Prüfen Sie im Dialog „Arbeitsregel“ (RULE), ob Planpausen korrekt eingerichtet sind.  
+
+3. **Planung im Modus „Planpausen mit Auswirkung auf Zeitwirtschaft“**  
+   > „Wenn Sie die Planung im Modus 'Planpausen mit Auswirkung auf Zeitwirtschaft' starten, werden die Felder Automatische Pause übernehmen, Feste unbezahlte Pause übernehmen, etc. ignoriert.“  
+   → In diesem Modus werden Pausenregelungen direkt in die Zeitwirtschaft integriert. Stellen Sie sicher, dass alle Pausen im neuen Muster explizit definiert sind, da automatische Übernahmen ausgeschaltet werden.  
+
+4. **Keine Auswirkung auf Prognosefunktionen**  
+   > „Dieses Feld [Pause gemäß Arbeitsmuster] hat keine Auswirkung auf die Prognosefunktionen im Dialog 'Flexible Staff Planning' (V XXX).“  
+   → Bei der Prognose werden Pausenregelungen unabhängig von der „ja/nein“-Einstellung berücksichtigt. Überprüfen Sie die Prognoseparameter separat, um sicherzustellen, dass Pausen korrekt in die Arbeitszeiten einfließen.  
+
+**Tipp:** Bei Unsicherheiten zur Pausenkonfiguration im neuen Arbeitsmuster prüfen Sie immer die Einstellungen im Dialog „Arbeitsregel“ (RULE) und stellen Sie sicher, dass alle Pausen explizit definiert sind.",18403.55,success,,http://localhost:11434,qwen3:8b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T18:34:58.711320,Wofür stehen die Abkürzungen PLAN und MPDATA?,"Die Abkürzungen **PLAN** und **MPDATA** beziehen sich auf folgende Funktionen im ATOSS-System:  
+
+> „…in folgenden Dialogen ist dies der Fall:  
+> - 'Tageskorrekturen' (MPDATA)  
+> - 'Planungen' (PLAN)  
+> - 'Personalstamm' (EMPLOY), indirekt über das Feld Schichtzyklus“  
+
+**Erklärung:**  
+- **PLAN** steht für den Dialog **„Planungen“**, in dem Sie z. B. Arbeitspläne oder Dienstpläne erstellen oder bearbeiten.  
+- **MPDATA** steht für den Dialog **„Tageskorrekturen“**, in dem Sie tägliche Anpassungen wie Überstunden, Pausen oder Schichtänderungen vornehmen.  
+
+Beide Dialoge sind wichtig, um Arbeitszeiten und -pläne zu verwalten, aber sie nutzen spezielle Abkürzungen, die im Dienstplan oder Wunschdienstplan mit einem Fragezeichen angezeigt werden, wenn keine eindeutige Zuordnung vorliegt.",9268.75,success,,http://localhost:11434,qwen3:8b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T18:35:07.980574,Welchem Funktionsbereich ist der Dialog 'Korrektur von Kontierungen' (CRCOST) zugeordnet und welche Hauptaufgabe erfüllt er?,"Der Dialog **'Korrektur von Kontierungen' (CRCOST)** ist dem **Kostenstellenmanagement** zugeordnet und dient der **Korrektur und Anpassung von Daten**, die für die Zuordnung von Arbeitszeiten zu Kostenstellen relevant sind.  
+
+> „Der Dialog 'Korrektur von Kontierungen' (CRCOST) dient dazu, die über einen Mitarbeiter und Tag gesammelten Informationen, insoweit sie relevant sind, für die Zuordnung zu Kostenstellen, anzuzeigen und zu korrigieren.“  
+
+**Hauptaufgabe:**  
+- Anzeigen und Korrigieren von Daten wie tägliche Arbeitszeiten, Buchungen (z. B. Kostenstellen-Belegung) und wage type-bezogene Angaben.  
+- Sicherstellen, dass die Arbeitszeiten korrekt zu den zugeordneten Kostenstellen verrechnet werden.  
+
+**Praktische Anwendung:**  
+1. Öffnen Sie den Dialog **CRCOST** im ATOSS-System.  
+2. Prüfen Sie die gesammelten Daten zu einem Mitarbeiter und einem Kalenderwochenbereich.  
+3. Korrigieren Sie Fehler oder Anpassungen (z. B. falsche Kostenstellen-Zuordnung, fehlende Buchungen).  
+4. Speichern Sie die Änderungen, um die Kostenstellen-Abrechnung korrekt zu halten.  
+
+Der Dialog ist Teil der **Kostenstellen-Verwaltung** und spielt eine zentrale Rolle bei der Genauigkeit von Kostenzuordnungen in Rechnungen und Budgetplanungen.",13170.42,success,,http://localhost:11434,qwen3:8b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T18:35:21.150989,Welche Exportformate sind standardmäßig für das Drucken von Reports freigegeben und wie verhält es sich mit den übrigen Formaten?,"**Antwort:**  
+Standardmäßig ist **PDF** das einzige freigegebene Exportformat für das Drucken von Reports. Dies wird in der Beschreibung von Jasper Report festgelegt:  
+> „...wenn Sie Jasper Report auswählen, wird PDF automatisch als Standardformat festgelegt.“  
+
+Weitere Formate wie **HTML** oder **Excel** sind zwar in der Exportfunktionsliste verfügbar, aber sie sind **nicht standardmäßig freigegeben**. Für die Nutzung von zusätzlichen Formaten muss der Benutzer **explizit Berechtigungen** haben, wie in der Beschreibung der „ACMASK“-Einstellungen erwähnt:  
+> „...wenn ein Benutzer keine Berechtigung für ein Format besitzt, ist die Druckaktion möglicherweise nicht verfügbar.“  
+
+**Schritt-für-Schritt-Anleitung:**  
+1. **Standarddruck:** Wählen Sie „Jasper Report“ aus, um automatisch PDF als Standardformat zu erhalten.  
+2. **Weitere Formate:** Wenn Sie HTML oder Excel nutzen möchten, prüfen Sie, ob Sie die entsprechenden Berechtigungen in der „ACMASK“-Konfiguration haben.  
+3. **Berechtigungsprüfung:** Falls ein Format nicht verfügbar ist, kontaktieren Sie die IT-Abteilung oder den ATOSS-Support, um die Zugriffsrechte zu überprüfen.  
+
+Diese Einstellungen sind für Endanwender relevant, da sie die Druck- und Exportoptionen direkt beeinflussen.",13344.39,success,,http://localhost:11434,qwen3:8b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T18:35:34.495375,Wie heißt Spongebobs bester Freund?,"Auf diese Frage habe ich leider keine Antwort. Bitte wenden Sie sich an Ihre Personalabteilung oder den internen ATOSS-Support.  
+
+Der Kontext enthält keine Informationen zu Figuren aus der Serie „SpongeBob SquarePants“ oder deren Beziehungen.",5093.16,success,,http://localhost:11434,qwen3:8b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
