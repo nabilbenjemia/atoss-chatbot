@@ -56,14 +56,16 @@ python main.py
 
 ```powershell
 cd backend/authentication
-npm start
+npm start 
+or
+npm run dev
 ```
 
 ### 3. Conversation Service (Node.js - Port 4004)
 
 ```powershell
 cd backend/conversation
-node index.js
+npm run dev
 ```
 
 ### 4. Frontend (Vite - Port 5173)
