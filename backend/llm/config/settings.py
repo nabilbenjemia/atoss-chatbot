@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # Ollama Configuration
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "qwen2.5:7b-instruct-q4_0"
-    OLLAMA_TEMPERATURE: float = 0
+    OLLAMA_TEMPERATURE: float = 0.3  # Balanced creativity
     OLLAMA_NUM_CTX: int = 5000  # Larger context window
     OLLAMA_REPEAT_PENALTY: float = 1.2  # Moderate repetition penalty
     OLLAMA_NUM_PREDICT: int = 500  # Precise Answers
@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     MAX_CONTEXT_LENGTH: int = 10000
     CHUNK_SIZE: int = 600
     CHUNK_OVERLAP: int = 300
+
+    # Reranking Configuration
+    ENABLE_RERANKING: bool = False
+    RERANKING_MODEL: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
+    RERANKING_TOP_K: int = 5  # Number of documents to keep after reranking
 
     class Config:
         env_file = ".env"
