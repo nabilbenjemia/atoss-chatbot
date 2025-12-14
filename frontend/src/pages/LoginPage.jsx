@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
+import { toast } from "react-toastify";
 import { authAPI } from "../services/api";
 import { validateTUMEmail, validatePassword } from "../utils/validation";
 
@@ -10,6 +11,27 @@ export default function LoginPage() {
   const [status, setStatus] = useState({ type: "idle", message: "" }); 
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const hasShownLogoutToast = useRef(false);
+
+  // Check for logout success parameter on mount
+  useEffect(() => {
+    const logoutParam = searchParams.get('logout');
+    if (logoutParam === 'success' && !hasShownLogoutToast.current) {
+      hasShownLogoutToast.current = true;
+      // Remove the query parameter from URL
+      setSearchParams({});
+      // Show toast notification
+      toast.success("Successfully logged out", {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+    }
+  }, [searchParams, setSearchParams]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
