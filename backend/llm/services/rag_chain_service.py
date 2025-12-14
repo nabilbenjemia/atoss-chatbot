@@ -8,6 +8,7 @@ from typing import Optional, AsyncIterator, List, Any
 
 from models.vectorstore import vectorstore_manager
 from models.llm_model import llm_manager
+from models.reranker_model import reranker_manager
 
 from config.settings import settings
 from models.llm_model import llm_manager
@@ -48,6 +49,22 @@ class RAGChainService:
 
         return context_str
 
+    def _rerank_documents(self, question: str, docs: List[Any]) -> List[Any]:
+        """Rerank documents based on relevance to the question"""
+        if not docs:
+            return docs
+
+        # Extract document texts
+        doc_texts = [doc.page_content for doc in docs]
+
+        # Get reranked indices and scores
+        ranked_indices = reranker_manager.rerank(question, doc_texts)
+
+        # Reorder documents based on reranked indices
+        reranked_docs = [docs[idx] for idx, _ in ranked_indices]
+
+        return reranked_docs
+
     async def generate_response(self, question: str, chat_history: str = "") -> str:
         """Generate a complete response for a question"""
         if not self.is_ready:
@@ -56,6 +73,11 @@ class RAGChainService:
         try:
             # Retrieve relevant documents
             docs = await vectorstore_manager.search(question, k=8)
+
+            # Rerank documents if enabled
+            if settings.ENABLE_RERANKING:
+                docs = self._rerank_documents(question, docs)
+
             context = self._format_docs(docs)
 
             # Format the context
@@ -100,6 +122,11 @@ class RAGChainService:
         try:
             # 1. Retrieve & Format (Same as above)
             docs = await vectorstore_manager.search(question, k=8)
+
+            # Rerank documents if enabled
+            if settings.ENABLE_RERANKING:
+                docs = self._rerank_documents(question, docs)
+
             context_str = self._format_docs(docs)
 
             # 2. Build Prompt
