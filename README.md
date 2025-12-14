@@ -24,18 +24,23 @@ An AI-powered chatbot for ATOSS Workforce Management documentation using RAG (Re
 
 - **Node.js** v18+
 - **Python** 3.10+
-- **Ollama** running locally with `qwen3:0.6b` model
+- **Ollama** running locally (`ollama serve` in background)
 - **MongoDB** running locally
+- **qwen2.5:7b-instruct-q4_0** model pulled and available in Ollama
 
 ### Install Ollama Model
 
 ```bash
-ollama pull qwen3:1.7b
+ollama pull qwen2.5:7b-instruct-q4_0
 ```
 
 ---
 
 ## 🚀 Quick Start
+
+**Prerequisites Check:**
+- Ensure MongoDB is running: `mongod`
+- Ensure Ollama is running in background: `ollama serve`
 
 Open **4 terminal windows** and run each command:
 
@@ -99,22 +104,26 @@ Implement a strictly on-premise Retrieval-Augmented Generation (RAG) system pair
 ### Software Stack 
 
 1. Engine Ollama
-   * Run ollama serve
-   * Pull models: ollama pull qwen2.5:7b 
-   * for the embedding sentence_transformers package was used -> SentenceTransformer(HF_MODEL, trust_remote_code=True)
+   * Run `ollama serve` in background
+   * Pull model: `ollama pull qwen2.5:7b-instruct-q4_0`
+   * SentenceTransformers for embeddings: `Snowflake/snowflake-arctic-embed-l-v2.0`
 
 2. Vector Database 
-   * ChromaDB -> stores mathematical representation created by the snowflake model
-   * pdf parsing with PyMuPDF -> pip install pymupdf
+   * ChromaDB (v0.4+) -> stores embeddings created by Snowflake model
+   * Persistent storage at `./chroma_db_snowflake_600chunks_300overlapping`
+   * PDF parsing with PyMuPDF for document ingestion
 
-3. Frontend & Backend
-   * MERN stack
+3. Frontend & Backend Services
+   * React (Vite) frontend for user interface
+   * Node.js/Express microservices (Authentication, Conversation)
+   * FastAPI server for RAG pipeline
 
 ### Why Ollama?
 
-* Data sovereignity: operates entirely offline
-* More efficient on worse hardware due to quantization 
-* Ollama eliminates the complexity of raw model deployment
+* **Data Sovereignty**: Operates entirely offline - all models run on-premise
+* **Hardware Efficiency**: Quantized models (q4_0) run efficiently on modest hardware
+* **Easy Deployment**: Eliminates complexity of raw model management
+* **Safety**: No data leaves your infrastructure
 
 ---
 
@@ -123,8 +132,37 @@ Implement a strictly on-premise Retrieval-Augmented Generation (RAG) system pair
 ### Backend LLM (`backend/llm/.env`)
 
 ```env
+# Server Configuration
+HOST=0.0.0.0
+PORT=8000
+
+# Ollama Configuration
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen3:0.6b
+OLLAMA_MODEL=qwen2.5:7b-instruct-q4_0
+OLLAMA_TEMPERATURE=0.3
+OLLAMA_NUM_CTX=5000
+OLLAMA_NUM_PREDICT=500
+
+# Embedding Configuration
+EMBEDDING_MODEL=Snowflake/snowflake-arctic-embed-l-v2.0
+EMBEDDING_DEVICE=auto
+
+# ChromaDB Configuration
+CHROMA_PERSIST_DIRECTORY=./chroma_db_snowflake_600chunks_300overlapping
+CHROMA_COLLECTION_NAME=tum_docs
+CHUNK_SIZE=600
+CHUNK_OVERLAP=300
+
+# RAG Configuration
+MAX_CONTEXT_LENGTH=10000
+
+# Reranking Configuration (Optional - improves relevance)
+ENABLE_RERANKING=False
+RERANKING_MODEL=cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+RERANKING_TOP_K=5
+
+# Debug Mode (Optional)
+DEBUG=False
 ```
 
 ### Backend Services (`backend/authentication/.env`, `backend/conversation/.env`)

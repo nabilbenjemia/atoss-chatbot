@@ -14,101 +14,52 @@ This diagram shows the sequence of events when the LLM server starts up and load
 │  Main   │     │  Service    │     │   Manager     │     │   Manager    │     │  Manager  │     │ Manager  │     │ Chain  │
 └────┬────┘     └──────┬──────┘     └───────┬───────┘     └──────┬───────┘     └─────┬─────┘     └─────┬────┘     └───┬────┘
      │                 │                    │                    │                   │                 │              │
-     │ 1. Lifespan     │                    │                    │                   │                 │              │
-     │    startup      │                    │                    │                   │                 │              │
-     │────────┐        │                    │                    │                   │                 │              │
-     │        │        │                    │                    │                   │                 │              │
-     │<───────┘        │                    │                    │                   │                 │              │
+     │─────────────────>│                    │                    │                   │                 │              │
+     │ lifespan start   │                    │                    │                   │                 │              │
      │                 │                    │                    │                   │                 │              │
-     │ 2. initialize_all()                  │                    │                   │                 │              │
-     │────────────────>│                    │                    │                   │                 │              │
+     │                 ├─ initialize_all() ─────────────────────────────────────────────────────────────────────────>│
      │                 │                    │                    │                   │                 │              │
-     │                 │ 3. Load embeddings │                    │                   │                 │              │
-     │                 │    (15%)           │                    │                   │                 │              │
-     │                 │───────────────────>│                    │                   │                 │              │
+     │                 │ 1. Load embedding (25%)               │                   │                 │              │
+     │                 ├────────────────────────────────────────────────────────────────────────────────────────────>│
      │                 │                    │                    │                   │                 │              │
-     │                 │                    │ Load Qwen 3        │                   │                 │              │
-     │                 │                    │ Embedding 0.6B     │                   │                 │              │
-     │                 │                    │─────────┐          │                   │                 │              │
-     │                 │                    │         │          │                   │                 │              │
-     │                 │                    │<────────┘          │                   │                 │              │
+     │                 │                    │ Snowflake embedding loaded             │                 │              │
+     │                 │                    │<─────────────────────────────────────────────────────────────────────── │
      │                 │                    │                    │                   │                 │              │
-     │                 │    Embeddings ready│                    │                   │                 │              │
-     │                 │<───────────────────│                    │                   │                 │              │
+     │                 │ 2. Load vectorstore (50%)              │                   │                 │              │
+     │                 ├─────────────────────────────────────────────────────────────────────────────────────────────>│
      │                 │                    │                    │                   │                 │              │
-     │                 │ 4. Load vectorstore│                    │                   │                 │              │
-     │                 │    (30%)           │                    │                   │                 │              │
-     │                 │───────────────────────────────────────> │                   │                 │              │
+     │                 │                    │                    │ ChromaDB loaded   │                 │              │
+     │                 │                    │                    │<─────────────────────────────────────────────────── │
      │                 │                    │                    │                   │                 │              │
-     │                 │                    │                    │ Load ChromaDB    │                 │              │
-     │                 │                    │                    │ ASES_Referenzhandbuch              │              │
-     │                 │                    │                    │─────────┐         │                 │              │
-     │                 │                    │                    │         │         │                 │              │
-     │                 │                    │                    │<────────┘         │                 │              │
+     │                 │ 3. Load LLM (75%)  │                    │                   │                 │              │
+     │                 ├────────────────────────────────────────────────────────────────────────────────────────────>│
      │                 │                    │                    │                   │                 │              │
-     │                 │    VectorStore ready                    │                   │                 │              │
-     │                 │<─────────────────────────────────────── │                   │                 │              │
+     │                 │                    │                    │                   │ Ollama connected│              │
+     │                 │                    │                    │                   │<─────────────────────────────── │
      │                 │                    │                    │                   │                 │              │
-     │                 │ 5. Load LLM (45%)  │                    │                   │                 │              │
-     │                 │─────────────────────────────────────────────────────────── >│                 │              │
+     │                 │ 4. Load reranker (85%)                 │                   │                 │              │
+     │                 ├─────────────────────────────────────────────────────────────────────────────────────────────>│
      │                 │                    │                    │                   │                 │              │
-     │                 │                    │                    │                   │ Connect to      │              │
-     │                 │                    │                    │                   │ Ollama          │              │
-     │                 │                    │                    │                   │ (qwen3:1.7b)    │              │
-     │                 │                    │                    │                   │───────┐         │              │
-     │                 │                    │                    │                   │       │         │              │
-     │                 │                    │                    │                   │<──────┘         │              │
+     │                 │                    │                    │                   │                 │ Cross-encoder│
+     │                 │                    │                    │                   │                 │  loaded (opt)│
+     │                 │                    │                    │                   │                 │<────────────── │
      │                 │                    │                    │                   │                 │              │
-     │                 │    LLM ready       │                    │                   │                 │              │
-     │                 │<─────────────────────────────────────────────────────────── │                 │              │
+     │                 │ 5. Verify RAG (100%)                   │                   │                 │              │
+     │                 ├────────────────────────────────────────────────────────────────────────────────────────────>│
      │                 │                    │                    │                   │                 │              │
-     │                 │ 6. Load reranker   │                    │                   │                 │              │
-     │                 │    (60%)           │                    │                   │                 │              │
-     │                 │────────────────────────────────────────────────────────────────────────────> │              │
+     │                 │                    │                    │                   │                 │ All dependencies
+     │                 │                    │                    │                   │                 │  verified     │
+     │                 │                    │                    │                   │                 │<────────────── │
      │                 │                    │                    │                   │                 │              │
-     │                 │                    │                    │                   │                 │ Load Jina    │
-     │                 │                    │                    │                   │                 │ Reranker v3  │
-     │                 │                    │                    │                   │                 │──────┐       │
-     │                 │                    │                    │                   │                 │      │       │
-     │                 │                    │                    │                   │                 │<─────┘       │
-     │                 │                    │                    │                   │                 │              │
-     │                 │    Reranker ready  │                    │                   │                 │              │
-     │                 │<──────────────────────────────────────────────────────────────────────────── │              │
-     │                 │                    │                    │                   │                 │              │
-     │                 │ 7. Load retriever  │                    │                   │                 │              │
-     │                 │    (80%)           │                    │                   │                 │              │
-     │                 │────────────┐       │                    │                   │                 │              │
-     │                 │            │ Create ContextualCompressionRetriever          │                 │              │
-     │                 │<───────────┘       │                    │                   │                 │              │
-     │                 │                    │                    │                   │                 │              │
-     │                 │ 8. Init RAG chain  │                    │                   │                 │              │
-     │                 │    (100%)          │                    │                   │                 │              │
-     │                 │────────────────────────────────────────────────────────────────────────────────────────────>│
-     │                 │                    │                    │                   │                 │              │
-     │                 │                    │                    │                   │                 │              │ Init
-     │                 │                    │                    │                   │                 │              │─────┐
-     │                 │                    │                    │                   │                 │              │     │
-     │                 │                    │                    │                   │                 │              │<────┘
-     │                 │                    │                    │                   │                 │              │
-     │                 │    RAG chain ready │                    │                   │                 │              │
-     │                 │<────────────────────────────────────────────────────────────────────────────────────────────│
-     │                 │                    │                    │                   │                 │              │
-     │ 9. All ready    │                    │                    │                   │                 │              │
-     │<────────────────│                    │                    │                   │                 │              │
-     │                 │                    │                    │                   │                 │              │
-     │ 10. Server ready│                    │                    │                   │                 │              │
-     │    on port 8000 │                    │                    │                   │                 │              │
-     │────────┐        │                    │                    │                   │                 │              │
-     │        │        │                    │                    │                   │                 │              │
-     │<───────┘        │                    │                    │                   │                 │              │
-     │                 │                    │                    │                   │                 │              │
+     │ All ready ✓     │                    │                    │                   │                 │              │
+     │<────────────────┤                    │                    │                   │                 │              │
 ```
 
 ---
 
 ## Step-by-Step Explanation (Startup)
 
-### Step 1-2: Lifespan Startup
+### Step 1: Lifespan Startup
 FastAPI's lifespan context manager triggers `startup_service.initialize_all()` when the server starts.
 
 ```python
@@ -119,61 +70,54 @@ async def lifespan(app_instance: FastAPI):
     await startup_service.shutdown()
 ```
 
-### Step 3: Load Embedding Model (15%)
+### Step 2: Load Embedding Model (25%)
 ```python
 embedding_manager.load()
-# Loads: Qwen/Qwen3-Embedding-0.6B (GPU/CUDA)
-# Warms up with test embedding
+# Loads: Snowflake/snowflake-arctic-embed-l-v2.0
+# Device: auto (CUDA > MPS > CPU)
 # Uses SentenceTransformer with cosine similarity
+# Warms up with test embedding
 ```
 
-### Step 4: Load Vector Store (30%)
+### Step 3: Load Vector Store (50%)
 ```python
 vectorstore_manager.load()
-# Loads ChromaDB from ./Chroma_ASES_Referenzhandbuch_db2
-# Collection: ASES_Referenzhandbuch
-# Uses QueryOnlyEmbeddings wrapper for LangChain compatibility
+# Loads ChromaDB from ./chroma_db_snowflake_600chunks_300overlapping
+# Collection: tum_docs
+# Uses native embedding_manager (no LangChain wrapper)
+# Settings: CHUNK_SIZE=600, CHUNK_OVERLAP=300
 ```
 
-### Step 5: Load LLM (45%)
+### Step 4: Load LLM (75%)
 ```python
 llm_manager.load()
 # Connects to Ollama at http://localhost:11434
-# Loads qwen3:1.7b model
+# Loads qwen2.5:7b-instruct-q4_0 model
 # Configuration:
-#   - temperature: 0.6
-#   - top_p: 0.8
-#   - num_ctx: 4096
+#   - temperature: 0.3 (balanced creativity)
+#   - num_ctx: 5000 (context window)
 #   - repeat_penalty: 1.2
-#   - num_predict: 1024
+#   - num_predict: 500 (max tokens)
 ```
 
-### Step 6: Load Reranker (60%)
+### Step 5: Load Reranker (85%) - Optional
 ```python
 reranker_manager.load()
-# Loads jinaai/jina-reranker-v3 from HuggingFace
-# Uses transformers AutoModel with trust_remote_code=True
-# Creates JinaRerankerCompressor for LangChain integration
+# Loads cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 (if ENABLE_RERANKING=True)
+# Multilingual cross-encoder for German medical documents
+# Can be disabled via settings: ENABLE_RERANKING=False
+# Device: auto (same as embedding model)
 ```
 
-### Step 7: Load Retriever (80%)
+### Step 6: Initialize RAG Chain (100%)
 ```python
-retriever_service.load()
-# Creates base retriever from vectorstore (k=16)
-# Wraps with ContextualCompressionRetriever
-# Uses JinaRerankerCompressor for reranking (top_k=5)
+rag_chain_service.verify()
+# Verifies all dependencies loaded successfully
+# Sets service as ready for request handling
 ```
 
-### Step 8: Initialize RAG Chain (100%)
-```python
-rag_chain_service.initialize()
-# Verifies all dependencies loaded
-# Initializes German RAG prompt template
-# Marks service as ready
-```
-
-### Step 9-10: Server Ready
-Server starts accepting requests on `http://localhost:8000`.
+### Step 7: Server Ready
+Server accepts requests on `http://localhost:8000`.
 
 ---
 
@@ -182,10 +126,10 @@ Server starts accepting requests on `http://localhost:8000`.
 This diagram shows the sequence of events when a user sends a message and receives a streaming response.
 
 ```
-┌──────────┐     ┌────────────┐     ┌───────────┐     ┌───────────┐     ┌─────────┐     ┌────────┐
-│ Frontend │     │ Node.js    │     │ FastAPI   │     │ Retriever │     │RAG Chain│     │ Ollama │
-│          │     │ Proxy      │     │ Controller│     │ Service   │     │ Service │     │        │
-└────┬─────┘     └─────┬──────┘     └─────┬─────┘     └─────┬─────┘     └────┬────┘     └───┬────┘
+┌──────────┐     ┌──────────┐     ┌───────────┐     ┌──────────────┐     ┌─────────────┐     ┌────────┐     ┌────────┐
+│ Frontend │     │ FastAPI  │     │ Vectorstore │     │  Reranker   │     │ RAG Chain   │     │  LLM   │     │ Ollama │
+│          │     │Controller│     │  Manager   │     │  Manager    │     │  Service    │     │Manager │     │        │
+└────┬─────┘     └─────┬────┘     └──────┬─────┘     └──────┬──────┘     └──────┬──────┘     └───┬────┘     └───┬────┘
      │                 │                  │                 │                │              │
      │ EventSource     │                  │                 │                │              │
      │ GET /:convId/stream?query=...      │                 │                │              │
@@ -273,35 +217,23 @@ This diagram shows the sequence of events when a user sends a message and receiv
 
 ---
 
-## Step-by-Step Explanation (Streaming)
+## Step-by-Step Explanation (Streaming Response)
 
-### Step 1: Frontend EventSource Connection
-Frontend connects via EventSource to Node.js proxy endpoint.
-
-```javascript
-const eventSource = new EventSource(
-    `http://localhost:4004/api/conversations/${convId}/stream?query=${encodeURIComponent(message)}&history=${encodeURIComponent(JSON.stringify(history))}`
-);
-```
-
-### Step 2: Node.js Proxies to FastAPI
-Node.js conversation service forwards the request to FastAPI.
+### Step 1: API Request
+Frontend sends POST request to `/api/chat/stream` with EventSource or fetch.
 
 ```javascript
-const response = await axios({
+const response = await fetch('http://localhost:8000/api/chat/stream', {
     method: 'POST',
-    url: 'http://localhost:8000/api/chat/stream',
-    data: {
-        message: query,
-        conversation_id: conversationId,
-        conversation_history: conversationHistory
-    },
-    responseType: 'stream'
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+        message: "Wie beantrage ich Urlaub?",
+        conversation_history: []
+    })
 });
-response.data.pipe(res);
 ```
 
-### Step 3: Validate Service Ready
+### Step 2: Validate Service
 Controller checks that all LLM components are loaded and ready.
 
 ```python
@@ -309,31 +241,51 @@ if not startup_service.is_loaded:
     raise RuntimeError("LLM service is not ready. Please wait for initialization.")
 ```
 
-### Step 4-5: Document Retrieval with Reranking
+### Step 3: Document Retrieval (k=8)
+VectorStore searches ChromaDB using semantic similarity.
+
 ```python
-docs = await retriever_service.retrieve(question)
-# 1. Embed query using Qwen 3 Embedding 0.6B
-# 2. Search ChromaDB (retrieve k=16 docs)
-# 3. Rerank using Jina Reranker v3
-# 4. Return top 5 most relevant documents
+docs = await vectorstore_manager.search(question, k=8)
+# 1. Embed question using embedding_manager
+# 2. Query ChromaDB with query_embeddings
+# 3. Return 8 most similar documents
 ```
 
-### Step 6: Prepare RAG Prompt (German)
+### Step 4: Rerank Documents (if enabled)
+If `ENABLE_RERANKING=True`, cross-encoder reranks the 8 documents.
+
+```python
+if settings.ENABLE_RERANKING:
+    docs = self._rerank_documents(question, docs)
+    # 1. Create query-document pairs
+    # 2. Get relevance scores from cross-encoder
+    # 3. Keep top RERANKING_TOP_K=5 documents
+```
+
+### Step 5: Format Context
+Retrieved documents are formatted into a context string with citations.
+
 ```python
 context = self._format_docs(docs)
-prompt_text = self._prompt.format(
+# Format: "--- Zitat aus: source (Page X) ---\n{content}\n\n"
+```
+
+### Step 6: Build RAG Prompt
+Context and chat history are combined into the full prompt.
+
+```python
+full_context = CONTEXT_CHATBOT.format(
     context=context,
-    user_question=question,
     chat_history=chat_history
 )
-# Uses German RAG prompt template for ATOSS Workforce Management
 ```
 
 ### Step 7: Stream from Ollama
+LLM streams response token-by-token.
+
 ```python
-llm = llm_manager.get_streaming_llm()
-async for chunk in llm.astream(prompt_text):
-    yield chunk.content
+async for chunk in llm_manager.stream_generate(context, question):
+    yield chunk  # Each token is yielded
 ```
 
 ### Step 8-10: SSE Events
@@ -359,102 +311,7 @@ await fetch(`/api/conversations/${convId}/messages/batch`, {
     body: JSON.stringify({ userMessage, aiMessage, userId })
 });
 ```
-     │                 │                  │                 │                │              │
-     │                 │                  │                 │                │   Token 1    │
-     │                 │                  │                 │                │<─────────────│
-     │                 │                  │                 │                │              │
-     │                 │ 8. SSE: {"content": "token1"}      │                │              │
-     │<────────────────────────────────────────────────────────────────────── │              │
-     │                 │                  │                 │                │              │
-     │                 │                  │                 │                │   Token 2    │
-     │                 │                  │                 │                │<─────────────│
-     │                 │                  │                 │                │              │
-     │                 │ 9. SSE: {"content": "token2"}      │                │              │
-     │<────────────────────────────────────────────────────────────────────── │              │
-     │                 │                  │                 │                │              │
-     │                 │                  │                 │                │   ...        │
-     │                 │                  │                 │                │<─────────────│
-     │                 │                  │                 │                │              │
-     │                 │ 10. SSE: {"done": true}            │                │              │
-     │<────────────────────────────────────────────────────────────────────── │              │
-     │                 │                  │                 │                │              │
-     │ 11. Display     │                  │                 │                │              │
-     │     complete    │                  │                 │                │              │
-     │────────┐        │                  │                 │                │              │
-     │        │        │                  │                 │                │              │
-     │<───────┘        │                  │                 │                │              │
-     │                 │                  │                 │                │              │
-┌────┴─────┐     ┌─────┴──────┐     ┌─────┴─────┐     ┌─────┴─────┐     ┌────┴────┐     ┌───┴────┐
-│ Frontend │     │ ChatRoutes │     │ Controller│     │ Retriever │     │RAG Chain│     │ Ollama │
-└──────────┘     └────────────┘     └───────────┘     └───────────┘     └─────────┘     └────────┘
-```
 
----
-
-## Step-by-Step Explanation (Streaming)
-
-### Step 1: API Request
-Frontend sends POST request to `/api/chat/stream` with SSE (Server-Sent Events) connection.
-
-```javascript
-const response = await fetch('http://localhost:8000/api/chat/stream', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, conversation_id })
-});
-```
-
-### Step 2: Validate Service
-Controller checks that all LLM components are loaded and ready.
-
-```python
-if not rag_chain_service.is_ready():
-    raise HTTPException(status_code=503, detail="Service not ready")
-```
-
-### Step 3-4: Document Retrieval
-```python
-docs = await retriever_service.retrieve(question)
-# 1. Embed query using embedding model
-# 2. Search ChromaDB (retrieve k=10 docs)
-# 3. Rerank using FlashrankRerank
-# 4. Return top 3 most relevant documents
-```
-
-### Step 5-6: Prepare RAG Chain
-```python
-context = format_docs(docs)
-prompt = RAG_PROMPT.format(context=context, question=question)
-```
-
-### Step 7: Stream from Ollama
-```python
-async for chunk in llm.astream(prompt):
-    yield chunk.content
-```
-
-### Step 8-10: SSE Events
-Each token is sent as an SSE event to the frontend:
-
-```
-data: {"content": "ATOSS"}
-data: {"content": " is"}
-data: {"content": " a"}
-...
-data: {"done": true}
-```
-
-### Step 11: Frontend Display
-Frontend appends each token to the message display in real-time.
-
-```javascript
-const reader = response.body.getReader();
-while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    // Parse and display each chunk
-}
-```
 
 ---
 
@@ -478,39 +335,57 @@ while (true) {
 | `HOST` | `0.0.0.0` | Server host |
 | `PORT` | `8000` | Server port |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API URL |
-| `OLLAMA_MODEL` | `qwen3:1.7b` | LLM model name |
-| `OLLAMA_TEMPERATURE` | `0.6` | Response randomness |
-| `OLLAMA_TOP_P` | `0.8` | Nucleus sampling |
-| `OLLAMA_NUM_CTX` | `4096` | Context window size |
+| `OLLAMA_MODEL` | `qwen2.5:7b-instruct-q4_0` | LLM model name |
+| `OLLAMA_TEMPERATURE` | `0.3` | Response creativity (balanced) |
+| `OLLAMA_NUM_CTX` | `5000` | Context window size |
 | `OLLAMA_REPEAT_PENALTY` | `1.2` | Repetition penalty |
-| `OLLAMA_NUM_PREDICT` | `1024` | Max tokens to generate |
-| `EMBEDDING_MODEL` | `Qwen/Qwen3-Embedding-0.6B` | Embedding model |
-| `EMBEDDING_DEVICE` | `cuda` | Device for embeddings (cuda/cpu) |
-| `CHROMA_PERSIST_DIRECTORY` | `./Chroma_ASES_Referenzhandbuch_db2` | ChromaDB storage path |
-| `CHROMA_COLLECTION_NAME` | `ASES_Referenzhandbuch` | ChromaDB collection name |
-| `RERANKER_MODEL` | `jinaai/jina-reranker-v3` | Reranker model |
-| `RERANKER_TOP_K` | `5` | Top K documents after reranking |
-| `RETRIEVER_K` | `16` | Initial retrieval count |
+| `OLLAMA_NUM_PREDICT` | `500` | Max tokens to generate |
+| `EMBEDDING_MODEL` | `Snowflake/snowflake-arctic-embed-l-v2.0` | Embedding model |
+| `EMBEDDING_DEVICE` | `auto` | Device for embeddings (auto/cuda/cpu/mps) |
+| `CHROMA_PERSIST_DIRECTORY` | `./chroma_db_snowflake_600chunks_300overlapping` | ChromaDB storage path |
+| `CHROMA_COLLECTION_NAME` | `tum_docs` | ChromaDB collection name |
+| `ENABLE_RERANKING` | `False` | Enable cross-encoder reranking |
+| `RERANKING_MODEL` | `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` | Reranker model |
+| `RERANKING_TOP_K` | `5` | Top K documents after reranking |
+
+
+
 
 ---
 
-## RAG Prompt Template
+## System Response Guidelines
 
-The system uses a German RAG prompt template optimized for ATOSS Workforce Management:
+You are an expert support assistant for the TUM University Hospital.
+Your task is to answer user questions accurately based on the provided documents and chat history.
 
-```
-Du bist ein hilfreicher KI-Assistent für ATOSS Workforce Management Lösungen.
-Deine Hauptaufgabe ist es, technische oder systemnahe Informationen aus dem internen Handbuch
-so umzuformulieren, dass sie für **Mitarbeiter, Teamleiter oder Planer** leicht verständlich
-und handlungsorientiert sind.
+### RULES:
 
-Nutze den folgenden Kontext, um die Frage des Benutzers zu beantworten. Der Kontext stammt
-aus dem offiziellen ATOSS-Handbuch. Wenn du Informationen aus dem Kontext verwendest,
-**zitiere die genaue Passage wörtlich** (als direktes Zitat), damit der Benutzer diese im
-PDF-Manual nachprüfen kann.
+1. **ANSWER IN GERMAN ONLY.**
 
-[... additional instructions ...]
-```
+2. **GROUND YOUR ANSWER** in the provided context - paraphrase if the user demands.
+
+3. **FOLLOW STRICTLY ONE OF THESE TWO CASES:**
+
+   **CASE A (Answer NOT found):** If the context does not contain enough information to answer, output EXACTLY this string and NOTHING else:
+   ```
+   Auf diese Frage habe ich leider keine Antwort. Bitte wenden Sie sich an ATOSS.pa@mri.tum.de
+   ```
+   (STOP writing immediately after this sentence. Do NOT add any citations or page numbers in CASE A.)
+
+   **CASE B (Answer found):** If the context contains the answer, provide a concise German answer first.
+   Structure your response EXACTLY in this order:
+   1. The Answer text.
+   2. Two newlines.
+   3. The Source at the very bottom.
+
+   DO NOT start the answer with the source. The source must be the very last line.
+
+   **Example format:**
+   ```
+   Example Answer
+   
+   [Quelle: Dateiname]
+   ```
 
 ---
 
@@ -527,7 +402,7 @@ cd backend/llm
 pip install -r requirements.txt
 
 # Ensure Ollama is running with the model
-ollama pull qwen3:1.7b
+ollama pull qwen2.5:7b-instruct-q4_0
 
 # Start the server
 python main.py
@@ -540,17 +415,15 @@ The server will start at `http://localhost:8000`.
 ## Component Dependencies
 
 ```
-startup_service
-    ├── embedding_manager (15%)
-    │       └── SentenceTransformer (Qwen3-Embedding-0.6B)
-    ├── vectorstore_manager (30%)
+startup_service (manages initialization sequence)
+    ├── embedding_manager (25%)
+    │       └── SentenceTransformer (Snowflake embedding)
+    ├── vectorstore_manager (50%)
     │       └── ChromaDB (depends on embedding_manager)
-    ├── llm_manager (45%)
-    │       └── ChatOllama (qwen3:1.7b)
-    ├── reranker_manager (60%)
-    │       └── Jina Reranker v3
-    ├── retriever_service (80%)
-    │       └── ContextualCompressionRetriever (depends on vectorstore + reranker)
+    ├── llm_manager (75%)
+    │       └── AsyncClient (Ollama - qwen2.5:7b-instruct-q4_0)
+    ├── reranker_manager (85%) - Optional
+    │       └── CrossEncoder (cross-encoder/mmarco-mMiniLMv2-L12-H384-v1)
     └── rag_chain_service (100%)
-            └── RAG Chain (depends on retriever + llm)
+            └── RAG Chain (depends on all managers)
 ```
