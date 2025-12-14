@@ -1,32 +1,50 @@
 """
 Benchmark Script for LLM RAG System
-Generates a xlsx with test queries, responses, and benchmark values
+
+Tests LLM models (qwen2.5:7b-instruct-q4_0) with real HR/workforce management queries
+using Snowflake embeddings and ChromaDB retrieval. Generates comprehensive benchmark
+reports with response quality metrics and similarity scores.
+
+Output: Excel file with query, expected answer, generated answer, latency, and similarity.
 """
 
 import time
-import ollama
-import fitz  # PyMuPDF
+import gc
 import os
 import chromadb
 import pandas as pd
+import ollama
 from sentence_transformers import SentenceTransformer, util
-import gc
 
-# --- CONFIGURATION ---
-PDF_PATH = "20251104_ATOSS FAQs_SEBA Lab.pdf"
+# ============================================================================
+# CONFIGURATION SECTION
+# ============================================================================
+
+# ChromaDB Configuration
 DB_PATH = "./chroma_db_snowflake_600chunks_300overlapping"
 COLLECTION_NAME = "tum_docs"
+
+# Embedding Model (Snowflake Arctic - optimized for multilingual/German text)
 EMBEDDING_MODEL = SentenceTransformer(
     "Snowflake/snowflake-arctic-embed-l-v2.0", device="cpu"
 )
 
+# LLM Models to benchmark
 MODELS = [
-    # "phi3.5",
-    # "llama3.1:8b-instruct-q4_0",
-    "qwen2.5:7b-instruct-q4_0",
-    # "sam860/LFM2:1.2b",
-    # "mistral-nemo",
+    "qwen2.5:7b-instruct-q4_0",  # Production model
 ]
+
+# LLM Response Configuration
+LLM_CONFIG = {
+    "num_ctx": 5000,  # Context window
+    "temperature": 0.3,  # Balanced creativity
+    "repeat_penalty": 1.2,  # Reduce hallucinations
+    "num_predict": 500,  # Max tokens to generate
+}
+
+# ============================================================================
+# TEST DATA: QUESTIONS & EXPECTED ANSWERS
+# ============================================================================
 
 """QUESTIONS = [
     "Wie entscheidet das System, welcher Feiertag gilt, wenn im automatischen Kalender zwei definierte Sondertage auf genau das gleiche Datum fallen?",
@@ -109,29 +127,21 @@ EXPECTED_ANSWERS = [
 
 def retrieve_context(query, collection, embed_model=EMBEDDING_MODEL):
     """
-    Embeds the query and searches the existing ChromaDB for relevant chunks.
+    Retrieve relevant context from ChromaDB using semantic similarity.
+
+    Args:
+        query: User question to search for
+        collection: ChromaDB collection instance
+        embed_model: SentenceTransformer model for embeddings
+
+    Returns:
+        tuple: (context_string, list_of_sources)
     """
-    # 1. Convert Question to Numbers (Embedding)
-    # query_embed = ollama.embeddings(model=EMBED_MODEL, prompt=query)["embedding"]
-
-    # 2. Search Database
-    # results = collection.query(query_embeddings=[query_embed], n_results=3)
-
-    """embed_model = SentenceTransformer(
-        "Snowflake/snowflake-arctic-embed-l-v2.0", device="cpu"
-    )"""
-
-    # task_description = (
-    #    "Given a web search query, retrieve relevant passages that answer the query"
-    # )
-
-    # formatted_query = f"Instruct: {task_description}\nQuery: {query}"
-
+    # 1. Embed the query using Snowflake embedding model
     query_embed = embed_model.encode([query], prompt_name="query").tolist()[0]
-
     gc.collect()
 
-    # Search Database
+    # 2. Search ChromaDB for k=8 most similar documents
     results = collection.query(query_embeddings=[query_embed], n_results=8)
 
     context_str = ""
@@ -148,22 +158,31 @@ def retrieve_context(query, collection, embed_model=EMBEDDING_MODEL):
     return context_str, list(set(sources))
 
 
-def run_benchmark():
-    # 1. Get the Context
-    benchmark_data = []
+def load_database():
+    """Load ChromaDB and return collection."""
     try:
         client = chromadb.PersistentClient(path=DB_PATH)
         collection = client.get_collection(COLLECTION_NAME)
         print(
-            f"✅ Database loaded. Found collection: '{COLLECTION_NAME}' with {collection.count()} chunks."
+            f"✅ ChromaDB loaded: '{COLLECTION_NAME}' with {collection.count()} chunks."
         )
+        return collection
     except Exception as e:
         print(f"❌ Error loading database: {e}")
-        print("   Did you run the ingestion script first?")
-        return {}
+        print("   ➜ Did you run the ingestion script first?")
+        return None
+
+
+def run_benchmark():
+    """Execute benchmark tests across configured models and questions."""
+    benchmark_data = []
+
+    collection = load_database()
+    if collection is None:
+        return {}, []
 
     # 2. Run the Battle
-    print(f"{'Model':<25} | {'Time':<10} | {'Status'}")
+    print(f"{'Model':<25} | {'Questions':<10} | {'Status'}")
     print("-" * 60)
     dict_time = {
         # "phi3.5": [],
@@ -213,12 +232,7 @@ def run_benchmark():
                             "content": f"Context:\n{rag_context}\n\nQuestion: {q}",
                         },
                     ],
-                    options={
-                        "num_ctx": 5000,
-                        "temperature": 0,  # Deterministic answers
-                        "repeat_penalty": 1.2,  # Reduce hallucinations
-                        "num_predict": 500,
-                    },
+                    options=LLM_CONFIG,
                 )
 
                 duration = time.time() - start
