@@ -6,7 +6,7 @@ Handles cross-encoder based document reranking for improved relevance
 import logging
 from typing import Optional, List, Tuple
 from sentence_transformers import CrossEncoder
-from embedding_model import embedding_manager
+from .embedding_model import embedding_manager
 
 from config.settings import settings
 
