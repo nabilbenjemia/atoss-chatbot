@@ -153,10 +153,11 @@ This diagram shows the sequence of events when a user sends a message and receiv
      │                 │                  │                 │<───────────────│              │
      │                 │                  │                 │                │              │
      │                 │                  │                 │ Embed query    │              │
-     │                 │                  │                 │ (Qwen3-Embedding)             │
+     │                 │                  │                 │ (Snowflake)    │              │
      │                 │                  │                 │ Search ChromaDB│              │
-     │                 │                  │                 │ (k=16)         │              │
-     │                 │                  │                 │ Rerank (Jina)  │              │
+     │                 │                  │                 │ (k=8)          │              │
+     │                 │                  │                 │ Rerank         │              │
+     │                 │                  │                 │ (cross-encoder)│              │
      │                 │                  │                 │ (top_k=5)      │              │
      │                 │                  │                 │───────┐        │              │
      │                 │                  │                 │       │        │              │
