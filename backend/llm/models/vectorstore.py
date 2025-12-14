@@ -50,7 +50,7 @@ class VectorStoreManager:
         """Load or initialize the ChromaDB vector store"""
         if self._is_loaded:
             logger.info("Vector store already loaded")
-            return False
+            return True
 
         return await asyncio.to_thread(self._load_store)
 
