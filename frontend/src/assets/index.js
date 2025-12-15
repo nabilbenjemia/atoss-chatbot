@@ -6,3 +6,4 @@ export { default as maximize_logo } from './maximize_logo.png';
 export { default as profile_photo_mock } from './profile_photo_mock.jpg';
 export { default as expand_up_logo } from './expand_up_logo.png';
 export { default as expand_down_logo } from './expand_down_logo.png';
+export { default as delete_logo } from './delete_logo.png';
