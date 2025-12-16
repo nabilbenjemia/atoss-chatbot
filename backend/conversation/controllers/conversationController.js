@@ -75,11 +75,13 @@ const deleteConversation = async (req, res) => {
         if (!deletedConversation) {
             return res.status(404).json({ error: "Conversation not found" });
         }
+        
+        // Delete associated messages (don't fail if no messages exist)
         const deletedMessages = await messageService.deleteMessagesByConversationId(id);
-        if (deletedMessages.deletedCount === 0) {
-            return res.status(404).json({ error: "Messages not found" });
-        }
-        res.status(200).json({ message: "Conversation and its " + deletedMessages.deletedCount + " messages were deleted successfully" });
+        
+        res.status(200).json({ 
+            message: `Conversation and ${deletedMessages.deletedCount} message(s) deleted successfully` 
+        });
     } catch (error) {
         console.error('Error deleting conversation:', error);
         res.status(500).json({ error: "Failed to delete conversation", details: error.message });

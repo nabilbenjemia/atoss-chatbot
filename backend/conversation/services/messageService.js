@@ -10,11 +10,11 @@ const getMessagesByConversationId = async (conversationId) => {
 };
 
 const deleteMessagesByConversationId = async (conversationId) => {
-  await Message.deleteMany({ conversationId });
+  return await Message.deleteMany({ conversationId });
 };
 
 const deleteMessage = async (messageId) => {
-  await Message.findByIdAndDelete(messageId);
+  return await Message.findByIdAndDelete(messageId);
 };
 
 module.exports = {
