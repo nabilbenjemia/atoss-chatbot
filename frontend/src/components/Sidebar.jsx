@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { tum_klinikum_logo, new_chat_logo, search_logo, minimize_logo, maximize_logo, profile_photo_mock, expand_down_logo,  expand_up_logo } from '../assets';
+import { tum_klinikum_logo, new_chat_logo, search_logo, minimize_logo, maximize_logo, profile_photo_mock, expand_down_logo,  expand_up_logo, delete_logo } from '../assets';
 import { authAPI, getCurrentUser } from '../services/api';
 
 export default function Sidebar({ conversationTitles, setConversationTitles, setConversationId, conversationId, userId }) {
@@ -11,6 +11,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [deleteDropdownId, setDeleteDropdownId] = useState(null);
   const dropdownRef = useRef(null);
 
   // Filter conversations based on search query
@@ -22,6 +23,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
     setSearchQuery('');
     setIsSearching(false);
   };
+  const deleteDropdownRef = useRef(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -39,6 +41,23 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showLogoutDropdown]);
+
+  // Close delete dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (deleteDropdownRef.current && !deleteDropdownRef.current.contains(event.target)) {
+        setDeleteDropdownId(null);
+      }
+    };
+
+    if (deleteDropdownId) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [deleteDropdownId]);
 
   const handleLogout = async () => {
     try {
@@ -80,9 +99,39 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
     } catch (error) {
         console.error("Failed to create conversation or fetch titles:", error);
     }
-};
+  };
 
+  const handleDeleteConversation = async (convId) => {
+    try {
+      console.log("Deleting conversation:", convId);
+      
+      // Call DELETE API
+      const response = await fetch(`http://localhost:4004/api/conversations/${convId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      });
 
+      if (!response.ok) {
+        throw new Error('Failed to delete conversation');
+      }
+
+      console.log("Conversation deleted successfully");
+      
+      // Only update UI after successful deletion
+      setConversationTitles(conversationTitles.filter(conv => conv._id !== convId));
+      
+      // Close the dropdown
+      setDeleteDropdownId(null);
+      
+      // If the deleted conversation was selected, clear the selection
+      setConversationId(null);
+      
+    } catch (error) {
+      console.error("Failed to delete conversation:", error);
+      // Optionally show an error message to the user
+      alert("Failed to delete conversation. Please try again.");
+    }
+  };
 
   return ( 
     <div className={`bg-tum-blue-light-4 ${isMinimized ? 'w-12' : 'w-64'} text-black h-screen p-2 rounded-r-2xl flex flex-col transition-all duration-300`}>
@@ -143,31 +192,19 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
             Chats {isHistoryVisible ? <img src={expand_up_logo} alt="Collapse" className="w-3 h-3 ml-1 mt-1" /> : <img src={expand_down_logo} alt="Expand" className="w-3 h-3 ml-1 mt-1" />}
           </button>
 
-          {isHistoryVisible && (
-            <nav className="mt-2 mr-2 flex-1 overflow-y-auto pr-3">
+          {isHistoryVisible && (<nav className="mt-2 mr-2 flex-1 overflow-y-auto pr-3">
               <ul>
-                {filteredConversations.length > 0 ? (
-                  filteredConversations.map((conv) => (
-                    <li 
-                      key={conv._id} 
-                      className={`flex items-center p-1 mb-1 cursor-pointer rounded hover:bg-tum-blue-light-2 ${
-                        conversationId === conv._id ? 'border border-tum-blue' : ''
-                      }`}
-                      onClick={() => {
-                        console.log("Selected conversation ID:", conv._id);
-                        setConversationId(conv._id);
-                      }}
-                    >
-                      <span className="truncate text-sm font-montserrat">
-                        {conv.title}
-                      </span>
-                    </li>
-                  ))
-                ) : (
-                  <li className="text-sm text-gray-400 text-center py-2">
-                    No conversations found
-                  </li>
-                )}
+                  {conversationTitles.map((conv) => (
+                      <li key={conv._id} className="flex items-center p-1 mb-1 cursor-pointer rounded hover:bg-tum-blue-light-2"
+                          onClick={() => {
+                            console.log("Selected conversation ID:", conv._id);
+                            setConversationId(conv._id);
+                            }}>
+                          <span className="truncate text-sm font-montserrat" >
+                            {conv.title}
+                          </span>
+                      </li>
+                  ))}
               </ul>
             </nav>
           )}
