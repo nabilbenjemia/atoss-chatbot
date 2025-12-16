@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { tum_klinikum_logo, new_chat_logo, search_logo, minimize_logo, maximize_logo, profile_photo_mock, expand_down_logo,  expand_up_logo } from '../assets';
 import { authAPI, getCurrentUser } from '../services/api';
 
-export default function Sidebar({ conversationTitles, setConversationTitles, setConversationId, userId }) {
+export default function Sidebar({ conversationTitles, setConversationTitles, setConversationId, conversationId, userId }) {
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
   const [isMinimized, setIsMinimized] = useState(false);
@@ -150,7 +150,9 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
                   filteredConversations.map((conv) => (
                     <li 
                       key={conv._id} 
-                      className="flex items-center p-1 mb-1 cursor-pointer rounded hover:bg-tum-blue-light-2"
+                      className={`flex items-center p-1 mb-1 cursor-pointer rounded hover:bg-tum-blue-light-2 ${
+                        conversationId === conv._id ? 'border border-tum-blue' : ''
+                      }`}
                       onClick={() => {
                         console.log("Selected conversation ID:", conv._id);
                         setConversationId(conv._id);

@@ -243,7 +243,13 @@ export default function ChatbotPage() {
 
     return (
         <div className="flex h-screen">
-            <Sidebar conversationTitles={conversationTitles} setConversationTitles={setConversationTitles} setConversationId={setConversationId} userId={userId}/>
+            <Sidebar 
+                conversationTitles={conversationTitles}
+                setConversationTitles={setConversationTitles}
+                setConversationId={setConversationId}
+                conversationId={conversationId}  
+                userId={userId}
+            />
             <div className="flex flex-col flex-1 overflow-hidden">
                 <Conversation
                     messages={messages}
