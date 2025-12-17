@@ -258,12 +258,31 @@ class AuthService {
 				throw new Error('Verification token is required');
 			}
 
-			// First, try to find user by token
+			// Clean the token
+			const trimmedToken = token.trim();
+
+			// Try to decode the token (in case it was URL-encoded)
+			let decodedToken = trimmedToken;
+			try {
+				decodedToken = decodeURIComponent(trimmedToken);
+			} catch (e) {
+				// If decoding fails, token is already decoded or invalid encoding - use as-is
+				decodedToken = trimmedToken;
+			}
+
+			// First, try to find user by the decoded token
 			let userCredentials = await UserCredentials.findOne({
-				emailVerificationToken: token.trim()
+				emailVerificationToken: decodedToken
 			});
 
-			// If not found by token, the token is invalid, expired, or already used
+			// If not found, try the original trimmed token (in case it wasn't encoded)
+			if (!userCredentials && decodedToken !== trimmedToken) {
+				userCredentials = await UserCredentials.findOne({
+					emailVerificationToken: trimmedToken
+				});
+			}
+
+			// If still not found by token, the token is invalid, expired, or already used
 			if (!userCredentials) {
 				throw new Error('Invalid or expired verification token. The link may have already been used or expired. Please request a new verification email.');
 			}
