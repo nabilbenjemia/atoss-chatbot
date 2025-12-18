@@ -236,6 +236,13 @@ export default function ChatbotPage() {
         }
     };
 
+    // NEW: Handle new chat
+    const handleNewChat = () => {
+        setConversationId(null);
+        setMessages([]);
+        setStreamingMessage("");
+    };
+
     // Don't render if user is not authenticated
     if (!userId) {
         return null;
@@ -243,7 +250,14 @@ export default function ChatbotPage() {
 
     return (
         <div className="flex h-screen">
-            <Sidebar conversationTitles={conversationTitles} setConversationTitles={setConversationTitles} setConversationId={setConversationId} userId={userId}/>
+            <Sidebar 
+                conversationTitles={conversationTitles}
+                setConversationTitles={setConversationTitles}
+                setConversationId={setConversationId}
+                conversationId={conversationId}  
+                userId={userId}
+                onNewChat={handleNewChat}  // Pass the function
+            />
             <div className="flex flex-col flex-1 overflow-hidden">
                 <Conversation
                     messages={messages}

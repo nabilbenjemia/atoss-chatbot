@@ -3,14 +3,26 @@ import { useNavigate } from 'react-router-dom';
 import { tum_klinikum_logo, new_chat_logo, search_logo, minimize_logo, maximize_logo, profile_photo_mock, expand_down_logo,  expand_up_logo, delete_logo } from '../assets';
 import { authAPI, getCurrentUser } from '../services/api';
 
-export default function Sidebar({ conversationTitles, setConversationTitles, setConversationId, userId }) {
+export default function Sidebar({ conversationTitles, setConversationTitles, setConversationId, conversationId, userId, onNewChat }) {
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
   const [isMinimized, setIsMinimized] = useState(false);
   const [isHistoryVisible, setIsHistoryVisible] = useState(true);
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [deleteDropdownId, setDeleteDropdownId] = useState(null);
   const dropdownRef = useRef(null);
+
+  // Filter conversations based on search query
+  const filteredConversations = conversationTitles.filter(conv =>
+    conv.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setIsSearching(false);
+  };
   const deleteDropdownRef = useRef(null);
 
   // Close dropdown when clicking outside
@@ -58,34 +70,10 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
     }
   };
 
-  const handleCreateNewConversation = async () => {
-    console.log("handleCreateNewConversation is called");
-    try {
-        //Create new conversation
-        const res = await fetch('http://localhost:4004/api/conversations', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: userId })          
-        });
-        const data = await res.json();
-
-        //Update selected conversation ID
-        setConversationId(data._id);
-        console.log("Created new conversation:", data);
-
-        // Refresh conversation titles
-        /*
-        const titlesRes = await fetch(`http://localhost:4004/api/conversations/user/${userId}`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-        });
-        const titlesData = await titlesRes.json();
-        setConversationTitles(titlesData); // update sidebar
-        console.log("Updated conversation titles:", titlesData);
-        */
-
-    } catch (error) {
-        console.error("Failed to create conversation or fetch titles:", error);
+  const handleCreateNewConversation = () => {
+    console.log("New chat clicked");
+    if (onNewChat) {
+      onNewChat();  // Call the parent's function
     }
   };
 
@@ -137,15 +125,40 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
         <>
           <ul>
               <li className="flex items-center p-0 cursor-pointer rounded hover:bg-tum-blue-light-2" 
-                onClick={() => {console.log("New chat clicked");
-                                handleCreateNewConversation();}}>
+                onClick={() => handleCreateNewConversation()}>
                 <img src={new_chat_logo} alt="New Chat Logo" className="h-4 text-sm" />
                 <span className="ml-3">New chat</span>
               </li>
-              <li className="flex items-center p-0 cursor-pointer rounded hover:bg-tum-blue-light-2">
-                <img src={search_logo} alt="Search Logo" className="h-4" />
-                <span className="ml-3">Search chats</span>
-              </li>
+              
+              {!isSearching ? (
+                <li 
+                  className="flex items-center p-0 cursor-pointer rounded hover:bg-tum-blue-light-2"
+                  onClick={() => setIsSearching(true)}
+                >
+                  <img src={search_logo} alt="Search Logo" className="h-4" />
+                  <span className="ml-3">Search chats</span>
+                </li>
+              ) : (
+                <li className="flex items-center p-0">
+                  <img src={search_logo} alt="Search Logo" className="h-4" />
+                  <div className="relative flex-1 ml-3">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search conversations..."
+                      className="w-full px-3 py-1 pr-8 text-sm border border-tum-gray rounded focus:outline-none focus:border-tum-blue"
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleClearSearch}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none p-0 border-0 bg-transparent"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </li>
+              )}
           </ul>
 
           <div className="border-t border-tum-gray m-2"></div>
@@ -155,57 +168,63 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
           </button>
 
           {isHistoryVisible && (
-            <nav className="mt-2 mr-2 flex-1 overflow-y-auto pr-2">
+            <nav className="mt-2 mr-2 flex-1 overflow-y-auto pr-3">
               <ul>
-                {conversationTitles.map((conv) => (
-                  <li 
-                    key={conv._id} 
-                    className="group flex items-center justify-between p-1 mb-1 cursor-pointer rounded hover:bg-tum-blue-light-2"
-                  >
-                    <span 
-                      className="truncate text-sm font-montserrat flex-1"
-                      onClick={() => {
-                        console.log("Selected conversation ID:", conv._id);
-                        setConversationId(conv._id);
-                      }}
-                    >
-                      {conv.title}
-                    </span>
-                    
-                    <div 
-                      className={`relative flex-shrink-0 transition-opacity ${
-                        deleteDropdownId === conv._id 
-                          ? 'opacity-100' 
-                          : 'opacity-0 group-hover:opacity-100'
+                {filteredConversations.length > 0 ? (
+                  filteredConversations.map((conv) => (
+                    <li 
+                      key={conv._id} 
+                      className={`group flex items-center justify-between p-1 mb-1 cursor-pointer rounded hover:bg-tum-blue-light-2 ${
+                        conversationId === conv._id ? 'border-2 border-tum-blue' : ''
                       }`}
-                      ref={deleteDropdownId === conv._id ? deleteDropdownRef : null}
                     >
-                      {deleteDropdownId === conv._id ? (
-                        // Show delete button when clicked
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteConversation(conv._id);
-                          }}
-                          className="w-16 h-5 text-xs text-tum-white bg-red-700 hover:bg-red-800 rounded transition-colors flex items-center justify-center"
-                        >
-                          Löschen
-                        </button>
-                      ) : (
-                        // Show delete icon by default
-                        <img 
-                          src={delete_logo} 
-                          alt="Delete" 
-                          className="w-4 h-4 cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteDropdownId(conv._id);
-                          }}
-                        />
-                      )}
-                    </div>
+                      <span 
+                        className="truncate text-sm font-montserrat flex-1"
+                        onClick={() => {
+                          console.log("Selected conversation ID:", conv._id);
+                          setConversationId(conv._id);
+                        }}
+                      >
+                        {conv.title}
+                      </span>
+                      
+                      <div 
+                        className={`relative flex-shrink-0 transition-opacity ${
+                          deleteDropdownId === conv._id 
+                            ? 'opacity-100' 
+                            : 'opacity-0 group-hover:opacity-100'
+                        }`}
+                        ref={deleteDropdownId === conv._id ? deleteDropdownRef : null}
+                      >
+                        {deleteDropdownId === conv._id ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteConversation(conv._id);
+                            }}
+                            className="w-16 h-5 text-xs text-tum-white bg-red-700 hover:bg-red-800 rounded transition-colors flex items-center justify-center"
+                          >
+                            Löschen
+                          </button>
+                        ) : (
+                          <img 
+                            src={delete_logo} 
+                            alt="Delete" 
+                            className="w-4 h-4 cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteDropdownId(conv._id);
+                            }}
+                          />
+                        )}
+                      </div>
+                    </li>
+                  ))
+                ) : (
+                  <li className="text-sm text-gray-400 text-center py-2">
+                    No conversations found
                   </li>
-                ))}
+                )}
               </ul>
             </nav>
           )}
