@@ -56,11 +56,12 @@ class EmailService {
 	async sendVerificationEmail(email, token) {
 		if (!this.transporter) {
 			console.log(`📧 [DEV MODE] Verification email would be sent to: ${email}`);
-			console.log(`📧 [DEV MODE] Verification link: ${this.appUrl}/verify-email?token=${token}`);
+			console.log(`📧 [DEV MODE] Verification link: ${this.appUrl}/verify-email?token=${encodeURIComponent(token)}`);
 			return { success: true, devMode: true };
 		}
 
-		const verificationUrl = `${this.appUrl}/verify-email?token=${token}`;
+		// URL-encode the token to ensure it's properly handled in the email link
+		const verificationUrl = `${this.appUrl}/verify-email?token=${encodeURIComponent(token)}`;
 
 		const mailOptions = {
 			from: `"ATOSS.GPT" <${this.fromEmail}>`,
