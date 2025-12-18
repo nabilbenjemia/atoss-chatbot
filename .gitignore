@@ -44,3 +44,14 @@ __pycache__/
 .vscode/
 !.vscode/extensions.json
 
+# Chroma DB files
+backend/llm/chroma_db_snowflake_600chunks_300overlapping/chroma.sqlite3
+backend/llm/chroma_db_snowflake_600chunks_300overlapping/*.sqlite3
+
+# Or more generally, ignore all sqlite files
+*.sqlite3
+*.db
+
+# Chroma DB directories (if there are other files)
+**/chroma_db*/
+
