@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { authAPI } from "../services/api";
 
@@ -8,18 +8,35 @@ export default function VerifyEmailPage() {
   const [email, setEmail] = useState("");
   const [resending, setResending] = useState(false);
   const navigate = useNavigate();
+  const hasVerifiedRef = useRef(false); // Prevent multiple verification attempts
 
   useEffect(() => {
+    // Only run verification once
+    if (hasVerifiedRef.current) {
+      return;
+    }
+
     const token = searchParams.get("token");
     if (token) {
-      verifyEmail(token);
+      hasVerifiedRef.current = true; // Mark as attempted
+      // searchParams.get() already decodes, but handle edge cases
+      let decodedToken = token;
+      try {
+        // Try decoding in case it was double-encoded
+        decodedToken = decodeURIComponent(token);
+      } catch (e) {
+        // If decoding fails, use original token (already decoded)
+        decodedToken = token;
+      }
+      verifyEmail(decodedToken);
     } else {
       setStatus({
         type: "error",
         message: "No verification token provided."
       });
     }
-  }, [searchParams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   const verifyEmail = async (token) => {
     try {
