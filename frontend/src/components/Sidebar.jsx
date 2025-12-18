@@ -192,19 +192,64 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
             Chats {isHistoryVisible ? <img src={expand_up_logo} alt="Collapse" className="w-3 h-3 ml-1 mt-1" /> : <img src={expand_down_logo} alt="Expand" className="w-3 h-3 ml-1 mt-1" />}
           </button>
 
-          {isHistoryVisible && (<nav className="mt-2 mr-2 flex-1 overflow-y-auto pr-3">
+          {isHistoryVisible && (
+            <nav className="mt-2 mr-2 flex-1 overflow-y-auto pr-3">
               <ul>
-                  {conversationTitles.map((conv) => (
-                      <li key={conv._id} className="flex items-center p-1 mb-1 cursor-pointer rounded hover:bg-tum-blue-light-2"
-                          onClick={() => {
-                            console.log("Selected conversation ID:", conv._id);
-                            setConversationId(conv._id);
-                            }}>
-                          <span className="truncate text-sm font-montserrat" >
-                            {conv.title}
-                          </span>
-                      </li>
-                  ))}
+                {filteredConversations.length > 0 ? (
+                  filteredConversations.map((conv) => (
+                    <li 
+                      key={conv._id} 
+                      className={`group flex items-center justify-between p-1 mb-1 cursor-pointer rounded hover:bg-tum-blue-light-2 ${
+                        conversationId === conv._id ? 'border-2 border-tum-blue' : ''
+                      }`}
+                    >
+                      <span 
+                        className="truncate text-sm font-montserrat flex-1"
+                        onClick={() => {
+                          console.log("Selected conversation ID:", conv._id);
+                          setConversationId(conv._id);
+                        }}
+                      >
+                        {conv.title}
+                      </span>
+                      
+                      <div 
+                        className={`relative flex-shrink-0 transition-opacity ${
+                          deleteDropdownId === conv._id 
+                            ? 'opacity-100' 
+                            : 'opacity-0 group-hover:opacity-100'
+                        }`}
+                        ref={deleteDropdownId === conv._id ? deleteDropdownRef : null}
+                      >
+                        {deleteDropdownId === conv._id ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteConversation(conv._id);
+                            }}
+                            className="w-16 h-5 text-xs text-tum-white bg-red-700 hover:bg-red-800 rounded transition-colors flex items-center justify-center"
+                          >
+                            Löschen
+                          </button>
+                        ) : (
+                          <img 
+                            src={delete_logo} 
+                            alt="Delete" 
+                            className="w-4 h-4 cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteDropdownId(conv._id);
+                            }}
+                          />
+                        )}
+                      </div>
+                    </li>
+                  ))
+                ) : (
+                  <li className="text-sm text-gray-400 text-center py-2">
+                    No conversations found
+                  </li>
+                )}
               </ul>
             </nav>
           )}
