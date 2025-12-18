@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { tum_klinikum_logo, new_chat_logo, search_logo, minimize_logo, maximize_logo, profile_photo_mock, expand_down_logo,  expand_up_logo, delete_logo } from '../assets';
 import { authAPI, getCurrentUser } from '../services/api';
 
-export default function Sidebar({ conversationTitles, setConversationTitles, setConversationId, conversationId, userId }) {
+export default function Sidebar({ conversationTitles, setConversationTitles, setConversationId, conversationId, userId, onNewChat }) {
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
   const [isMinimized, setIsMinimized] = useState(false);
@@ -70,34 +70,10 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
     }
   };
 
-  const handleCreateNewConversation = async () => {
-    console.log("handleCreateNewConversation is called");
-    try {
-        //Create new conversation
-        const res = await fetch('http://localhost:4004/api/conversations', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: userId })          
-        });
-        const data = await res.json();
-
-        //Update selected conversation ID
-        setConversationId(data._id);
-        console.log("Created new conversation:", data);
-
-        // Refresh conversation titles
-        /*
-        const titlesRes = await fetch(`http://localhost:4004/api/conversations/user/${userId}`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-        });
-        const titlesData = await titlesRes.json();
-        setConversationTitles(titlesData); // update sidebar
-        console.log("Updated conversation titles:", titlesData);
-        */
-
-    } catch (error) {
-        console.error("Failed to create conversation or fetch titles:", error);
+  const handleCreateNewConversation = () => {
+    console.log("New chat clicked");
+    if (onNewChat) {
+      onNewChat();  // Call the parent's function
     }
   };
 
@@ -149,8 +125,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
         <>
           <ul>
               <li className="flex items-center p-0 cursor-pointer rounded hover:bg-tum-blue-light-2" 
-                onClick={() => {console.log("New chat clicked");
-                                handleCreateNewConversation();}}>
+                onClick={() => handleCreateNewConversation()}>
                 <img src={new_chat_logo} alt="New Chat Logo" className="h-4 text-sm" />
                 <span className="ml-3">New chat</span>
               </li>
