@@ -363,6 +363,163 @@ class AuthService {
 			throw error;
 		}
 	}
+
+	/**
+	 * Get user by ID
+	 * @param {string} userId - User ID
+	 * @returns {Promise<Object>} - User credentials
+	 */
+	async getUserById(userId) {
+		try {
+			const userCredentials = await UserCredentials.findOne({ id: userId });
+			
+			if (!userCredentials) {
+				throw new Error('User not found');
+			}
+
+			return {
+				id: userCredentials.id,
+				email: userCredentials.email,
+				role: userCredentials.role,
+				department: userCredentials.department,
+				emailVerified: userCredentials.emailVerified,
+				lastLogin: userCredentials.lastLogin,
+				createdAt: userCredentials.createdAt,
+				updatedAt: userCredentials.updatedAt
+			};
+		} catch (error) {
+			throw error;
+		}
+	}
+
+	/**
+	 * Update user role
+	 * @param {string} userId - User ID
+	 * @param {string} role - New role
+	 * @returns {Promise<Object>} - Updated user credentials
+	 */
+	async updateUserRole(userId, role) {
+		try {
+			if (!role || ![Role.STAFF, Role.ADMIN].includes(role)) {
+				throw new Error('Invalid role. Must be Admin or Staff');
+			}
+
+			const userCredentials = await UserCredentials.findOne({ id: userId });
+			
+			if (!userCredentials) {
+				throw new Error('User not found');
+			}
+
+			userCredentials.role = role;
+			await userCredentials.save();
+
+			return {
+				id: userCredentials.id,
+				email: userCredentials.email,
+				role: userCredentials.role,
+				department: userCredentials.department,
+				updatedAt: userCredentials.updatedAt
+			};
+		} catch (error) {
+			throw error;
+		}
+	}
+
+	/**
+	 * Update user department
+	 * @param {string} userId - User ID
+	 * @param {string} department - New department
+	 * @returns {Promise<Object>} - Updated user credentials
+	 */
+	async updateUserDepartment(userId, department) {
+		try {
+			if (!department || ![Department.DEPARTMENT_1, Department.DEPARTMENT_2, Department.DEPARTMENT_3].includes(department)) {
+				throw new Error('Invalid department');
+			}
+
+			const userCredentials = await UserCredentials.findOne({ id: userId });
+			
+			if (!userCredentials) {
+				throw new Error('User not found');
+			}
+
+			userCredentials.department = department;
+			await userCredentials.save();
+
+			return {
+				id: userCredentials.id,
+				email: userCredentials.email,
+				role: userCredentials.role,
+				department: userCredentials.department,
+				updatedAt: userCredentials.updatedAt
+			};
+		} catch (error) {
+			throw error;
+		}
+	}
+
+	/**
+	 * Update user password
+	 * @param {string} userId - User ID
+	 * @param {string} currentPassword - Current password
+	 * @param {string} newPassword - New password
+	 * @returns {Promise<Object>} - Success message
+	 */
+	async updateUserPassword(userId, currentPassword, newPassword) {
+		try {
+			const userCredentials = await UserCredentials.findOne({ id: userId });
+			
+			if (!userCredentials) {
+				throw new Error('User not found');
+			}
+
+			// Verify current password
+			const isPasswordValid = await bcrypt.compare(currentPassword, userCredentials.passwordHash);
+			
+			if (!isPasswordValid) {
+				throw new Error('Current password is incorrect');
+			}
+
+			// Validate new password
+			const { validatePassword } = require('../utils/validation');
+			const passwordValidation = validatePassword(newPassword);
+			if (!passwordValidation.valid) {
+				throw new Error(passwordValidation.message);
+			}
+
+			// Hash new password
+			const saltRounds = 10;
+			const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+
+			userCredentials.passwordHash = passwordHash;
+			await userCredentials.save();
+
+			return {
+				message: 'Password updated successfully'
+			};
+		} catch (error) {
+			throw error;
+		}
+	}
+
+	/**
+	 * Delete user by ID
+	 * @param {string} userId - User ID
+	 * @returns {Promise<boolean>} - Success status
+	 */
+	async deleteUser(userId) {
+		try {
+			const result = await UserCredentials.deleteOne({ id: userId });
+			
+			if (result.deletedCount === 0) {
+				throw new Error('User not found');
+			}
+
+			return true;
+		} catch (error) {
+			throw error;
+		}
+	}
 }
 
 module.exports = new AuthService();
