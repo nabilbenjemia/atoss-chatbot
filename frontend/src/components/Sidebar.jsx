@@ -81,8 +81,11 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
     try {
       console.log("Deleting conversation:", convId);
       
+      // Use environment variable or default to localhost
+      const API_BASE_URL = import.meta.env.VITE_CONVERSATION_URL || 'http://localhost:4004';
+      
       // Call DELETE API
-      const response = await fetch(`http://localhost:4004/api/conversations/${convId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/conversations/${convId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
       });

@@ -5,6 +5,8 @@ import MessageInput from '../components/MessageInput'
 import Conversation from '../components/Conversation'
 import { getCurrentUser } from '../services/api'
 
+const CONVERSATION_API = import.meta.env.VITE_CONVERSATION_URL || 'http://localhost:4004';
+
 export default function ChatbotPage() {
     const navigate = useNavigate();
     const currentUser = getCurrentUser();
@@ -63,7 +65,7 @@ export default function ChatbotPage() {
 
         try {
             const response = await fetch(
-                `http://localhost:4004/api/conversations/${conversationId || 'new'}/messages/batch`,
+                `${CONVERSATION_API}/api/conversations/${conversationId || 'new'}/messages/batch`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -98,7 +100,7 @@ export default function ChatbotPage() {
 
     const fetchMessages = useCallback(async () => {
         try {
-            const response = await fetch(`http://localhost:4004/api/conversations/${conversationId}/messages`, {
+            const response = await fetch(`${CONVERSATION_API}/api/conversations/${conversationId}/messages`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -112,7 +114,7 @@ export default function ChatbotPage() {
     const fetchConversationTitles = useCallback(async () => {
         if (!userId) return;
         try {
-            const response = await fetch(`http://localhost:4004/api/conversations/user/${userId}`, {
+            const response = await fetch(`${CONVERSATION_API}/api/conversations/user/${userId}`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -173,7 +175,7 @@ export default function ChatbotPage() {
 
             // Create EventSource for streaming
             const convId = conversationId || 'new';
-            const url = new URL(`http://localhost:4004/api/conversations/${convId}/stream`);
+            const url = new URL(`${CONVERSATION_API}/api/conversations/${convId}/stream`);
             url.searchParams.append('query', messageText);
             url.searchParams.append('history', JSON.stringify(history));
 

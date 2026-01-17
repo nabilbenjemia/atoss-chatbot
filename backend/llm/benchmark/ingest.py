@@ -8,6 +8,7 @@ and stores them in ChromaDB with batch processing for efficiency.
 import logging
 import os
 from typing import List, Dict, Any
+from dotenv import load_dotenv
 
 import fitz  # PyMuPDF
 import torch
@@ -15,11 +16,16 @@ from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 import chromadb
 
+# Load environment variables from .env file
+load_dotenv()
+
 # Configuration
 PDF_FILES = ["20251104_ATOSS FAQs_SEBA Lab.pdf", "ASES_Referenzhandbuch.pdf"]
 DB_PATH = "./chroma_db_snowflake_600chunks_400overlapping"
 COLLECTION_NAME = "tum_docs"
-EMBEDDING_MODEL = "Snowflake/snowflake-arctic-embed-l-v2.0"
+
+# Use the embedding model from .env, with a default fallback
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "Snowflake/snowflake-arctic-embed-l-v2.0")
 
 # Chunk configuration
 CHUNK_SIZE = 600
