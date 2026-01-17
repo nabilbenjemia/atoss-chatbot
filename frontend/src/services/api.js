@@ -30,11 +30,18 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid - clear storage and redirect to login
+      // Token expired or invalid - clear storage
       localStorage.removeItem('auth_token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
-      window.location.href = '/';
+      
+      // Only redirect if we're not already on the profile page
+      // The profile page will handle its own redirect with better UX
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/profile') {
+        window.location.href = '/';
+      }
+      // If on profile page, let the component handle the redirect
     }
     return Promise.reject(error);
   }
@@ -98,6 +105,88 @@ export const authAPI = {
   // Resend verification email
   resendVerificationEmail: async (email) => {
     const response = await api.post('/auth/resend-verification', { email });
+    return response.data;
+  },
+};
+
+// User Management API
+export const userAPI = {
+  // Get user profile
+  getProfile: async () => {
+    const response = await api.get('/users/me');
+    return response.data;
+  },
+
+  // Update username
+  updateUsername: async (username) => {
+    const response = await api.patch('/users/me/username', { username });
+    return response.data;
+  },
+
+  // Update role
+  updateRole: async (role) => {
+    const response = await api.patch('/users/me/role', { role });
+    if (response.data.success) {
+      // Update user in localStorage
+      const currentUser = getCurrentUser();
+      if (currentUser) {
+        currentUser.role = role;
+        localStorage.setItem('user', JSON.stringify(currentUser));
+      }
+    }
+    return response.data;
+  },
+
+  // Update department
+  updateDepartment: async (department) => {
+    const response = await api.patch('/users/me/department', { department });
+    if (response.data.success) {
+      // Update user in localStorage
+      const currentUser = getCurrentUser();
+      if (currentUser) {
+        currentUser.department = department;
+        localStorage.setItem('user', JSON.stringify(currentUser));
+      }
+    }
+    return response.data;
+  },
+
+  // Update password
+  updatePassword: async (currentPassword, newPassword) => {
+    const response = await api.patch('/users/me/password', {
+      currentPassword,
+      newPassword,
+    });
+    return response.data;
+  },
+
+  // Update preferences
+  updatePreferences: async (preferences) => {
+    const response = await api.patch('/users/me/preferences', { preferences });
+    return response.data;
+  },
+
+  // Update profile picture
+  updateProfilePicture: async (profilePicture) => {
+    const response = await api.patch('/users/me/profile-picture', { profilePicture });
+    return response.data;
+  },
+
+  // Delete profile picture
+  deleteProfilePicture: async () => {
+    const response = await api.delete('/users/me/profile-picture');
+    return response.data;
+  },
+
+  // Delete account
+  deleteAccount: async () => {
+    const response = await api.delete('/users/me');
+    // Clear localStorage after successful deletion
+    if (response.data.success) {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user');
+    }
     return response.data;
   },
 };

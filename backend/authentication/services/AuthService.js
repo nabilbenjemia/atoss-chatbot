@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const UserCredentials = require('../models/UserCredentials');
+const Role = require('../models/Role');
 const axios = require('axios');
 const emailService = require('./EmailService');
 
@@ -433,8 +434,8 @@ class AuthService {
 	 */
 	async updateUserDepartment(userId, department) {
 		try {
-			if (!department || ![Department.DEPARTMENT_1, Department.DEPARTMENT_2, Department.DEPARTMENT_3].includes(department)) {
-				throw new Error('Invalid department');
+			if (!department || typeof department !== 'string' || department.trim() === '') {
+				throw new Error('Department is required and must be a non-empty string');
 			}
 
 			const userCredentials = await UserCredentials.findOne({ id: userId });

@@ -33,8 +33,8 @@ const userCredentialsSchema = new mongoose.Schema({
 	},
 	department: {
 		type: String,
-		enum: [Department.DEPARTMENT_1, Department.DEPARTMENT_2, Department.DEPARTMENT_3],
-		required: true
+		required: true,
+		trim: true
 	},
 	token: {
 		type: String,

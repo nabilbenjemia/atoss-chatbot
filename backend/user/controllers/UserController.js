@@ -83,6 +83,7 @@ class UserController {
 				data: result
 			});
 		} catch (error) {
+			console.error('Error updating username:', error);
 			res.status(400).json({
 				success: false,
 				message: error.message || 'Failed to update username'
@@ -123,6 +124,7 @@ class UserController {
 				data: result
 			});
 		} catch (error) {
+			console.error('Error updating role:', error);
 			res.status(400).json({
 				success: false,
 				message: error.message || 'Failed to update role'
@@ -163,6 +165,7 @@ class UserController {
 				data: result
 			});
 		} catch (error) {
+			console.error('Error updating department:', error);
 			res.status(400).json({
 				success: false,
 				message: error.message || 'Failed to update department'
@@ -275,6 +278,70 @@ class UserController {
 			res.status(500).json({
 				success: false,
 				message: error.message || 'Failed to delete account'
+			});
+		}
+	}
+
+	/**
+	 * Update profile picture
+	 * PATCH /users/me/profile-picture
+	 */
+	async updateProfilePicture(req, res) {
+		try {
+			const userId = req.user?.id;
+
+			if (!userId) {
+				return res.status(401).json({
+					success: false,
+					message: 'Unauthorized'
+				});
+			}
+
+			const { profilePicture } = req.body;
+
+			const result = await userService.updateProfilePicture(userId, profilePicture);
+
+			res.status(200).json({
+				success: true,
+				message: 'Profile picture updated successfully',
+				data: result
+			});
+		} catch (error) {
+			console.error('Error updating profile picture:', error);
+			res.status(400).json({
+				success: false,
+				message: error.message || 'Failed to update profile picture'
+			});
+		}
+	}
+
+	/**
+	 * Delete profile picture
+	 * DELETE /users/me/profile-picture
+	 */
+	async deleteProfilePicture(req, res) {
+		try {
+			const userId = req.user?.id;
+
+			if (!userId) {
+				return res.status(401).json({
+					success: false,
+					message: 'Unauthorized'
+				});
+			}
+
+			const result = await userService.deleteProfilePicture(userId);
+
+			res.status(200).json({
+				success: true,
+				message: 'Profile picture deleted successfully',
+				data: result
+			});
+		} catch (error) {
+			console.error('Error deleting profile picture:', error);
+			res.status(400).json({
+				success: false,
+				message: error.message || 'Failed to delete profile picture'
 			});
 		}
 	}

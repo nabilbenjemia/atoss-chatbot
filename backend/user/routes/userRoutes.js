@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/UserController');
-const authMiddleware = require('../../authentication/middleware/authMiddleware');
+const authMiddleware = require('../middleware/authMiddleware');
 
 /**
  * User routes
@@ -29,6 +29,12 @@ router.patch('/me/password', authMiddleware, userController.updatePassword.bind(
 
 // Update preferences
 router.patch('/me/preferences', authMiddleware, userController.updatePreferences.bind(userController));
+
+// Update profile picture
+router.patch('/me/profile-picture', authMiddleware, userController.updateProfilePicture.bind(userController));
+
+// Delete profile picture
+router.delete('/me/profile-picture', authMiddleware, userController.deleteProfilePicture.bind(userController));
 
 // Delete account
 router.delete('/me', authMiddleware, userController.deleteAccount.bind(userController));

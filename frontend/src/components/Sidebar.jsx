@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { tum_klinikum_logo, new_chat_logo, search_logo, minimize_logo, maximize_logo, profile_photo_mock, expand_down_logo,  expand_up_logo, delete_logo } from '../assets';
-import { authAPI, getCurrentUser } from '../services/api';
+import { authAPI, getCurrentUser, userAPI } from '../services/api';
 
 export default function Sidebar({ conversationTitles, setConversationTitles, setConversationId, conversationId, userId, onNewChat }) {
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
+  const [userProfile, setUserProfile] = useState(null);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isHistoryVisible, setIsHistoryVisible] = useState(true);
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
@@ -24,6 +25,36 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
     setIsSearching(false);
   };
   const deleteDropdownRef = useRef(null);
+
+  // Load user profile to get username
+  const loadUserProfile = async () => {
+    try {
+      const response = await userAPI.getProfile();
+      if (response.success) {
+        setUserProfile(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to load user profile in sidebar:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (userId) {
+      loadUserProfile();
+    }
+  }, [userId]);
+
+  // Reload profile when window regains focus (user might have updated profile in another tab/window)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (userId) {
+        loadUserProfile();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [userId]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -234,18 +265,26 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
               className="flex items-center gap-3 p-1 border-gray-700 cursor-pointer rounded hover:bg-tum-blue-light-2"
               onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
             >
-              <div className="w-8 h-8 rounded-full bg-gray-500 overflow-hidden">
-                <img
-                  src={profile_photo_mock} 
-                  alt="User Avatar"
-                  className="w-full h-full object-cover"
-                />
+              <div className="w-8 h-8 rounded-full bg-gray-500 overflow-hidden border-2 border-gray-300">
+                {userProfile?.profilePicture ? (
+                  <img
+                    src={userProfile.profilePicture}
+                    alt="User Avatar"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <img
+                    src={profile_photo_mock}
+                    alt="User Avatar"
+                    className="w-full h-full object-cover"
+                  />
+                )}
               </div>
 
               {/* User info */}
               <div className="flex flex-col flex-1">
                 <span className="text-sm font-medium text-tum-black">
-                  {currentUser?.email?.split('@')[0] || 'User'}
+                  {userProfile?.username || currentUser?.email?.split('@')[0] || 'User'}
                 </span>
                 <span className="text-xs text-gray-400">
                   {currentUser?.role || 'TUM Klinikum Staff'}
@@ -256,6 +295,15 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
             {/* Logout dropdown */}
             {showLogoutDropdown && (
               <div className="absolute bottom-full left-0 right-0 mb-2 bg-tum-white border border-tum-grey-7 rounded-lg shadow-lg z-10">
+                <button
+                  onClick={() => {
+                    setShowLogoutDropdown(false);
+                    navigate('/profile');
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-tum-black bg-tum-white hover:bg-tum-blue-light-2 rounded-lg transition-colors border-b border-tum-grey-7"
+                >
+                  Profile
+                </button>
                 <button
                   onClick={handleLogout}
                   className="w-full text-left px-4 py-2 text-sm text-tum-black bg-tum-white hover:bg-tum-blue-light-2 rounded-lg transition-colors"
@@ -284,19 +332,36 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
           </nav>
           <div className="relative mt-auto" ref={dropdownRef}>
             <div 
-              className="w-8 h-8 rounded-full bg-gray-500 overflow-hidden cursor-pointer hover:ring-2 hover:ring-tum-blue"
+              className="w-8 h-8 rounded-full bg-gray-500 overflow-hidden cursor-pointer hover:ring-2 hover:ring-tum-blue border-2 border-gray-300"
               onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
               title="Click to logout"
             >
-              <img
-                src={profile_photo_mock} 
-                alt="User Avatar"
-                className="w-full h-full object-cover"
-              />
+              {userProfile?.profilePicture ? (
+                <img
+                  src={userProfile.profilePicture}
+                  alt="User Avatar"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <img
+                  src={profile_photo_mock}
+                  alt="User Avatar"
+                  className="w-full h-full object-cover"
+                />
+              )}
             </div>
             {/* Logout dropdown for minimized state */}
             {showLogoutDropdown && (
               <div className="absolute bottom-full left-0 mb-2 bg-tum-white border border-tum-grey-7 rounded-lg shadow-lg z-10 whitespace-nowrap">
+                <button
+                  onClick={() => {
+                    setShowLogoutDropdown(false);
+                    navigate('/profile');
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-tum-black bg-tum-white hover:bg-tum-blue-light-2 rounded-lg transition-colors border-b border-tum-grey-7"
+                >
+                  Profile
+                </button>
                 <button
                   onClick={handleLogout}
                   className="w-full text-left px-4 py-2 text-sm text-tum-black bg-tum-white hover:bg-tum-blue-light-2 rounded-lg transition-colors"

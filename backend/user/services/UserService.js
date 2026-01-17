@@ -37,6 +37,7 @@ class UserService {
 			return {
 				userId: userProfile.userId,
 				username: userProfile.username,
+				profilePicture: userProfile.profilePicture,
 				email: credentialsInfo.email,
 				role: credentialsInfo.role,
 				department: credentialsInfo.department,
@@ -107,6 +108,7 @@ class UserService {
 				updatedAt: userProfile.updatedAt
 			};
 		} catch (error) {
+			console.error('UserService.updateUsername error:', error);
 			throw error;
 		}
 	}
@@ -142,6 +144,7 @@ class UserService {
 
 			return response.data.data;
 		} catch (error) {
+			console.error('UserService.updateRole error:', error.response?.data || error.message);
 			if (error.response && error.response.status === 404) {
 				throw new Error('User not found');
 			}
@@ -158,8 +161,8 @@ class UserService {
 	 */
 	async updateDepartment(userId, department, token = null) {
 		try {
-			if (!department || ![Department.DEPARTMENT_1, Department.DEPARTMENT_2, Department.DEPARTMENT_3].includes(department)) {
-				throw new Error('Invalid department');
+			if (!department || typeof department !== 'string' || department.trim() === '') {
+				throw new Error('Department is required and must be a non-empty string');
 			}
 
 			const headers = { 'Content-Type': 'application/json' };
@@ -180,6 +183,7 @@ class UserService {
 
 			return response.data.data;
 		} catch (error) {
+			console.error('UserService.updateDepartment error:', error.response?.data || error.message);
 			if (error.response && error.response.status === 404) {
 				throw new Error('User not found');
 			}
@@ -314,6 +318,69 @@ class UserService {
 			// Ensure profile is deleted even if auth service fails
 			await UserProfile.deleteOne({ userId });
 			throw new Error('Failed to fully delete user account');
+		}
+	}
+
+	/**
+	 * Update user profile picture
+	 * @param {string} userId - User ID
+	 * @param {string} profilePicture - Base64 encoded image data (data:image/png;base64,...)
+	 * @returns {Promise<Object>} - Updated profile
+	 */
+	async updateProfilePicture(userId, profilePicture) {
+		try {
+			// Validate base64 image format
+			if (profilePicture && !profilePicture.startsWith('data:image/')) {
+				throw new Error('Invalid image format. Must be base64 encoded image (data:image/...)');
+			}
+
+			// Limit image size (e.g., 2MB = ~2.6MB in base64)
+			if (profilePicture && profilePicture.length > 2800000) {
+				throw new Error('Image size too large. Maximum size is 2MB');
+			}
+
+			let userProfile = await UserProfile.findOne({ userId });
+			
+			if (!userProfile) {
+				userProfile = new UserProfile({ userId });
+			}
+
+			userProfile.profilePicture = profilePicture || null;
+			await userProfile.save();
+
+			return {
+				userId: userProfile.userId,
+				profilePicture: userProfile.profilePicture,
+				updatedAt: userProfile.updatedAt
+			};
+		} catch (error) {
+			throw error;
+		}
+	}
+
+	/**
+	 * Delete user profile picture
+	 * @param {string} userId - User ID
+	 * @returns {Promise<Object>} - Updated profile
+	 */
+	async deleteProfilePicture(userId) {
+		try {
+			let userProfile = await UserProfile.findOne({ userId });
+			
+			if (!userProfile) {
+				userProfile = new UserProfile({ userId });
+			}
+
+			userProfile.profilePicture = null;
+			await userProfile.save();
+
+			return {
+				userId: userProfile.userId,
+				profilePicture: null,
+				updatedAt: userProfile.updatedAt
+			};
+		} catch (error) {
+			throw error;
 		}
 	}
 

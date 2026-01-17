@@ -304,6 +304,7 @@ class AuthController {
 				data: result
 			});
 		} catch (error) {
+			console.error('Error updating user role:', error);
 			res.status(400).json({
 				success: false,
 				message: error.message || 'Failed to update role'
@@ -343,6 +344,14 @@ class AuthController {
 				data: result
 			});
 		} catch (error) {
+			console.error('Error updating user department:', error);
+			// Check if it's a Mongoose validation error
+			if (error.name === 'ValidationError') {
+				return res.status(400).json({
+					success: false,
+					message: `Validation error: ${error.message}. Department must be one of: Department 1, Department 2, Department 3`
+				});
+			}
 			res.status(400).json({
 				success: false,
 				message: error.message || 'Failed to update department'

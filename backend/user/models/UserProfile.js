@@ -17,6 +17,11 @@ const userProfileSchema = new mongoose.Schema({
 		trim: true,
 		maxlength: 50
 	},
+	profilePicture: {
+		type: String,
+		default: null
+		// Stores base64 encoded image data (data:image/png;base64,...)
+	},
 	preferences: {
 		theme: {
 			type: String,
