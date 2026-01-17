@@ -13,7 +13,7 @@ done
 echo "Ollama server is ready"
 
 # Pull the model
-MODEL="${OLLAMA_MODEL:-qwen2.5:3b-instruct-q4_0}"
+MODEL="${OLLAMA_MODEL:-qwen2.5:7b-instruct-q4_0}"
 echo "Checking if model $MODEL exists..."
 
 # Check if model already exists
