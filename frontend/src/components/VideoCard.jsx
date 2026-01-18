@@ -26,7 +26,7 @@ const VideoCard = ({ video, onVideoClick, apiBaseUrl }) => {
 
             {/* Video Info - more compact */}
             <div className="p-3">
-                <h3 className="font-semibold text-sm mb-1 line-clamp-1 overflow-hidden text-ellipsis">
+                <h3 className="font-semibold text-sm mb-1 line-clamp-2 overflow-hidden text-ellipsis">
                     {video.title}
                 </h3>
                 <p className="text-gray-600 text-xs mb-2 line-clamp-1 overflow-hidden text-ellipsis">
