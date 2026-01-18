@@ -22,8 +22,9 @@ const LearningMaterialPage = () => {
 
     const API_BASE_URL = import.meta.env.VITE_LEARNING_API_URL || 'http://localhost:4005';
     const currentUser = getCurrentUser();
-    //const isAdmin = currentUser?.role === 'admin';
-    const isAdmin = 'admin'; //TODO remove
+    const role = currentUser?.role;
+    console.log('currentUser.role:', role);
+    const isAdmin = typeof role === 'string' && role.toLowerCase() === 'admin';
 
     // Initial fetch - get all videos once
     useEffect(() => {
