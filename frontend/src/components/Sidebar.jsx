@@ -1,13 +1,36 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { tum_klinikum_logo, new_chat_logo, search_logo, minimize_logo, maximize_logo, profile_photo_mock, expand_down_logo,  expand_up_logo, delete_logo } from '../assets';
+import { tum_klinikum_logo, tum_logo_darkmode, new_chat_logo, search_logo, minimize_logo, maximize_logo, profile_photo_mock, expand_down_logo,  expand_up_logo, delete_logo } from '../assets';
 import { authAPI, getCurrentUser, userAPI } from '../services/api';
 
-export default function Sidebar({ conversationTitles, setConversationTitles, setConversationId, conversationId, userId, onNewChat }) {
+export default function Sidebar({ conversationTitles, setConversationTitles, setConversationId, conversationId, userId, onNewChat, isDarkMode = false }) {
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
   const [userProfile, setUserProfile] = useState(null);
   const [isMinimized, setIsMinimized] = useState(false);
+  
+  // Get language from user profile or default to English
+  const language = userProfile?.preferences?.language || 'en';
+  
+  // Translations
+  const translations = {
+    en: {
+      newChat: 'New chat',
+      searchChats: 'Search chats',
+      chats: 'Chats',
+      logOut: 'Log out',
+      profile: 'Profile'
+    },
+    de: {
+      newChat: 'Neuer Chat',
+      searchChats: 'Suche Chats',
+      chats: 'Chats',
+      logOut: 'Abmelden',
+      profile: 'Profil'
+    }
+  };
+  
+  const t = translations[language] || translations.en;
   const [isHistoryVisible, setIsHistoryVisible] = useState(true);
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -141,12 +164,18 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
   };
 
   return ( 
-    <div className={`bg-tum-blue-light-4 ${isMinimized ? 'w-12' : 'w-64'} text-black h-screen p-2 rounded-r-2xl flex flex-col transition-all duration-300`}>
-      <div className={`flex ${isMinimized ? 'justify-center' : 'justify-between'} items-start mb-1`}>
-        {!isMinimized && <img src={tum_klinikum_logo} alt="TUM Klinikum Logo" className="h-16 w-auto -ml-5 -my-2" />}
+    <div className={`${isDarkMode ? 'bg-[#1f1f1f]' : 'bg-tum-blue-light-4'} ${isMinimized ? 'w-12' : 'w-64'} ${isDarkMode ? 'text-gray-200' : 'text-black'} h-screen p-2 rounded-r-2xl flex flex-col transition-all duration-300`}>
+      <div className={`flex ${isMinimized ? 'justify-center' : (isDarkMode ? 'justify-center' : 'justify-between')} items-start mb-1`}>
+        {!isMinimized && (
+          <img 
+            src={isDarkMode ? tum_logo_darkmode : tum_klinikum_logo} 
+            alt="TUM Klinikum Logo" 
+            className={isDarkMode ? "h-12 w-auto rounded-lg" : "h-16 w-auto -ml-5 -my-2"} 
+          />
+        )}
         <button 
           onClick={() => setIsMinimized(!isMinimized)}
-          className="p-2 bg-tum-blue-light-4 rounded w-10 h-10 flex items-center justify-center focus:outline-none border-0"
+          className={`p-2 rounded w-10 h-10 flex items-center justify-center focus:outline-none border-0 ${isDarkMode ? 'bg-[#1f1f1f] hover:bg-[#2f2f2f]' : 'bg-tum-blue-light-4'}`}
         >
           {isMinimized ? <img src={maximize_logo} alt="Maximize" className="h-4" /> : <img src={minimize_logo} alt="Minimize" className="h-4" />}
         </button>
@@ -155,19 +184,19 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
       {!isMinimized && (
         <>
           <ul>
-              <li className="flex items-center p-0 cursor-pointer rounded hover:bg-tum-blue-light-2" 
+              <li className={`flex items-center p-0 cursor-pointer rounded ${isDarkMode ? 'hover:bg-[#2f2f2f]' : 'hover:bg-tum-blue-light-2'}`} 
                 onClick={() => handleCreateNewConversation()}>
                 <img src={new_chat_logo} alt="New Chat Logo" className="h-4 text-sm" />
-                <span className="ml-3">New chat</span>
+                <span className="ml-3">{t.newChat}</span>
               </li>
               
               {!isSearching ? (
                 <li 
-                  className="flex items-center p-0 cursor-pointer rounded hover:bg-tum-blue-light-2"
+                  className={`flex items-center p-0 cursor-pointer rounded ${isDarkMode ? 'hover:bg-[#2f2f2f]' : 'hover:bg-tum-blue-light-2'}`}
                   onClick={() => setIsSearching(true)}
                 >
                   <img src={search_logo} alt="Search Logo" className="h-4" />
-                  <span className="ml-3">Search chats</span>
+                  <span className="ml-3">{t.searchChats}</span>
                 </li>
               ) : (
                 <li className="flex items-center p-0">
@@ -178,12 +207,12 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Search conversations..."
-                      className="w-full px-3 py-1 pr-8 text-sm border border-tum-gray rounded focus:outline-none focus:border-tum-blue"
+                      className={`w-full px-3 py-1 pr-8 text-sm border rounded focus:outline-none focus:border-tum-blue ${isDarkMode ? 'bg-[#2f2f2f] border-gray-600 text-gray-200 placeholder-gray-500' : 'border-tum-gray'}`}
                       autoFocus
                     />
                     <button
                       onClick={handleClearSearch}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none p-0 border-0 bg-transparent"
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 text-lg leading-none p-0 border-0 bg-transparent ${isDarkMode ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
                     >
                       ✕
                     </button>
@@ -192,10 +221,10 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
               )}
           </ul>
 
-          <div className="border-t border-tum-gray m-2"></div>
+          <div className={`border-t m-2 ${isDarkMode ? 'border-gray-700' : 'border-tum-gray'}`}></div>
 
-          <button className="bg-tum-blue-light-4 text-left font-medium w-14 h-8 flex items-center justify-center font-medium focus:outline-none border-0" onClick={() => setIsHistoryVisible(!isHistoryVisible)}>
-            Chats {isHistoryVisible ? <img src={expand_up_logo} alt="Collapse" className="w-3 h-3 ml-1 mt-1" /> : <img src={expand_down_logo} alt="Expand" className="w-3 h-3 ml-1 mt-1" />}
+          <button className={`text-left font-medium w-14 h-8 flex items-center justify-center font-medium focus:outline-none border-0 ${isDarkMode ? 'bg-[#1f1f1f] hover:bg-[#2f2f2f]' : 'bg-tum-blue-light-4'}`} onClick={() => setIsHistoryVisible(!isHistoryVisible)}>
+            {t.chats} {isHistoryVisible ? <img src={expand_up_logo} alt="Collapse" className="w-3 h-3 ml-1 mt-1" /> : <img src={expand_down_logo} alt="Expand" className="w-3 h-3 ml-1 mt-1" />}
           </button>
 
           {isHistoryVisible && (
@@ -205,8 +234,10 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
                   filteredConversations.map((conv) => (
                     <li 
                       key={conv._id} 
-                      className={`group flex items-center justify-between p-1 mb-1 cursor-pointer rounded hover:bg-tum-blue-light-2 ${
-                        conversationId === conv._id ? 'border-2 border-tum-blue' : ''
+                      className={`group flex items-center justify-between p-1 mb-1 cursor-pointer rounded ${
+                        isDarkMode 
+                          ? `hover:bg-[#2f2f2f] ${conversationId === conv._id ? 'border-2 border-tum-blue bg-[#2f2f2f]' : ''}`
+                          : `hover:bg-tum-blue-light-2 ${conversationId === conv._id ? 'border-2 border-tum-blue' : ''}`
                       }`}
                     >
                       <span 
@@ -252,7 +283,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
                     </li>
                   ))
                 ) : (
-                  <li className="text-sm text-gray-400 text-center py-2">
+                  <li className={`text-sm text-center py-2 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
                     No conversations found
                   </li>
                 )}
@@ -262,10 +293,10 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
 
           <div className="relative mt-auto" ref={dropdownRef}>
             <div 
-              className="flex items-center gap-3 p-1 border-gray-700 cursor-pointer rounded hover:bg-tum-blue-light-2"
+              className={`flex items-center gap-3 p-1 cursor-pointer rounded ${isDarkMode ? 'hover:bg-[#2f2f2f]' : 'border-gray-700 hover:bg-tum-blue-light-2'}`}
               onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
             >
-              <div className="w-8 h-8 rounded-full bg-gray-500 overflow-hidden border-2 border-gray-300">
+              <div className={`w-8 h-8 rounded-full bg-gray-500 overflow-hidden border-2 ${isDarkMode ? 'border-gray-600' : 'border-gray-300'}`}>
                 {userProfile?.profilePicture ? (
                   <img
                     src={userProfile.profilePicture}
@@ -283,10 +314,10 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
 
               {/* User info */}
               <div className="flex flex-col flex-1">
-                <span className="text-sm font-medium text-tum-black">
+                <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-200' : 'text-tum-black'}`}>
                   {userProfile?.username || currentUser?.email?.split('@')[0] || 'User'}
                 </span>
-                <span className="text-xs text-gray-400">
+                <span className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
                   {currentUser?.role || 'TUM Klinikum Staff'}
                 </span>
               </div>
@@ -294,21 +325,21 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
 
             {/* Logout dropdown */}
             {showLogoutDropdown && (
-              <div className="absolute bottom-full left-0 right-0 mb-2 bg-tum-white border border-tum-grey-7 rounded-lg shadow-lg z-10">
+              <div className={`absolute bottom-full left-0 right-0 mb-2 border rounded-lg shadow-lg z-10 ${isDarkMode ? 'bg-[#2f2f2f] border-gray-700' : 'bg-tum-white border-tum-grey-7'}`}>
                 <button
                   onClick={() => {
                     setShowLogoutDropdown(false);
                     navigate('/profile');
                   }}
-                  className="w-full text-left px-4 py-2 text-sm text-tum-black bg-tum-white hover:bg-tum-blue-light-2 rounded-lg transition-colors border-b border-tum-grey-7"
+                  className={`w-full text-left px-4 py-2 text-sm rounded-lg transition-colors border-b ${isDarkMode ? 'text-gray-200 bg-[#2f2f2f] hover:bg-[#3f3f3f] border-gray-700' : 'text-tum-black bg-tum-white hover:bg-tum-blue-light-2 border-tum-grey-7'}`}
                 >
-                  Profile
+                  {t.profile}
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 text-sm text-tum-black bg-tum-white hover:bg-tum-blue-light-2 rounded-lg transition-colors"
+                  className={`w-full text-left px-4 py-2 text-sm rounded-lg transition-colors ${isDarkMode ? 'text-gray-200 bg-[#2f2f2f] hover:bg-[#3f3f3f]' : 'text-tum-black bg-tum-white hover:bg-tum-blue-light-2'}`}
                 >
-                  Log out
+                  {t.logOut}
                 </button>
               </div>
             )}
@@ -320,19 +351,19 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
         <>
             <nav className="mt-1">
               <ul>
-                  <li className="flex items-center p-2 cursor-pointer rounded hover:bg-tum-blue-light-2 justify-center" 
+                  <li className={`flex items-center p-2 cursor-pointer rounded justify-center ${isDarkMode ? 'hover:bg-[#2f2f2f]' : 'hover:bg-tum-blue-light-2'}`} 
                     onClick={() => {console.log("New chat clicked");
                                     handleCreateNewConversation();}}>
                     <img src={new_chat_logo} alt="New Chat Logo" className="h-4" />
                   </li>
-                  <li className="flex items-center p-2 cursor-pointer rounded hover:bg-tum-blue-light-2 justify-center">
+                  <li className={`flex items-center p-2 cursor-pointer rounded justify-center ${isDarkMode ? 'hover:bg-[#2f2f2f]' : 'hover:bg-tum-blue-light-2'}`}>
                     <img src={search_logo} alt="Search Logo" className="h-4" />
                   </li>
               </ul>
           </nav>
           <div className="relative mt-auto" ref={dropdownRef}>
             <div 
-              className="w-8 h-8 rounded-full bg-gray-500 overflow-hidden cursor-pointer hover:ring-2 hover:ring-tum-blue border-2 border-gray-300"
+              className={`w-8 h-8 rounded-full bg-gray-500 overflow-hidden cursor-pointer hover:ring-2 hover:ring-tum-blue border-2 ${isDarkMode ? 'border-gray-600' : 'border-gray-300'}`}
               onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
               title="Click to logout"
             >
@@ -352,21 +383,21 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
             </div>
             {/* Logout dropdown for minimized state */}
             {showLogoutDropdown && (
-              <div className="absolute bottom-full left-0 mb-2 bg-tum-white border border-tum-grey-7 rounded-lg shadow-lg z-10 whitespace-nowrap">
+              <div className={`absolute bottom-full left-0 mb-2 border rounded-lg shadow-lg z-10 whitespace-nowrap ${isDarkMode ? 'bg-[#2f2f2f] border-gray-700' : 'bg-tum-white border-tum-grey-7'}`}>
                 <button
                   onClick={() => {
                     setShowLogoutDropdown(false);
                     navigate('/profile');
                   }}
-                  className="w-full text-left px-4 py-2 text-sm text-tum-black bg-tum-white hover:bg-tum-blue-light-2 rounded-lg transition-colors border-b border-tum-grey-7"
+                  className={`w-full text-left px-4 py-2 text-sm rounded-lg transition-colors border-b ${isDarkMode ? 'text-gray-200 bg-[#2f2f2f] hover:bg-[#3f3f3f] border-gray-700' : 'text-tum-black bg-tum-white hover:bg-tum-blue-light-2 border-tum-grey-7'}`}
                 >
-                  Profile
+                  {t.profile}
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 text-sm text-tum-black bg-tum-white hover:bg-tum-blue-light-2 rounded-lg transition-colors"
+                  className={`w-full text-left px-4 py-2 text-sm rounded-lg transition-colors ${isDarkMode ? 'text-gray-200 bg-[#2f2f2f] hover:bg-[#3f3f3f]' : 'text-tum-black bg-tum-white hover:bg-tum-blue-light-2'}`}
                 >
-                  Log out
+                  {t.logOut}
                 </button>
               </div>
             )}

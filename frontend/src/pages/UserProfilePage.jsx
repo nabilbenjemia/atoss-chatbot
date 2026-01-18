@@ -33,7 +33,7 @@ export default function UserProfilePage() {
   
   // Preferences
   const [preferences, setPreferences] = useState({
-    theme: 'auto',
+    theme: 'light',
     language: 'en',
     notifications: {
       email: true,
@@ -43,6 +43,9 @@ export default function UserProfilePage() {
   
   // Delete account confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  
+  // Theme state
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Load user profile on mount
   useEffect(() => {
@@ -87,6 +90,9 @@ export default function UserProfilePage() {
         setOriginalProfilePicture(profilePic);
         if (data.preferences) {
           setPreferences(data.preferences);
+          // Handle theme for dark mode
+          const userTheme = data.preferences.theme || 'light';
+          setIsDarkMode(userTheme === 'dark');
         }
       }
     } catch (error) {
@@ -220,6 +226,9 @@ export default function UserProfilePage() {
       const response = await userAPI.updatePreferences(preferences);
       if (response.success) {
         toast.success('Preferences updated successfully');
+        // Update dark mode immediately
+        const userTheme = preferences.theme;
+        setIsDarkMode(userTheme === 'dark');
         loadProfile();
       }
     } catch (error) {
@@ -296,14 +305,14 @@ export default function UserProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
+      <div className={`flex items-center justify-center h-screen ${isDarkMode ? 'bg-[#212121]' : 'bg-gray-50'}`}>
         <div className="text-lg text-gray-600">Loading profile...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className={`min-h-screen py-8 ${isDarkMode ? 'bg-[#212121]' : 'bg-gray-50'}`}>
       <div className="max-w-4xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
@@ -313,23 +322,23 @@ export default function UserProfilePage() {
           >
             ← Back to Chat
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">User Profile</h1>
-          <p className="text-gray-600 mt-2">Manage your account settings</p>
+          <h1 className={`text-3xl font-bold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>User Profile</h1>
+          <p className={`mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Manage your account settings</p>
         </div>
 
         {/* Profile Information Section */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Profile Information</h2>
+        <div className={`rounded-lg shadow-md p-6 mb-6 ${isDarkMode ? 'bg-[#2f2f2f] border border-gray-700' : 'bg-white'}`}>
+          <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>Profile Information</h2>
           
           {/* Profile Picture */}
-          <div className="mb-6 pb-6 border-b border-gray-200">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div className={`mb-6 pb-6 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+            <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
               Profile Picture
             </label>
             <div className="flex items-center gap-6">
               {/* Profile Picture Preview */}
               <div className="flex-shrink-0">
-                <div className="w-24 h-24 rounded-full bg-gray-200 overflow-hidden border-2 border-gray-300 flex items-center justify-center">
+                <div className={`w-24 h-24 rounded-full overflow-hidden border-2 flex items-center justify-center ${isDarkMode ? 'bg-[#1f1f1f] border-gray-600' : 'bg-gray-200 border-gray-300'}`}>
                   {profilePicturePreview ? (
                     <img 
                       src={profilePicturePreview} 
@@ -345,7 +354,7 @@ export default function UserProfilePage() {
               {/* Upload Controls */}
               <div className="flex-1 flex flex-col gap-2">
                 <div className="flex gap-2">
-                  <label className="px-4 py-2 bg-tum-blue text-white rounded-lg hover:bg-tum-dark-blue transition-colors cursor-pointer inline-block">
+                  <label className="px-3 py-1.5 text-sm bg-tum-blue text-white rounded-xl hover:bg-tum-dark-blue transition-colors cursor-pointer inline-block">
                     {profilePicturePreview ? 'Change Picture' : 'Upload Picture'}
                     <input
                       type="file"
@@ -358,20 +367,20 @@ export default function UserProfilePage() {
                     <>
                       <button
                         onClick={handleUpdateProfilePicture}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors"
                       >
                         Save
                       </button>
                       <button
                         onClick={handleDeleteProfilePicture}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
                       >
                         Delete
                       </button>
                     </>
                   )}
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   Recommended: Square image, max 2MB. Supported formats: JPG, PNG, GIF
                 </p>
               </div>
@@ -380,14 +389,14 @@ export default function UserProfilePage() {
 
           {/* Email (Read-only) */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
               Email
             </label>
             <input
               type="email"
               value={email}
               disabled
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+              className={`w-full px-4 py-2 border rounded-lg cursor-not-allowed ${isDarkMode ? 'bg-[#1f1f1f] border-gray-600 text-gray-400' : 'border-gray-300 bg-gray-50 text-gray-600'}`}
             />
             {emailVerified ? (
               <span className="text-sm text-green-600 mt-1 inline-block">✓ Verified</span>
@@ -398,21 +407,21 @@ export default function UserProfilePage() {
 
           {/* Username */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
               Username (Display Name)
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter username"
                 maxLength={50}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue"
+                className={`flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue ${isDarkMode ? 'bg-[#1f1f1f] border-gray-600 text-gray-200' : 'border-gray-300'}`}
               />
               <button
                 onClick={handleUpdateUsername}
-                className="px-6 py-2 bg-tum-blue text-white rounded-lg hover:bg-tum-dark-blue transition-colors"
+                className="px-4 py-2 text-sm bg-tum-blue text-white rounded-xl hover:bg-tum-dark-blue transition-colors whitespace-nowrap"
               >
                 Update
               </button>
@@ -421,21 +430,21 @@ export default function UserProfilePage() {
 
           {/* Role */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
               Role
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue"
+                className={`flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue ${isDarkMode ? 'bg-[#1f1f1f] border-gray-600 text-gray-200' : 'border-gray-300'}`}
               >
                 <option value="Staff">Staff</option>
                 <option value="Admin">Admin</option>
               </select>
               <button
                 onClick={handleUpdateRole}
-                className="px-6 py-2 bg-tum-blue text-white rounded-lg hover:bg-tum-dark-blue transition-colors"
+                className="px-4 py-2 text-sm bg-tum-blue text-white rounded-xl hover:bg-tum-dark-blue transition-colors whitespace-nowrap"
               >
                 Update
               </button>
@@ -444,20 +453,20 @@ export default function UserProfilePage() {
 
           {/* Department */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
               Department
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <input
                 type="text"
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
                 placeholder="Enter department name"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue"
+                className={`flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue ${isDarkMode ? 'bg-[#1f1f1f] border-gray-600 text-gray-200' : 'border-gray-300'}`}
               />
               <button
                 onClick={handleUpdateDepartment}
-                className="px-6 py-2 bg-tum-blue text-white rounded-lg hover:bg-tum-dark-blue transition-colors"
+                className="px-4 py-2 text-sm bg-tum-blue text-white rounded-xl hover:bg-tum-dark-blue transition-colors whitespace-nowrap"
               >
                 Update
               </button>
@@ -466,12 +475,12 @@ export default function UserProfilePage() {
         </div>
 
         {/* Password Change Section */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div className={`rounded-lg shadow-md p-6 mb-6 ${isDarkMode ? 'bg-[#2f2f2f] border border-gray-700' : 'bg-white'}`}>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Password</h2>
+            <h2 className={`text-xl font-semibold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>Password</h2>
             <button
               onClick={() => setShowPasswordForm(!showPasswordForm)}
-              className="px-6 py-2 bg-tum-blue text-white rounded-lg hover:bg-tum-dark-blue transition-colors"
+              className="px-4 py-1.5 text-sm bg-tum-blue text-white rounded-xl hover:bg-tum-dark-blue transition-colors"
             >
               {showPasswordForm ? 'Cancel' : 'Change Password'}
             </button>
@@ -480,14 +489,14 @@ export default function UserProfilePage() {
           {showPasswordForm && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   Current Password
                 </label>
                 <input
                   type="password"
                   value={passwordData.currentPassword}
                   onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue ${isDarkMode ? 'bg-[#1f1f1f] border-gray-600 text-gray-200' : 'border-gray-300'}`}
                 />
                 {passwordErrors.currentPassword && (
                   <span className="text-sm text-red-600 mt-1">{passwordErrors.currentPassword}</span>
@@ -495,14 +504,14 @@ export default function UserProfilePage() {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   New Password
                 </label>
                 <input
                   type="password"
                   value={passwordData.newPassword}
                   onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue ${isDarkMode ? 'bg-[#1f1f1f] border-gray-600 text-gray-200' : 'border-gray-300'}`}
                 />
                 {passwordErrors.newPassword && (
                   <span className="text-sm text-red-600 mt-1">{passwordErrors.newPassword}</span>
@@ -510,14 +519,14 @@ export default function UserProfilePage() {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   Confirm New Password
                 </label>
                 <input
                   type="password"
                   value={passwordData.confirmPassword}
                   onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue ${isDarkMode ? 'bg-[#1f1f1f] border-gray-600 text-gray-200' : 'border-gray-300'}`}
                 />
                 {passwordErrors.confirmPassword && (
                   <span className="text-sm text-red-600 mt-1">{passwordErrors.confirmPassword}</span>
@@ -526,7 +535,7 @@ export default function UserProfilePage() {
               
               <button
                 onClick={handlePasswordChange}
-                className="px-6 py-2 bg-tum-blue text-white rounded-lg hover:bg-tum-dark-blue transition-colors"
+                className="px-4 py-1.5 text-sm bg-tum-blue text-white rounded-xl hover:bg-tum-dark-blue transition-colors"
               >
                 Update Password
               </button>
@@ -535,33 +544,32 @@ export default function UserProfilePage() {
         </div>
 
         {/* Preferences Section */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Preferences</h2>
+        <div className={`rounded-lg shadow-md p-6 mb-6 ${isDarkMode ? 'bg-[#2f2f2f] border border-gray-700' : 'bg-white'}`}>
+          <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>Preferences</h2>
           
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 Theme
               </label>
               <select
                 value={preferences.theme}
                 onChange={(e) => setPreferences({ ...preferences, theme: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue ${isDarkMode ? 'bg-[#1f1f1f] border-gray-600 text-gray-200' : 'border-gray-300'}`}
               >
                 <option value="light">Light</option>
                 <option value="dark">Dark</option>
-                <option value="auto">Auto (System)</option>
               </select>
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 Language
               </label>
               <select
                 value={preferences.language}
                 onChange={(e) => setPreferences({ ...preferences, language: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue ${isDarkMode ? 'bg-[#1f1f1f] border-gray-600 text-gray-200' : 'border-gray-300'}`}
               >
                 <option value="en">English</option>
                 <option value="de">Deutsch</option>
@@ -570,7 +578,7 @@ export default function UserProfilePage() {
             
             <button
               onClick={handleUpdatePreferences}
-              className="px-6 py-2 bg-tum-blue text-white rounded-lg hover:bg-tum-dark-blue transition-colors"
+              className="px-4 py-1.5 text-sm bg-tum-blue text-white rounded-xl hover:bg-tum-dark-blue transition-colors"
             >
               Save Preferences
             </button>
@@ -578,17 +586,17 @@ export default function UserProfilePage() {
         </div>
 
         {/* Danger Zone */}
-        <div className="bg-white rounded-lg shadow-md p-6 border-2 border-red-200">
+        <div className={`rounded-lg shadow-md p-6 border-2 ${isDarkMode ? 'bg-[#2f2f2f] border-red-800' : 'bg-white border-red-200'}`}>
           <h2 className="text-xl font-semibold text-red-600 mb-4">Danger Zone</h2>
           
           {!showDeleteConfirm ? (
             <div>
-              <p className="text-gray-600 mb-4">
+              <p className={`mb-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                 Once you delete your account, there is no going back. Please be certain.
               </p>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
-                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                className="px-4 py-1.5 text-sm bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
               >
                 Delete Account
               </button>
