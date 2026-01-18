@@ -8,6 +8,7 @@ import ForgetPass from "./pages/ForgetPass.jsx";
 import ChatbotPage from "./pages/ChatbotPage.jsx";
 import LearningPage from "./pages/LearningMaterialPage.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import UserProfilePage from "./pages/UserProfilePage.jsx";
 
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
             </ProtectedRoute>
           } 
         />
+        <Route path="/profile" element={<UserProfilePage />} />
       </Routes>
       <ToastContainer
         position="top-right"
