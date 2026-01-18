@@ -2,16 +2,22 @@ const express = require('express');
 const router = express.Router();
 const videoController = require('../controllers/videoController');
 
-// Video routes
+// GET /api/videos
 router.get('/', videoController.getAllVideos);
+
+// POST /api/videos
 router.post('/', videoController.upload.single('video'), videoController.uploadVideo);
 
-// Specific routes before /:id to avoid route conflicts
+// POST /api/videos/:id/view
 router.post('/:id/view', videoController.incrementViews);
 
-// Single video CRUD - MUST be after more specific routes
+// GET /api/videos/:id
 router.get('/:id', videoController.getVideoById);
-router.put('/:id', videoController.updateVideo);
+
+// PUT /api/videos/:id
+router.put('/:id', videoController.uploadThumbnail.single('thumbnail'), videoController.updateVideo);
+
+// DELETE /api/videos/:id
 router.delete('/:id', videoController.deleteVideo);
 
 module.exports = router;

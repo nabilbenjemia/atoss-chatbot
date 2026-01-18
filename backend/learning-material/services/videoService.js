@@ -35,8 +35,7 @@ const getAllVideos = async (filters = {}) => {
 };
 
 const getVideoById = async (videoId) => {
-    return await Video.findById(videoId)
-        .populate('uploadedBy', 'username email');
+    return await Video.findById(videoId);
 };
 
 const uploadVideo = async (videoData) => {
@@ -49,7 +48,7 @@ const updateVideo = async (videoId, updateData) => {
         videoId,
         updateData,
         { new: true, runValidators: true }
-    ).populate('uploadedBy', 'username email');
+    );
 };
 
 const deleteVideo = async (videoId) => {

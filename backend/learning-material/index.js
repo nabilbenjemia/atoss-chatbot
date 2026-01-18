@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const connectDB = require('./config/database');
-const videoRoutes = require('./routes/videoRoutes');
 require('dotenv').config();
 
 const app = express();
@@ -32,7 +31,7 @@ app.use((req, res, next) => {
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 // Video routes
-app.use('/api/videos', videoRoutes);
+app.use('/api/videos', require('./routes/videoRoutes'));
 
 // 404 handler - MUST be last
 app.use((req, res) => {
