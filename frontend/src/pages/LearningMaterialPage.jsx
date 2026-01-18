@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import learningApi from '../services/learningApi';
 import VideoCard from '../components/VideoCard';
+import AdminVideoCard from '../components/AdminVideoCard';
+import UploadVideoCard from '../components/UploadVideoCard';
 import VideoPlayerModal from '../components/VideoPlayerModal';
+import VideoUploadModal from '../components/VideoUploadModal';
+import { getCurrentUser } from '../services/api';
 
 const LearningMaterialPage = () => {
     const [videos, setVideos] = useState([]);
@@ -12,8 +16,14 @@ const LearningMaterialPage = () => {
     const [selectedCategory, setSelectedCategory] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedVideo, setSelectedVideo] = useState(null);
+    const [showUploadModal, setShowUploadModal] = useState(false);
+    const [editingVideo, setEditingVideo] = useState(null);
+    const [deletingVideo, setDeletingVideo] = useState(null);
 
     const API_BASE_URL = import.meta.env.VITE_LEARNING_API_URL || 'http://localhost:4005';
+    const currentUser = getCurrentUser();
+    //const isAdmin = currentUser?.role === 'admin';
+    const isAdmin = 'admin'; //TODO remove
 
     // Initial fetch - get all videos once
     useEffect(() => {
@@ -90,6 +100,38 @@ const LearningMaterialPage = () => {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
+    const handleEdit = (video) => {
+        setEditingVideo(video);
+        setShowUploadModal(true);
+    };
+
+    const handleDelete = (video) => {
+        setDeletingVideo(video);
+    };
+
+    const confirmDelete = async () => {
+        try {
+            await learningApi.delete(`/api/videos/${deletingVideo._id}`);
+            setAllVideos(allVideos.filter(v => v._id !== deletingVideo._id));
+            setDeletingVideo(null);
+        } catch (err) {
+            console.error('Error deleting video:', err);
+            alert('Failed to delete video');
+        }
+    };
+
+    const handleUploadSuccess = (newVideo) => {
+        if (editingVideo) {
+            const updateVideo = (videoList) => 
+                videoList.map(v => v._id === newVideo._id ? newVideo : v);
+            setAllVideos(updateVideo);
+        } else {
+            setAllVideos([newVideo, ...allVideos]);
+        }
+        setShowUploadModal(false);
+        setEditingVideo(null);
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -143,18 +185,33 @@ const LearningMaterialPage = () => {
 
             {/* Video Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {isAdmin && (
+                    <UploadVideoCard onUploadClick={() => setShowUploadModal(true)} />
+                )}
+                
                 {videos.length === 0 ? (
                     <div className="col-span-full text-center py-12 text-gray-500">
                         {searchTerm || selectedCategory ? 'No videos match your search' : 'No videos found'}
                     </div>
                 ) : (
                     videos.map((video) => (
-                        <VideoCard
-                            key={video._id}
-                            video={video}
-                            onVideoClick={handleViewVideo}
-                            apiBaseUrl={API_BASE_URL}
-                        />
+                        isAdmin ? (
+                            <AdminVideoCard
+                                key={video._id}
+                                video={video}
+                                onVideoClick={handleViewVideo}
+                                onEdit={handleEdit}
+                                onDelete={handleDelete}
+                                apiBaseUrl={API_BASE_URL}
+                            />
+                        ) : (
+                            <VideoCard
+                                key={video._id}
+                                video={video}
+                                onVideoClick={handleViewVideo}
+                                apiBaseUrl={API_BASE_URL}
+                            />
+                        )
                     ))
                 )}
             </div>
@@ -165,6 +222,43 @@ const LearningMaterialPage = () => {
                 onClose={closeVideoPlayer}
                 apiBaseUrl={API_BASE_URL}
             />
+
+            {/* Upload/Edit Modal */}
+            <VideoUploadModal
+                isOpen={showUploadModal}
+                onClose={() => {
+                    setShowUploadModal(false);
+                    setEditingVideo(null);
+                }}
+                onSuccess={handleUploadSuccess}
+                editVideo={editingVideo}
+            />
+
+            {/* Delete Confirmation Modal */}
+            {deletingVideo && (
+                <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg max-w-md w-full p-6">
+                        <h3 className="text-xl font-bold mb-4">Delete Video?</h3>
+                        <p className="text-gray-600 mb-6">
+                            Are you sure you want to delete "{deletingVideo.title}"? This action cannot be undone.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setDeletingVideo(null)}
+                                className="flex-1 px-4 py-2 border bg-white rounded-lg border-tum-blue hover:bg-gray-100 disabled:bg-gray-200"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
