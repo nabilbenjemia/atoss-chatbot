@@ -2,6 +2,7 @@ const express = require('express');
 const proxy = require('express-http-proxy');
 const authRoutes = require('../routes/authRoutes');
 const gatewayAuthMiddleware = require('../middleware/gatewayMiddleware');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 
 /**
  * API Gateway
@@ -66,18 +67,12 @@ const createApiGateway = (app) => {
 
 	// Learning Service proxy
 	// Routes: /learning/* -> Learning Service
-	const learningServiceUrl = process.env.LEARNING_SERVICE_URL || 'http://localhost:4003';
-	app.use('/learning', proxy(learningServiceUrl, {
-		proxyReqPathResolver: (req) => {
-			return req.url;
+	app.use('/learning', createProxyMiddleware({
+		target: process.env.LEARNING_SERVICE_URL || 'http://localhost:4005',
+		changeOrigin: true,
+		pathRewrite: {
+			'^/learning': '', // Remove /learning prefix when forwarding
 		},
-		proxyErrorHandler: (err, res, next) => {
-			console.error('Learning Service proxy error:', err);
-			res.status(502).json({
-				success: false,
-				message: 'Learning Service is currently unavailable'
-			});
-		}
 	}));
 
 	// Health check endpoint
