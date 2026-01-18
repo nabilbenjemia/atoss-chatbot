@@ -32,6 +32,12 @@ services:
     networks:
       - atoss-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/health\")' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 180s
 
   authentication:
     build:
@@ -54,7 +60,10 @@ services:
     env_file:
       - ./backend/conversation/.env
     depends_on:
-      - authentication
+      llm:
+        condition: service_healthy
+      authentication:
+        condition: service_started
     networks:
       - atoss-network
     restart: unless-stopped
