@@ -9,7 +9,7 @@ export default function RegisterPage() {
     password: "", 
     confirmPassword: "",
     role: "Staff",
-    department: "Department 1"
+    department: ""
   });
   const [errors, setErrors] = useState({});
   const [status, setStatus] = useState({ type: "idle", message: "" });
@@ -196,20 +196,17 @@ export default function RegisterPage() {
 
             <div>
               <label className="mb-1 block text-sm font-medium text-tum-grey-3">Department</label>
-              <select
+              <input
+                type="text"
                 name="department"
                 value={form.department}
                 onChange={handleChange}
+                placeholder="Enter department name"
                 className={`w-full rounded-xl border px-3 py-2 outline-none transition focus:ring-2
                  ${errors.department
                     ? "border-tum-red ring-tum-red-1"
                     : "border-tum-grey-7 focus:border-tum-blue focus:ring-tum-blue-light"}`}
-              >
-                <option value="">Select Department</option>
-                <option value="Department 1">Department 1</option>
-                <option value="Department 2">Department 2</option>
-                <option value="Department 3">Department 3</option>
-              </select>
+              />
               {errors.department && <p className="mt-1 text-xs text-tum-red">{errors.department}</p>}
             </div>
 

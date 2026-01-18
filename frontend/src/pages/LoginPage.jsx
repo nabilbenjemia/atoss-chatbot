@@ -59,8 +59,15 @@ export default function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Only clear status on successful validation attempt, not at the start
+    // This allows error messages to persist until the user fixes the issue
+    if (!validate()) {
+      // Keep any existing error status when validation fails
+      return;
+    }
+
+    // Clear previous error messages only when starting a new valid submission
     setStatus({ type: "idle", message: "" });
-    if (!validate()) return;
 
     try {
       setLoading(true);

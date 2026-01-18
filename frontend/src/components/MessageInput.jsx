@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import PropTypes from "prop-types";
 
-export default function MessageInput({ onSendMessage, onInterrupt, isStreaming }) {
+export default function MessageInput({ onSendMessage, onInterrupt, isStreaming, isDarkMode }) {
   const textareaRef = useRef(null);
   const [message, setMessage] = useState("");
 
@@ -32,14 +32,16 @@ export default function MessageInput({ onSendMessage, onInterrupt, isStreaming }
   };
 
   return (
-   <div className="sticky bottom-0 mt-auto w-full max-w-3xl h-auto mx-auto p-4 bg-white border-t border-tum-gray z-10">
-      <div className="flex items-center gap-1 bg-white rounded-2xl shadow-lg border border-tum-blue-light-2 p-1">
+   <div className={`sticky bottom-0 mt-auto w-full max-w-3xl h-auto mx-auto p-4 z-10 ${isDarkMode ? 'bg-[#212121] border-t border-gray-700' : 'bg-white border-t border-tum-gray'}`}>
+      <div className={`flex items-center gap-1 rounded-2xl shadow-lg p-1 ${isDarkMode ? 'bg-[#2f2f2f] border border-gray-700' : 'bg-white border border-tum-blue-light-2'}`}>
         <textarea
           ref={textareaRef}
           placeholder={isStreaming ? "AI is responding..." : "Type your message..."}  // CHANGE: Dynamic placeholder
           disabled={isStreaming}  // ADD: Disable during streaming
-          className={`flex-1 outline-none text-gray-700 placeholder-gray-400 resize-y min-h-[40px] max-h-[240px] overflow-y-auto pl-3 py-2 text-sm ${
-            isStreaming ? 'bg-gray-100 cursor-not-allowed' : 'bg-transparent'  // ADD: Conditional styling
+          className={`flex-1 outline-none resize-y min-h-[40px] max-h-[240px] overflow-y-auto pl-3 py-2 text-sm ${
+            isDarkMode 
+              ? (isStreaming ? 'bg-[#1f1f1f] cursor-not-allowed text-gray-200 placeholder-gray-500' : 'bg-transparent text-gray-200 placeholder-gray-500')
+              : (isStreaming ? 'bg-gray-100 cursor-not-allowed text-gray-700 placeholder-gray-400' : 'bg-transparent text-gray-700 placeholder-gray-400')
           }`}
           rows={1}
           onInput={handleInput}
@@ -65,7 +67,7 @@ export default function MessageInput({ onSendMessage, onInterrupt, isStreaming }
           </button>
         )}
       </div>
-      <p className="text-center text-xs text-tum-gray mt-2">
+      <p className={`text-center text-xs mt-2 ${isDarkMode ? 'text-gray-500' : 'text-tum-gray'}`}>
         © Technische Universität München 2026
       </p>
     </div>
@@ -77,4 +79,5 @@ MessageInput.propTypes = {
   onSendMessage: PropTypes.func.isRequired,
   onInterrupt: PropTypes.func.isRequired,
   isStreaming: PropTypes.bool.isRequired,
+  isDarkMode: PropTypes.bool,
 };
