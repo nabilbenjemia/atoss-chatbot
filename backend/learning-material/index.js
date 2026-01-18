@@ -6,31 +6,37 @@ const videoRoutes = require('./routes/videoRoutes');
 require('dotenv').config();
 
 const app = express();
-app.use(cors());
+
+// CORS Configuration
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true
+}));
 
 connectDB();
 
-// CRITICAL: Middleware MUST be before routes
+// Middleware MUST be before routes
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ extended: true, limit: '500mb' }));
 
-// Serve static files (uploaded videos and thumbnails)
+// Serve static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Debug
+// Debug middleware
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`);
-  console.log('Body:', req.body);
-  console.log('Headers:', req.headers);
+  console.log(`[DEBUG] ${req.method} ${req.path}`);
   next();
 });
 
-// Routes
-app.use('/api/videos', videoRoutes);
-
+// Health check
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
+// Video routes
+app.use('/api/videos', videoRoutes);
+
+// 404 handler - MUST be last
 app.use((req, res) => {
+  console.log(`[404] ${req.method} ${req.path}`);
   res.status(404).json({ error: 'Route not found' });
 });
 

@@ -21,14 +21,34 @@ const upload = multer({
     storage: storage,
     limits: { fileSize: 500 * 1024 * 1024 }, // 500MB limit (recommended for tutorials)
     fileFilter: (req, file, cb) => {
-        const allowedTypes = /mp4|avi|mov|wmv|flv|mkv/;
-        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = allowedTypes.test(file.mimetype);
+        const allowedExtensions = /mp4|avi|mov|wmv|flv|mkv/;
+        const extname = allowedExtensions.test(path.extname(file.originalname).toLowerCase());
         
-        if (mimetype && extname) {
+        // Allow common video MIME types
+        const allowedMimeTypes = [
+            'video/mp4',
+            'video/avi',
+            'video/x-msvideo',
+            'video/quicktime',
+            'video/x-ms-wmv',
+            'video/x-flv',
+            'video/x-matroska',  // MKV
+            'video/mkv'           // Alternative MKV MIME type
+        ];
+        
+        const mimetypeValid = allowedMimeTypes.includes(file.mimetype);
+        
+        if (mimetypeValid && extname) {
             return cb(null, true);
         }
-        cb(new Error('Only video files are allowed'));
+        
+        console.log('Rejected file:', {
+            filename: file.originalname,
+            mimetype: file.mimetype,
+            extension: path.extname(file.originalname)
+        });
+        
+        cb(new Error('Only video files are allowed (mp4, avi, mov, wmv, flv, mkv)'));
     }
 });
 
@@ -64,18 +84,14 @@ const generateThumbnail = (videoPath, thumbnailPath) => {
 // GET /api/videos
 const getAllVideos = async (req, res) => {
     try {
-        const { category, tags, search } = req.query;
-        const filters = {};
-        
-        if (category) filters.category = category;
-        if (tags) filters.tags = tags.split(',');
-        if (search) filters.search = search;
-        
-        const videos = await videoService.getAllVideos(filters);
-        res.status(200).json(videos);
+        console.log('getAllVideos called with query:', req.query);
+        const videos = await videoService.getAllVideos(req.query);
+        console.log('Videos found:', videos.length);
+        console.log('Video IDs:', videos.map(v => v._id));
+        res.json(videos);
     } catch (error) {
-        console.error('Error retrieving videos:', error);
-        res.status(500).json({ error: "Failed to retrieve videos", details: error.message });
+        console.error('Error in getAllVideos:', error);
+        res.status(500).json({ error: error.message });
     }
 };
 

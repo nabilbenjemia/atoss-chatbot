@@ -2,23 +2,36 @@
 const Video = require('../models/Video');
 
 const getAllVideos = async (filters = {}) => {
-    const query = {};
-    
-    if (filters.category) {
-        query.category = filters.category;
+    try {
+        console.log('videoService.getAllVideos called with filters:', filters);
+        
+        const query = {};
+        if (filters.category) query.category = filters.category;
+        if (filters.search) {
+            query.$or = [
+                { title: { $regex: filters.search, $options: 'i' } },
+                { description: { $regex: filters.search, $options: 'i' } }
+            ];
+        }
+        
+        console.log('MongoDB query:', JSON.stringify(query));
+        
+        // Check collection
+        const collectionName = Video.collection.name;
+        console.log('Querying collection:', collectionName);
+        
+        // Count total documents
+        const totalCount = await Video.countDocuments();
+        console.log('Total documents in collection:', totalCount);
+        
+        const videos = await Video.find(query).sort({ createdAt: -1 });
+        console.log('Videos found with filter:', videos.length);
+        
+        return videos;
+    } catch (error) {
+        console.error('Error in videoService.getAllVideos:', error);
+        throw error;
     }
-    
-    if (filters.tags && filters.tags.length > 0) {
-        query.tags = { $in: filters.tags };
-    }
-    
-    if (filters.search) {
-        query.$text = { $search: filters.search };
-    }
-    
-    return await Video.find(query)
-        .populate('uploadedBy', 'username email')
-        .sort({ createdAt: -1 });
 };
 
 const getVideoById = async (videoId) => {
