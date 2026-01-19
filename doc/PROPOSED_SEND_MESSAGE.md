@@ -53,9 +53,9 @@ This document describes the streaming flow for sending messages with AI response
 │                              FASTAPI LLM SERVICE                                    │
 │   AI Service (Port 8000)                                                            │
 │   - RAG Chain with document retrieval                                               │
-│   - Qwen 3 1.7B via Ollama for generation                                           │
-│   - Qwen 3 Embedding 0.6B for embeddings                                            │
-│   - Jina Reranker v3 for reranking                                                  │
+│   - qwen2.5:7b-instruct-q4_0 via Ollama for generation                              │
+│   - Snowflake Arctic Embed for embeddings                                           │
+│   - mMiniLM cross-encoder for reranking (optional)                                  │
 │   - ChromaDB for vector storage                                                     │
 │   - StreamingResponse for SSE                                                       │
 └─────────────────────────────────────────────────────────────────────────────────────┘
@@ -326,10 +326,10 @@ backend/llm/
 ├── controllers/
 │   └── chat_controller.py   # ChatController with streaming
 ├── models/
-│   ├── embedding_model.py   # Qwen 3 Embedding 0.6B
-│   ├── llm_model.py         # ChatOllama (qwen3:1.7b)
+│   ├── embedding_model.py   # Snowflake Arctic Embed L v2.0
+│   ├── llm_model.py         # ChatOllama (qwen2.5:7b-instruct-q4_0)
 │   ├── vectorstore.py       # ChromaDB manager
-│   └── reranker_model.py    # Jina Reranker v3
+│   └── reranker_model.py    # mMiniLM cross-encoder (optional)
 └── services/
     ├── startup_service.py   # Component initialization
     ├── retriever_service.py # Document retrieval + reranking
