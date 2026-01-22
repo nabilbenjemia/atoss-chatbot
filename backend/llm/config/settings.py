@@ -15,11 +15,11 @@ class Settings(BaseSettings):
 
     # Ollama Configuration
     OLLAMA_BASE_URL: str = "http://ollama:11434"
-    OLLAMA_MODEL: str = "qwen2.5:7b-instruct-q4_0"
+    OLLAMA_MODEL: str = "qwen3:4b-instruct"
     OLLAMA_TEMPERATURE: float = 0.3  # Balanced creativity
-    OLLAMA_NUM_CTX: int = 5000  # Larger context window
-    OLLAMA_REPEAT_PENALTY: float = 1.2  # Moderate repetition penalty
-    OLLAMA_NUM_PREDICT: int = 500  # Precise Answers
+    OLLAMA_NUM_CTX: int = 20000  # Larger context window
+    OLLAMA_REPEAT_PENALTY: float = 1.15  # Moderate repetition penalty
+    OLLAMA_NUM_PREDICT: int = 1000  # Precise Answers
     OLLAMA_KEEP_ALIVE: str = "-1"  # Keep model loaded in memory (-1 = forever)
 
     # Embedding Configuration
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     # Reranking Configuration
     ENABLE_RERANKING: bool = False
-    RERANKING_MODEL: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
+    RERANKING_MODEL: str = "jinaai/jina-reranker-v3"
     RERANKING_TOP_K: int = 5  # Number of documents to keep after reranking
 
     class Config:
