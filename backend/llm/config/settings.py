@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     EMBEDDING_DEVICE: str = "auto"
 
     # ChromaDB Configuration
-    CHROMA_PERSIST_DIRECTORY: str = "./chroma_db_snowflake_600chunks_300overlapping"
+    CHROMA_PERSIST_DIRECTORY: str = "./chroma_db_merged"
     CHROMA_COLLECTION_NAME: str = "tum_docs"
 
     # RAG Configuration
