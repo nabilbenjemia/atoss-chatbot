@@ -7,6 +7,7 @@ import VerifyEmailPage from "./pages/VerifyEmailPage.jsx";
 import ForgetPass from "./pages/ForgetPass.jsx";
 import ChatbotPage from "./pages/ChatbotPage.jsx";
 import UserProfilePage from "./pages/UserProfilePage.jsx";
+import IngestionPage from "./pages/IngestionPage.jsx";
 
 
 export default function App() {
@@ -19,6 +20,8 @@ export default function App() {
         <Route path="/forget-password" element={<ForgetPass />} />
         <Route path="/chatbot" element={<ChatbotPage />} />
         <Route path="/profile" element={<UserProfilePage />} />
+        {/* Admin routes - TODO: Enhance auth guard when backend provides user.role */}
+        <Route path="/admin/ingestion" element={<IngestionPage />} />
       </Routes>
       <ToastContainer
         position="top-right"
