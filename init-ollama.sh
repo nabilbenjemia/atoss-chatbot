@@ -7,10 +7,23 @@ pid=$!
 
 # Wait for Ollama server to be ready
 echo "Waiting for Ollama server to start..."
-until curl -s http://localhost:11434/api/tags > /dev/null 2>&1; do
+RETRY_COUNT=0
+MAX_RETRIES=30
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    # Try using ollama list command instead of curl since curl might not be available
+    if ollama list >/dev/null 2>&1; then
+        echo "Ollama server is ready (attempt $RETRY_COUNT)"
+        break
+    fi
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    echo "Waiting for server... ($RETRY_COUNT/$MAX_RETRIES)"
     sleep 1
 done
-echo "Ollama server is ready"
+
+if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+    echo "ERROR: Ollama server failed to start after $MAX_RETRIES seconds"
+    exit 1
+fi
 
 # Pull the model
 MODEL="${OLLAMA_MODEL:-qwen2.5:7b-instruct-q4_0}"
@@ -30,7 +43,8 @@ fi
 
 # Preload the model into memory
 echo "Preloading model $MODEL into memory..."
-curl -s http://localhost:11434/api/generate -d "{\"model\":\"$MODEL\",\"prompt\":\"Hello\",\"stream\":false,\"keep_alive\":-1}" > /dev/null
+echo "Hello" | ollama run "$MODEL" --keepalive -1 > /dev/null 2>&1 &
+sleep 2
 echo "Model preloaded and will stay in memory"
 
 # Keep the server running
