@@ -25,6 +25,7 @@ services:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
     volumes:
+      - hf_cache:/root/.cache
       - ./backend/llm/chroma_db_snowflake_600chunks_300overlapping:/app/chroma_db_snowflake_600chunks_300overlapping
     depends_on:
       ollama:
@@ -94,3 +95,4 @@ networks:
 
 volumes:
   ollama_data:
+  hf_cache:
