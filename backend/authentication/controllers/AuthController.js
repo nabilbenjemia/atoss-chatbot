@@ -240,6 +240,195 @@ class AuthController {
 			});
 		}
 	}
+
+	/**
+	 * Get user by ID (for user service)
+	 * GET /auth/user/:userId
+	 */
+	async getUserById(req, res) {
+		try {
+			const { userId } = req.params;
+			const requestingUserId = req.user?.id;
+
+			// Users can only view their own data
+			if (requestingUserId !== userId) {
+				return res.status(403).json({
+					success: false,
+					message: 'Forbidden: You can only view your own profile'
+				});
+			}
+
+			const user = await authService.getUserById(userId);
+
+			res.status(200).json({
+				success: true,
+				data: user
+			});
+		} catch (error) {
+			res.status(404).json({
+				success: false,
+				message: error.message || 'User not found'
+			});
+		}
+	}
+
+	/**
+	 * Update user role (for user service)
+	 * PATCH /auth/user/:userId/role
+	 */
+	async updateUserRole(req, res) {
+		try {
+			const { userId } = req.params;
+			const { role } = req.body;
+			const requestingUserId = req.user?.id;
+
+			// Users can only update their own role
+			if (requestingUserId !== userId) {
+				return res.status(403).json({
+					success: false,
+					message: 'Forbidden: You can only update your own role'
+				});
+			}
+
+			if (!role) {
+				return res.status(400).json({
+					success: false,
+					message: 'Role is required'
+				});
+			}
+
+			const result = await authService.updateUserRole(userId, role);
+
+			res.status(200).json({
+				success: true,
+				data: result
+			});
+		} catch (error) {
+			console.error('Error updating user role:', error);
+			res.status(400).json({
+				success: false,
+				message: error.message || 'Failed to update role'
+			});
+		}
+	}
+
+	/**
+	 * Update user department (for user service)
+	 * PATCH /auth/user/:userId/department
+	 */
+	async updateUserDepartment(req, res) {
+		try {
+			const { userId } = req.params;
+			const { department } = req.body;
+			const requestingUserId = req.user?.id;
+
+			// Users can only update their own department
+			if (requestingUserId !== userId) {
+				return res.status(403).json({
+					success: false,
+					message: 'Forbidden: You can only update your own department'
+				});
+			}
+
+			if (!department) {
+				return res.status(400).json({
+					success: false,
+					message: 'Department is required'
+				});
+			}
+
+			const result = await authService.updateUserDepartment(userId, department);
+
+			res.status(200).json({
+				success: true,
+				data: result
+			});
+		} catch (error) {
+			console.error('Error updating user department:', error);
+			// Check if it's a Mongoose validation error
+			if (error.name === 'ValidationError') {
+				return res.status(400).json({
+					success: false,
+					message: `Validation error: ${error.message}. Department must be one of: Department 1, Department 2, Department 3`
+				});
+			}
+			res.status(400).json({
+				success: false,
+				message: error.message || 'Failed to update department'
+			});
+		}
+	}
+
+	/**
+	 * Update user password (for user service)
+	 * PATCH /auth/user/:userId/password
+	 */
+	async updateUserPassword(req, res) {
+		try {
+			const { userId } = req.params;
+			const { currentPassword, newPassword } = req.body;
+			const requestingUserId = req.user?.id;
+
+			// Users can only update their own password
+			if (requestingUserId !== userId) {
+				return res.status(403).json({
+					success: false,
+					message: 'Forbidden: You can only update your own password'
+				});
+			}
+
+			if (!currentPassword || !newPassword) {
+				return res.status(400).json({
+					success: false,
+					message: 'Current password and new password are required'
+				});
+			}
+
+			const result = await authService.updateUserPassword(userId, currentPassword, newPassword);
+
+			res.status(200).json({
+				success: true,
+				message: result.message || 'Password updated successfully'
+			});
+		} catch (error) {
+			const statusCode = error.message.includes('incorrect') ? 401 : 400;
+			res.status(statusCode).json({
+				success: false,
+				message: error.message || 'Failed to update password'
+			});
+		}
+	}
+
+	/**
+	 * Delete user (for user service)
+	 * DELETE /auth/user/:userId
+	 */
+	async deleteUser(req, res) {
+		try {
+			const { userId } = req.params;
+			const requestingUserId = req.user?.id;
+
+			// Users can only delete their own account
+			if (requestingUserId !== userId) {
+				return res.status(403).json({
+					success: false,
+					message: 'Forbidden: You can only delete your own account'
+				});
+			}
+
+			await authService.deleteUser(userId);
+
+			res.status(200).json({
+				success: true,
+				message: 'User deleted successfully'
+			});
+		} catch (error) {
+			res.status(404).json({
+				success: false,
+				message: error.message || 'Failed to delete user'
+			});
+		}
+	}
 }
 
 module.exports = new AuthController();
