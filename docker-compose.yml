@@ -81,6 +81,13 @@ services:
     networks:
       - atoss-network
     entrypoint: ["/bin/sh", "/usr/local/bin/init-ollama.sh"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     healthcheck:
       test: ["CMD-SHELL", "ollama list || exit 1"]
       interval: 10s
