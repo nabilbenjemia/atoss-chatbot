@@ -114,15 +114,10 @@ async def root():
     }
 
 
-@app.get("/health")
-async def health():
-    """Global health check endpoint"""
-    status = startup_service.get_status()
-    return {
-        "status": "healthy" if status["is_loaded"] else "initializing",
-        "ready": status["is_loaded"],
-        "components": status["components"]
-    }
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "message": "LLM Server is ready"}
 
 
 def main():

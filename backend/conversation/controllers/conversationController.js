@@ -130,10 +130,11 @@ const streamMessage = async (req, res) => {
 
         console.log('Forwarding to LLM server with', conversationHistory.length, 'history messages');
 
-        // Proxy to FastAPI stream endpoint
+        // Proxy to FastAPI stream endpoint - use Docker service name
+        const llmUrl = process.env.CHATBOT_SERVICE_URL || 'http://llm:8000';
         const response = await axios({
             method: 'POST',
-            url: 'http://localhost:8000/api/chat/stream',
+            url: `${llmUrl}/api/chat/stream`,
             data: {
                 message: query,
                 conversation_id: conversationId,

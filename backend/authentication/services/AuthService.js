@@ -15,7 +15,7 @@ class AuthService {
 		this.jwtSecret = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 		this.jwtExpiration = process.env.JWT_EXPIRATION || '24h';
 		this.refreshTokenSecret = process.env.REFRESH_TOKEN_SECRET || 'your-refresh-secret-key-change-in-production';
-		this.userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:4001';
+		this.userServiceUrl = process.env.USER_SERVICE_URL || 'http://authentication:4003';
 	}
 
 	/**
