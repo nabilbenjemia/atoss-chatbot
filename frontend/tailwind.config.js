@@ -74,6 +74,7 @@ export default {
           "grey-7": "#DDE2E6",
           "grey-8": "#EBECEF",
           "grey-9": "#FBF9FA",
+          "grey-20": "#F5F6F8",
         },
       },
 

@@ -51,26 +51,27 @@ export default function IngestionModal({
     const embeddingModels = backendConfig?.embeddingModels || [];
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-tum-black/50 flex items-center justify-center z-50">
             <div
-                className="bg-white rounded-2xl shadow-xl p-6 w-96 max-w-[90vw]"
+                className="bg-white p-6 w-96 max-w-[90vw] shadow-lg border-t-4 border-tum-blue"
                 onClick={(e) => e.stopPropagation()}
             >
-                <h2 className="text-lg font-bold text-tum-grey-1 mb-4">
+                <h2 className="text-xl font-bold text-tum-blue mb-6">
                     Start Ingestion
                 </h2>
 
                 {/* Target Database */}
                 <div className="mb-4">
-                    <label className="block text-sm font-medium text-tum-grey-1 mb-2">
+                    <label className="block text-sm font-bold text-tum-black mb-2">
                         Target Database
                     </label>
                     <select
                         value={selectedDb}
                         onChange={(e) => setSelectedDb(e.target.value)}
                         disabled={isIngesting}
-                        className="w-full rounded-xl border border-tum-grey-7 px-3 py-2 outline-none transition
-                            focus:ring-2 focus:border-tum-blue focus:ring-tum-blue-light
+                        className="w-full border border-tum-grey-7 px-3 py-2 outline-none transition
+                            bg-white text-tum-black
+                            focus:border-tum-blue focus:ring-1 focus:ring-tum-blue
                             disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <option value="">Select a database...</option>
@@ -85,14 +86,14 @@ export default function IngestionModal({
                 {/* Embedding Model (disabled for MVP) */}
                 {embeddingModels.length > 0 && (
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-tum-grey-1 mb-2">
+                        <label className="block text-sm font-bold text-tum-black mb-2">
                             Embedding Model
                             <span className="text-xs text-tum-grey-4 ml-2">(coming soon)</span>
                         </label>
                         <select
                             disabled
-                            className="w-full rounded-xl border border-tum-grey-7 px-3 py-2 outline-none
-                                opacity-50 cursor-not-allowed bg-tum-grey-20"
+                            className="w-full border border-tum-grey-7 px-3 py-2 outline-none
+                                opacity-50 cursor-not-allowed bg-tum-blue-light-5"
                         >
                             {embeddingModels.map((model) => (
                                 <option key={model.id} value={model.id} disabled={model.disabled}>
@@ -106,7 +107,7 @@ export default function IngestionModal({
                 {/* Progress bar during ingestion */}
                 {isIngesting && (
                     <div className="mb-4">
-                        <div className="h-2 bg-tum-grey-20 rounded-full overflow-hidden">
+                        <div className="h-2 bg-tum-grey-8 rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-tum-blue transition-all duration-300"
                                 style={{ width: `${progress}%` }}
@@ -124,7 +125,7 @@ export default function IngestionModal({
                         onClick={onClose}
                         disabled={isIngesting}
                         className="flex-1 px-4 py-2 rounded-xl border border-tum-grey-7 text-tum-grey-1
-                            hover:bg-tum-grey-20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                            bg-white hover:bg-tum-grey-8 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                         Cancel
                     </button>

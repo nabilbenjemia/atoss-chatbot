@@ -88,11 +88,12 @@ export default function UploadZone({
     return (
         <div
             className={`
-                border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all
+                border-2 border-dashed p-6 text-center cursor-pointer transition-all
+                bg-white
                 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
                 ${isDragging
                     ? 'border-tum-blue bg-tum-blue-light-2'
-                    : 'border-tum-grey-7 hover:border-tum-blue hover:bg-tum-blue-light-3'}
+                    : 'border-tum-grey-7 hover:border-tum-blue hover:bg-tum-blue-light-5'}
             `}
             onDragOver={!disabled ? handleDragOver : undefined}
             onDragLeave={!disabled ? handleDragLeave : undefined}
@@ -109,10 +110,10 @@ export default function UploadZone({
                 disabled={disabled}
             />
             <div className="text-4xl mb-2">📄</div>
-            <p className="text-sm text-tum-grey-4">
+            <p className="text-sm text-tum-grey-2">
                 Drag & drop files here or click to browse
             </p>
-            <p className="text-xs text-tum-grey-4 mt-1">
+            <p className="text-xs text-tum-grey-3 mt-1">
                 {getAllowedTypesText()} • Max {getFileSizeLimitText()}
             </p>
         </div>

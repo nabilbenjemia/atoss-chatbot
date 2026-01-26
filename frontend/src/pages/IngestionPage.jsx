@@ -67,6 +67,33 @@ export default function IngestionPage() {
     const [isIngesting, setIsIngesting] = useState(false);
     const [showRegexModal, setShowRegexModal] = useState(false);
     const [runningHelper, setRunningHelper] = useState(null);
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [editingTitleValue, setEditingTitleValue] = useState('');
+
+    // Sidebar state
+    const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
+    const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
+
+    // Auto-collapse sidebars on small screens
+    useEffect(() => {
+        const handleResize = () => {
+            const width = window.innerWidth;
+            // Collapse both sidebars when screen is narrow
+            if (width < 768) {
+                setLeftSidebarCollapsed(true);
+                setRightSidebarCollapsed(true);
+            } else if (width < 1024) {
+                // Collapse only right sidebar on medium screens
+                setRightSidebarCollapsed(true);
+            }
+        };
+
+        // Check initial size
+        handleResize();
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Local cache
     useLocalCache(
@@ -121,6 +148,7 @@ export default function IngestionPage() {
 
     // Select a document to view/edit
     const selectDocument = useCallback(async (documentId) => {
+        console.log('[IngestionPage] selectDocument called', { documentId });
         try {
             const content = await getExtractedContent(documentId);
             resetDocument(content);
@@ -135,6 +163,7 @@ export default function IngestionPage() {
 
     // Poll for processing completion
     const pollProcessingStatus = useCallback((queueId, documentId) => {
+        console.log('[IngestionPage] pollProcessingStatus called', { queueId, documentId });
         const poll = async () => {
             try {
                 const status = await getProcessingStatus(documentId);
@@ -172,6 +201,7 @@ export default function IngestionPage() {
 
     // Handle files selected from upload zone
     const handleFilesSelected = useCallback(async (files) => {
+        console.log('[IngestionPage] 🎯 handleFilesSelected (USER ACTION)', { files: files.map(f => f.name) });
         // Add to upload queue
         const newDocs = files.map((file) => ({
             id: `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -217,12 +247,31 @@ export default function IngestionPage() {
     }, [pollProcessingStatus]);
 
     // Handle drag state
-    const handleDragOver = useCallback(() => setIsDragging(true), []);
-    const handleDragLeave = useCallback(() => setIsDragging(false), []);
-    const handleDrop = useCallback(() => setIsDragging(false), []);
+    const handleDragOver = useCallback(() => { console.log('[IngestionPage] 🎯 handleDragOver (USER ACTION)'); setIsDragging(true); }, []);
+    const handleDragLeave = useCallback(() => { console.log('[IngestionPage] 🎯 handleDragLeave (USER ACTION)'); setIsDragging(false); }, []);
+    const handleDrop = useCallback(() => { console.log('[IngestionPage] 🎯 handleDrop (USER ACTION)'); setIsDragging(false); }, []);
+
+    // Handle file rename
+    const handleRenameFile = useCallback((docId, newFilename) => {
+        console.log('[IngestionPage] 🎯 handleRenameFile (USER ACTION)', { docId, newFilename });
+        setUploadQueue((prev) =>
+            prev.map((d) =>
+                d.id === docId ? { ...d, filename: newFilename } : d
+            )
+        );
+        // Also update documentState filename if it's the currently selected document
+        if (documentState) {
+            const doc = uploadQueue.find(d => d.id === docId);
+            if (doc && doc.documentId === selectedDocumentId) {
+                updateDocument({ ...documentState, filename: newFilename });
+            }
+        }
+        toast.success('File renamed');
+    }, [documentState, uploadQueue, selectedDocumentId, updateDocument]);
 
     // Navigation between pages
     const goToPage = useCallback((page) => {
+        console.log('[IngestionPage] 🎯 goToPage (USER ACTION)', { page });
         if (!documentState?.pages) return;
         const maxPage = documentState.pages.length;
         const newPage = Math.max(1, Math.min(page, maxPage));
@@ -231,6 +280,7 @@ export default function IngestionPage() {
 
     // Edit handlers
     const handleEditItem = useCallback((itemId, newContent) => {
+        console.log('[IngestionPage] 🎯 handleEditItem (USER ACTION)', { itemId, newContent: newContent?.substring(0, 50) + '...' });
         if (!documentState) return;
 
         const updatedPages = documentState.pages.map((page) => ({
@@ -245,6 +295,7 @@ export default function IngestionPage() {
     }, [documentState, updateDocument]);
 
     const handleDeleteItem = useCallback((itemId) => {
+        console.log('[IngestionPage] 🎯 handleDeleteItem (USER ACTION)', { itemId });
         if (!documentState) return;
 
         const updatedPages = documentState.pages.map((page) => ({
@@ -260,6 +311,7 @@ export default function IngestionPage() {
     }, [documentState, updateDocument]);
 
     const handleRestoreItem = useCallback((itemId) => {
+        console.log('[IngestionPage] 🎯 handleRestoreItem (USER ACTION)', { itemId });
         if (!documentState) return;
 
         const updatedPages = documentState.pages.map((page) => ({
@@ -275,6 +327,7 @@ export default function IngestionPage() {
     }, [documentState, updateDocument]);
 
     const handleClassChange = useCallback((itemId, newClass) => {
+        console.log('[IngestionPage] 🎯 handleClassChange (USER ACTION)', { itemId, newClass });
         if (!documentState) return;
 
         const updatedPages = documentState.pages.map((page) => ({
@@ -290,6 +343,7 @@ export default function IngestionPage() {
 
     // Helper functions
     const handleRunHelper = useCallback(async (helperId) => {
+        console.log('[IngestionPage] 🎯 handleRunHelper (USER ACTION)', { helperId });
         if (!documentState) return;
 
         // Handle helpers with input
@@ -381,6 +435,7 @@ export default function IngestionPage() {
 
     // Handle regex delete
     const handleRegexDelete = useCallback((pattern) => {
+        console.log('[IngestionPage] 🎯 handleRegexDelete (USER ACTION)', { pattern });
         if (!documentState) return;
 
         try {
@@ -408,6 +463,7 @@ export default function IngestionPage() {
 
     // Start ingestion
     const handleStartIngestion = useCallback(async (targetDb) => {
+        console.log('[IngestionPage] 🎯 handleStartIngestion (USER ACTION)', { targetDb, documentId: selectedDocumentId });
         if (!targetDb || !documentState) return;
 
         setIsIngesting(true);
@@ -458,6 +514,7 @@ export default function IngestionPage() {
 
     // Save changes (mark as saved locally)
     const handleSave = useCallback(() => {
+        console.log('[IngestionPage] 🎯 handleSave (USER ACTION)');
         setHasUnsavedChanges(false);
         toast.success('Changes saved');
     }, []);
@@ -505,46 +562,136 @@ export default function IngestionPage() {
     const totalPages = documentState?.pages?.length || 0;
 
     return (
-        <div className="flex h-screen bg-tum-grey-20">
+        <div className="flex h-screen bg-tum-blue-light-5 overflow-hidden font-display">
             {/* Left Panel - File Queue */}
-            <div className="w-72 bg-tum-blue-light-4 p-4 flex flex-col rounded-r-2xl">
-                <h2 className="text-lg font-bold text-tum-grey-1 mb-4">Document Ingestion</h2>
-
-                {/* Upload Zone */}
-                <UploadZone
-                    onFilesSelected={handleFilesSelected}
-                    disabled={isIngesting}
-                    isDragging={isDragging}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                />
-
-                {/* File Queue */}
-                <div className="mt-4">
-                    <FileQueue
-                        files={uploadQueue}
-                        selectedDocumentId={selectedDocumentId}
-                        onSelect={selectDocument}
-                    />
+            <div
+                className={`
+                    ${leftSidebarCollapsed ? 'w-12' : 'w-56 lg:w-64'} 
+                    bg-tum-blue-light-4 flex flex-col border-r border-tum-grey-7 rounded-r-2xl
+                    transition-all duration-300 ease-in-out flex-shrink-0
+                `}
+            >
+                {/* Header with toggle */}
+                <div className={`p-4 flex items-center ${leftSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+                    {!leftSidebarCollapsed && (
+                        <h2 className="text-lg font-bold text-tum-blue">Document Ingestion</h2>
+                    )}
+                    <button
+                        onClick={() => setLeftSidebarCollapsed(!leftSidebarCollapsed)}
+                        className="w-8 h-8 bg-tum-white/50 border border-tum-grey-7
+                            flex items-center justify-center rounded-lg
+                            hover:bg-tum-white transition-colors"
+                        title={leftSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                    >
+                        <span className="text-sm text-tum-black font-bold">
+                            {leftSidebarCollapsed ? '»' : '«'}
+                        </span>
+                    </button>
                 </div>
+
+                {!leftSidebarCollapsed && (
+                    <div className="px-4 pb-4 flex flex-col flex-1 overflow-hidden pt-4">
+
+                        {/* Upload Zone */}
+                        <UploadZone
+                            onFilesSelected={handleFilesSelected}
+                            disabled={isIngesting}
+                            isDragging={isDragging}
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                        />
+
+                        {/* File Queue */}
+                        <div className="mt-4 flex-1 overflow-y-auto">
+                            <FileQueue
+                                files={uploadQueue}
+                                selectedDocumentId={selectedDocumentId}
+                                onSelect={selectDocument}
+                                onRename={handleRenameFile}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Collapsed state icon */}
+                {leftSidebarCollapsed && (
+                    <div className="flex flex-col items-center pt-4">
+                        <span className="text-2xl mb-2" title="Documents">📄</span>
+                        <span className="text-xs text-tum-grey-3">
+                            {uploadQueue.length > 0 && `${uploadQueue.length}`}
+                        </span>
+                    </div>
+                )}
             </div>
 
             {/* Main Content Area */}
             <main className="flex-1 flex flex-col overflow-hidden">
                 {/* Header / Save Bar */}
                 <div className="bg-white border-b border-tum-grey-7 px-6 py-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h1 className="text-xl font-bold text-tum-grey-1">
-                                {documentState?.filename || 'Select a document'}
-                            </h1>
-                            {documentState && (
-                                <p className="text-sm text-tum-grey-4">
-                                    Page {currentPage} of {totalPages}
-                                </p>
+                    {/* Title row */}
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex-1">
+                            {documentState ? (
+                                isEditingTitle ? (
+                                    <input
+                                        type="text"
+                                        value={editingTitleValue}
+                                        onChange={(e) => setEditingTitleValue(e.target.value)}
+                                        onBlur={() => {
+                                            const trimmed = editingTitleValue.trim();
+                                            if (trimmed && trimmed !== documentState.filename) {
+                                                // Update document state
+                                                updateDocument({ ...documentState, filename: trimmed });
+                                                // Update upload queue
+                                                const doc = uploadQueue.find(d => d.documentId === selectedDocumentId);
+                                                if (doc) {
+                                                    handleRenameFile(doc.id, trimmed);
+                                                }
+                                            }
+                                            setIsEditingTitle(false);
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.target.blur();
+                                            } else if (e.key === 'Escape') {
+                                                setEditingTitleValue(documentState.filename);
+                                                setIsEditingTitle(false);
+                                            }
+                                        }}
+                                        autoFocus
+                                        className="w-full text-xl font-bold text-tum-black bg-white border border-tum-blue 
+                                            px-3 py-2 focus:outline-none focus:ring-1 focus:ring-tum-blue"
+                                    />
+                                ) : (
+                                    <h1
+                                        className="text-xl font-bold text-tum-black cursor-text hover:bg-tum-blue-light-5 
+                                            px-3 py-2 -mx-3 -my-2 transition-colors border border-transparent hover:border-tum-grey-7"
+                                        onClick={() => {
+                                            setEditingTitleValue(documentState.filename);
+                                            setIsEditingTitle(true);
+                                        }}
+                                        title="Click to edit filename"
+                                    >
+                                        {documentState.filename}
+                                    </h1>
+                                )
+                            ) : (
+                                <h1 className="text-xl font-bold text-tum-grey-4 px-3 py-2 -mx-3 -my-2">
+                                    Select a document
+                                </h1>
                             )}
                         </div>
+                    </div>
+
+                    {/* Actions row */}
+                    <div className="flex items-center justify-between">
+                        {documentState && (
+                            <p className="text-sm text-tum-grey-4">
+                                Page {currentPage} of {totalPages}
+                            </p>
+                        )}
+                        {!documentState && <div />}
 
                         <SaveBar
                             hasUnsavedChanges={hasUnsavedChanges}
@@ -579,11 +726,46 @@ export default function IngestionPage() {
             </main>
 
             {/* Right Panel - Helpers */}
-            <HelperPanel
-                onRunHelper={handleRunHelper}
-                disabled={!documentState || isIngesting}
-                runningHelper={runningHelper}
-            />
+            <div
+                className={`
+                    ${rightSidebarCollapsed ? 'w-12' : 'w-48 lg:w-56'} 
+                    bg-white border-l border-tum-grey-7 flex flex-col
+                    transition-all duration-300 ease-in-out flex-shrink-0
+                `}
+            >
+                {/* Header with toggle */}
+                <div className={`p-4 flex items-center ${rightSidebarCollapsed ? 'justify-center' : 'justify-between'} border-b border-tum-grey-7`}>
+                    <button
+                        onClick={() => setRightSidebarCollapsed(!rightSidebarCollapsed)}
+                        className="w-8 h-8 bg-tum-blue-light-5 border border-tum-grey-7
+                            flex items-center justify-center
+                            hover:bg-tum-blue-light-3 transition-colors"
+                        title={rightSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                    >
+                        <span className="text-sm text-tum-blue font-bold">
+                            {rightSidebarCollapsed ? '«' : '»'}
+                        </span>
+                    </button>
+                    {!rightSidebarCollapsed && (
+                        <h3 className="text-sm font-semibold text-tum-blue">Helpers</h3>
+                    )}
+                </div>
+
+                {!rightSidebarCollapsed && (
+                    <HelperPanel
+                        onRunHelper={handleRunHelper}
+                        disabled={!documentState || isIngesting}
+                        runningHelper={runningHelper}
+                    />
+                )}
+
+                {/* Collapsed state icon */}
+                {rightSidebarCollapsed && (
+                    <div className="flex flex-col items-center pt-4">
+                        <span className="text-2xl" title="Helpers">🛠️</span>
+                    </div>
+                )}
+            </div>
 
             {/* Ingestion Modal */}
             <IngestionModal

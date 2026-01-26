@@ -21,19 +21,20 @@ export default function TableItem({
     // Deleted state
     if (item.deleted) {
         return (
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-tum-grey-7 opacity-50">
+            <div className="bg-tum-blue-light-5 p-4 border border-tum-grey-7 opacity-60">
                 <div className="flex items-center justify-between">
-                    <span className="text-xs text-red-500 font-medium">Deleted</span>
+                    <span className="text-xs text-tum-orange font-bold uppercase">Deleted</span>
                     {onRestore && (
                         <button
                             onClick={() => onRestore(item.id)}
-                            className="text-xs text-tum-blue hover:text-tum-dark-blue"
+                            className="px-3 py-1 text-xs font-bold bg-white border border-tum-blue 
+                                text-tum-blue hover:bg-tum-blue hover:text-white transition-colors"
                         >
                             Restore
                         </button>
                     )}
                 </div>
-                <div className="mt-2 h-16 bg-tum-grey-20 rounded flex items-center justify-center">
+                <div className="mt-2 h-16 bg-tum-grey-8 flex items-center justify-center">
                     <span className="text-tum-grey-4 text-sm">Table deleted</span>
                 </div>
             </div>
@@ -42,22 +43,22 @@ export default function TableItem({
 
     if (!tableData || !tableData.headers || !tableData.rows) {
         return (
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-tum-grey-7">
+            <div className="bg-white p-4 border border-tum-grey-7">
                 <p className="text-sm text-tum-grey-4">Invalid table data</p>
             </div>
         );
     }
 
     return (
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-tum-grey-7 group">
+        <div className="bg-white p-4 border border-tum-grey-7 group hover:border-tum-blue transition-colors">
             <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-tum-grey-7">
-                    <thead className="bg-tum-grey-20">
+                <table className="min-w-full divide-y divide-tum-grey-7 border border-tum-grey-7">
+                    <thead className="bg-tum-blue-light-5">
                         <tr>
                             {tableData.headers.map((header, i) => (
                                 <th
                                     key={i}
-                                    className="px-4 py-2 text-left text-xs font-medium text-tum-grey-1 uppercase tracking-wider"
+                                    className="px-4 py-2 text-left text-xs font-bold text-tum-black uppercase tracking-wider"
                                 >
                                     {header}
                                 </th>
@@ -66,11 +67,11 @@ export default function TableItem({
                     </thead>
                     <tbody className="bg-white divide-y divide-tum-grey-7">
                         {tableData.rows.map((row, i) => (
-                            <tr key={i} className="hover:bg-tum-grey-20 transition-colors">
+                            <tr key={i} className="hover:bg-tum-blue-light-5 transition-colors">
                                 {row.map((cell, j) => (
                                     <td
                                         key={j}
-                                        className="px-4 py-2 text-sm text-tum-grey-1 whitespace-nowrap"
+                                        className="px-4 py-2 text-sm text-tum-black whitespace-nowrap"
                                     >
                                         {cell}
                                     </td>
@@ -82,11 +83,12 @@ export default function TableItem({
             </div>
 
             {/* Action buttons */}
-            <div className="flex items-center justify-end space-x-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center justify-end space-x-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
                 {onDelete && (
                     <button
                         onClick={() => onDelete(item.id)}
-                        className="text-xs text-red-500 hover:text-red-700"
+                        className="px-3 py-1 text-xs font-bold bg-white border border-tum-orange 
+                            text-tum-orange hover:bg-tum-orange hover:text-white transition-colors"
                     >
                         🗑️ Delete
                     </button>

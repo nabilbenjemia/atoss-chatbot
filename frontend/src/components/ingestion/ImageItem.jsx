@@ -42,19 +42,20 @@ export default function ImageItem({
     // Deleted state
     if (item.deleted) {
         return (
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-tum-grey-7 opacity-50">
+            <div className="bg-tum-blue-light-5 p-4 border border-tum-grey-7 opacity-60">
                 <div className="flex items-center justify-between">
-                    <span className="text-xs text-red-500 font-medium">Deleted</span>
+                    <span className="text-xs text-tum-orange font-bold uppercase">Deleted</span>
                     {onRestore && (
                         <button
                             onClick={() => onRestore(item.id)}
-                            className="text-xs text-tum-blue hover:text-tum-dark-blue"
+                            className="px-3 py-1 text-xs font-bold bg-white border border-tum-blue 
+                                text-tum-blue hover:bg-tum-blue hover:text-white transition-colors"
                         >
                             Restore
                         </button>
                     )}
                 </div>
-                <div className="mt-2 h-16 bg-tum-grey-20 rounded flex items-center justify-center">
+                <div className="mt-2 h-16 bg-tum-grey-8 flex items-center justify-center">
                     <span className="text-tum-grey-4 text-sm">Image deleted</span>
                 </div>
             </div>
@@ -63,13 +64,13 @@ export default function ImageItem({
 
     return (
         <>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-tum-grey-7 group">
+            <div className="bg-white p-4 border border-tum-grey-7 group hover:border-tum-blue transition-colors">
                 <div className="relative">
                     {/* Image */}
                     <img
                         src={item.imageUrl}
                         alt="Document image"
-                        className={`rounded-lg cursor-pointer ${needsResize ? 'max-w-full h-auto' : ''}`}
+                        className={`cursor-pointer ${needsResize ? 'max-w-full h-auto' : ''}`}
                         style={{
                             maxWidth: INGESTION_CONFIG.image.maxDisplayWidth,
                             maxHeight: INGESTION_CONFIG.image.maxDisplayHeight,
@@ -82,9 +83,9 @@ export default function ImageItem({
                     <div className="absolute top-2 right-2">
                         <button
                             onClick={() => setShowClassDropdown(!showClassDropdown)}
-                            className="px-2 py-1 rounded-full text-xs font-medium
-                                bg-tum-blue-light-2 text-tum-blue hover:bg-tum-blue-light-1
-                                transition-colors"
+                            className="px-2 py-1 text-xs font-bold
+                                bg-white border border-tum-blue text-tum-blue hover:bg-tum-blue hover:text-white
+                                transition-colors shadow-sm"
                         >
                             {item.classification || 'unclassified'}
                         </button>
@@ -92,14 +93,17 @@ export default function ImageItem({
                         {/* Classification dropdown */}
                         {showClassDropdown && availableClasses.length > 0 && (
                             <div className="absolute top-full right-0 mt-1 bg-white border border-tum-grey-7 
-                                rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
+                                shadow-lg py-1 z-10 min-w-[120px]">
                                 {availableClasses.map((cls) => (
                                     <button
                                         key={cls}
                                         onClick={() => handleClassChange(cls)}
                                         className={`
-                                            w-full px-3 py-1 text-left text-xs hover:bg-tum-blue-light-3
-                                            ${cls === item.classification ? 'text-tum-blue font-medium' : 'text-tum-grey-1'}
+                                            w-full px-3 py-2 text-left text-sm transition-colors
+                                            hover:bg-tum-blue-light-3
+                                            ${cls === item.classification
+                                                ? 'text-tum-blue font-medium bg-tum-blue-light-4'
+                                                : 'text-tum-grey-1 bg-white'}
                                         `}
                                     >
                                         {cls}
@@ -119,11 +123,12 @@ export default function ImageItem({
                 </div>
 
                 {/* Action buttons */}
-                <div className="flex items-center justify-end space-x-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center justify-end space-x-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
                     {onDelete && (
                         <button
                             onClick={() => onDelete(item.id)}
-                            className="text-xs text-red-500 hover:text-red-700"
+                            className="px-3 py-1 text-xs rounded-md bg-white border border-tum-grey-7 
+                                text-red-500 hover:bg-red-50 hover:border-red-300 transition-colors"
                         >
                             🗑️ Delete
                         </button>

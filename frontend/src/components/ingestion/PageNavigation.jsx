@@ -53,22 +53,22 @@ export default function PageNavigation({
             <button
                 onClick={() => goToPage(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="px-4 py-2 rounded-lg transition-all disabled:opacity-40
-                    bg-tum-grey-20 hover:bg-tum-grey-7 text-tum-grey-1"
+                className="px-4 py-2 transition-all disabled:opacity-40
+                    bg-white border border-tum-blue hover:bg-tum-blue-light-5 text-tum-blue font-bold"
                 aria-label="Previous page"
             >
                 ← Previous
             </button>
 
-            <span className="text-sm text-tum-grey-4">
+            <span className="text-sm font-bold text-tum-black">
                 Page {currentPage} of {totalPages}
             </span>
 
             <button
                 onClick={() => goToPage(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="px-4 py-2 rounded-lg transition-all disabled:opacity-40
-                    bg-tum-grey-20 hover:bg-tum-grey-7 text-tum-grey-1"
+                className="px-4 py-2 transition-all disabled:opacity-40
+                    bg-white border border-tum-blue hover:bg-tum-blue-light-5 text-tum-blue font-bold"
                 aria-label="Next page"
             >
                 Next →

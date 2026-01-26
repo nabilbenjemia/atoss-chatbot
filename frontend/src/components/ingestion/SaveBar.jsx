@@ -26,35 +26,35 @@ export default function SaveBar({
     canIngest = true,
 }) {
     return (
-        <div className="bg-white border-b border-tum-grey-7 px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+        <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
                 {/* Undo/Redo */}
                 <button
                     onClick={onUndo}
                     disabled={!canUndo}
-                    className="px-3 py-1.5 rounded-lg text-sm transition-all disabled:opacity-40
-                        bg-tum-grey-20 hover:bg-tum-grey-7 text-tum-grey-1"
+                    className="px-2 sm:px-3 py-1.5 text-sm transition-all disabled:opacity-40
+                        bg-white border border-tum-blue hover:bg-tum-blue-light-5 text-tum-blue font-bold"
                     title="Undo (Ctrl+Z)"
                 >
-                    ↩️ Undo
+                    <span className="hidden sm:inline">↩️ </span><span className="sm:hidden">↩️</span><span className="hidden sm:inline">Undo</span>
                 </button>
                 <button
                     onClick={onRedo}
                     disabled={!canRedo}
-                    className="px-3 py-1.5 rounded-lg text-sm transition-all disabled:opacity-40
-                        bg-tum-grey-20 hover:bg-tum-grey-7 text-tum-grey-1"
+                    className="px-2 sm:px-3 py-1.5 text-sm transition-all disabled:opacity-40
+                        bg-white border border-tum-blue hover:bg-tum-blue-light-5 text-tum-blue font-bold"
                     title="Redo (Ctrl+Shift+Z)"
                 >
-                    ↪️ Redo
+                    <span className="hidden sm:inline">↪️ </span><span className="sm:hidden">↪️</span><span className="hidden sm:inline">Redo</span>
                 </button>
             </div>
 
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center gap-2">
                 {/* Unsaved indicator */}
                 {hasUnsavedChanges && (
-                    <span className="text-xs text-orange-500 flex items-center">
-                        <span className="w-2 h-2 bg-orange-500 rounded-full mr-1" />
-                        Unsaved
+                    <span className="text-xs text-tum-orange flex items-center">
+                        <span className="w-2 h-2 bg-tum-orange rounded-full mr-1" />
+                        <span className="hidden sm:inline">Unsaved</span>
                     </span>
                 )}
 
@@ -62,7 +62,7 @@ export default function SaveBar({
                 <button
                     onClick={onSave}
                     disabled={!hasUnsavedChanges}
-                    className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-40
+                    className="px-3 sm:px-4 py-1.5 text-sm font-bold transition-all disabled:opacity-40
                         bg-tum-blue hover:bg-tum-dark-blue text-white"
                 >
                     Save
@@ -72,10 +72,10 @@ export default function SaveBar({
                 <button
                     onClick={onIngest}
                     disabled={!canIngest}
-                    className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all disabled:opacity-40
-                        bg-tum-green-3 hover:bg-tum-green-2 text-white"
+                    className="px-3 sm:px-4 py-1.5 text-sm font-bold transition-all disabled:opacity-40
+                        bg-tum-green hover:bg-tum-green text-white"
                 >
-                    🚀 Ingest
+                    <span className="hidden sm:inline">🚀 </span>Ingest
                 </button>
             </div>
         </div>

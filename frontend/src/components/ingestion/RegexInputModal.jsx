@@ -98,6 +98,7 @@ export default function RegexInputModal({
                         placeholder="e.g., ^Chapter \d+$"
                         className={`
                             w-full rounded-xl border px-3 py-2 outline-none transition font-mono text-sm
+                            bg-white text-tum-grey-1
                             focus:ring-2 focus:ring-tum-blue-light
                             ${error ? 'border-red-500' : 'border-tum-grey-7 focus:border-tum-blue'}
                         `}
@@ -107,12 +108,12 @@ export default function RegexInputModal({
                     )}
                 </div>
 
-                <div className="mb-4 p-3 bg-tum-grey-20 rounded-lg">
-                    <p className="text-xs text-tum-grey-4">
+                <div className="mb-4 p-3 bg-tum-blue-light-4 border border-tum-blue-light-2 rounded-lg">
+                    <p className="text-xs text-tum-grey-2">
                         💡 Examples:
-                        <br />• <code>^Page \d+$</code> - Lines starting with "Page" followed by numbers
-                        <br />• <code>TODO</code> - Lines containing "TODO"
-                        <br />• <code>^\s*$</code> - Empty or whitespace-only lines
+                        <br />• <code className="bg-white px-1 rounded">^Page \d+$</code> - Lines starting with "Page" followed by numbers
+                        <br />• <code className="bg-white px-1 rounded">TODO</code> - Lines containing "TODO"
+                        <br />• <code className="bg-white px-1 rounded">^\s*$</code> - Empty or whitespace-only lines
                     </p>
                 </div>
 
@@ -121,7 +122,7 @@ export default function RegexInputModal({
                     <button
                         onClick={onClose}
                         className="flex-1 px-4 py-2 rounded-xl border border-tum-grey-7 text-tum-grey-1
-                            hover:bg-tum-grey-20 transition-all"
+                            bg-white hover:bg-tum-grey-8 transition-all"
                     >
                         Cancel
                     </button>
