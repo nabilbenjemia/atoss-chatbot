@@ -2,10 +2,11 @@
  * TextItem Component
  * 
  * Displays text content with edit mode support.
- * Click to edit raw markdown.
+ * Renders Markdown normally, switches to raw editor on click (like a notebook cell).
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 /**
  * @param {Object} props
@@ -63,13 +64,14 @@ export default function TextItem({
     // Deleted state
     if (item.deleted) {
         return (
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-tum-grey-7 opacity-50">
+            <div className="bg-tum-blue-light-5 p-4 border border-tum-grey-7 opacity-60">
                 <div className="flex items-center justify-between">
-                    <span className="text-xs text-red-500 font-medium">Deleted</span>
+                    <span className="text-xs text-tum-orange font-bold uppercase">Deleted</span>
                     {onRestore && (
                         <button
                             onClick={() => onRestore(item.id)}
-                            className="text-xs text-tum-blue hover:text-tum-dark-blue"
+                            className="px-3 py-1 text-xs font-bold bg-white border border-tum-blue 
+                                text-tum-blue hover:bg-tum-blue hover:text-white transition-colors"
                         >
                             Restore
                         </button>
@@ -85,8 +87,8 @@ export default function TextItem({
     return (
         <div
             className={`
-                bg-white rounded-xl p-4 shadow-sm border transition-all group
-                ${isEditing ? 'border-tum-blue ring-2 ring-tum-blue-light' : 'border-tum-grey-7 hover:border-tum-grey-5'}
+                bg-white p-4 border transition-all group
+                ${isEditing ? 'border-tum-blue ring-1 ring-tum-blue' : 'border-tum-grey-7 hover:border-tum-blue'}
             `}
         >
             {isEditing ? (
@@ -94,13 +96,19 @@ export default function TextItem({
                     <textarea
                         ref={textareaRef}
                         value={editContent}
-                        onChange={(e) => setEditContent(e.target.value)}
+                        onChange={(e) => {
+                            setEditContent(e.target.value);
+                            // Auto-resize textarea
+                            e.target.style.height = 'auto';
+                            e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
                         onKeyDown={handleKeyDown}
                         onBlur={handleSave}
-                        className="w-full min-h-[100px] p-2 border border-tum-grey-7 rounded-lg 
+                        className="w-full min-h-[200px] p-3 border border-tum-grey-7 rounded-lg 
                             focus:outline-none focus:ring-2 focus:ring-tum-blue
-                            font-mono text-sm"
+                            font-mono text-sm bg-white text-tum-grey-1 resize-y"
                         placeholder="Enter markdown content..."
+                        style={{ height: 'auto', minHeight: Math.max(200, editContent.split('\n').length * 24) + 'px' }}
                     />
                     <div className="flex justify-end space-x-2 text-xs text-tum-grey-4">
                         <span>Ctrl+Enter to save • ESC to cancel</span>
@@ -111,21 +119,27 @@ export default function TextItem({
                     className="cursor-text"
                     onClick={() => setIsEditing(true)}
                 >
-                    <div className="prose prose-sm max-w-none">
-                        {/* TODO: Replace with React Markdown rendering */}
-                        <pre className="whitespace-pre-wrap font-sans text-sm text-tum-grey-1">
-                            {item.content}
-                        </pre>
+                    <div className="prose prose-sm max-w-none 
+                        prose-headings:text-tum-grey-1 prose-headings:font-semibold
+                        prose-p:text-tum-grey-1 prose-p:my-2
+                        prose-strong:text-tum-grey-1
+                        prose-ul:text-tum-grey-1 prose-ol:text-tum-grey-1
+                        prose-li:text-tum-grey-1
+                        prose-a:text-tum-blue
+                        prose-code:text-tum-grey-1 prose-code:bg-tum-grey-8 prose-code:px-1 prose-code:rounded
+                        prose-pre:bg-tum-grey-8 prose-pre:text-tum-grey-1">
+                        <ReactMarkdown>{item.content}</ReactMarkdown>
                     </div>
 
                     {/* Action buttons on hover */}
-                    <div className="flex items-center justify-end space-x-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center justify-end space-x-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setIsEditing(true);
                             }}
-                            className="text-xs text-tum-blue hover:text-tum-dark-blue"
+                            className="px-3 py-1 text-xs rounded-md bg-white border border-tum-grey-7 
+                                text-tum-blue hover:bg-tum-blue-light-4 hover:border-tum-blue transition-colors"
                         >
                             ✏️ Edit
                         </button>
@@ -135,7 +149,8 @@ export default function TextItem({
                                     e.stopPropagation();
                                     onDelete(item.id);
                                 }}
-                                className="text-xs text-red-500 hover:text-red-700"
+                                className="px-3 py-1 text-xs rounded-md bg-white border border-tum-grey-7 
+                                    text-red-500 hover:bg-red-50 hover:border-red-300 transition-colors"
                             >
                                 🗑️ Delete
                             </button>
