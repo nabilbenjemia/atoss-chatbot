@@ -24,8 +24,9 @@ services:
       - ./backend/llm/.env
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - HF_HOME=/root/.cache/huggingface
     volumes:
-      - hf_cache:/root/.cache
+      - ~/.cache/huggingface:/root/.cache/huggingface  # Mount host HF cache
       - ./backend/llm/chroma_db_snowflake_600chunks_300overlapping:/app/chroma_db_snowflake_600chunks_300overlapping
     depends_on:
       ollama:
@@ -81,13 +82,14 @@ services:
     networks:
       - atoss-network
     entrypoint: ["/bin/sh", "/usr/local/bin/init-ollama.sh"]
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    # GPU support - uncomment for NVIDIA GPUs on Linux
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
     healthcheck:
       test: ["CMD-SHELL", "ollama list || exit 1"]
       interval: 10s
