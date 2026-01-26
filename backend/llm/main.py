@@ -11,9 +11,11 @@ This server handles:
 import logging
 import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 from config.settings import settings
@@ -93,6 +95,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files for serving images from resources folder
+resources_path = Path(__file__).parent / "docling" / "output" / "resources"
+if resources_path.exists():
+    app.mount("/resources", StaticFiles(directory=str(resources_path)), name="resources")
+    logger.info(f"Serving static images from: {resources_path}")
 
 # Include routers
 app.include_router(chat_router)

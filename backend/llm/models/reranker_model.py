@@ -1,12 +1,13 @@
 """
 Reranker Model Manager
-Handles cross-encoder based document reranking for improved relevance
+Handles document reranking using Jina Reranker v3 for improved relevance
 """
 
 import logging
-from typing import Optional, List, Tuple
-from sentence_transformers import CrossEncoder
-from .embedding_model import embedding_manager
+import time
+from typing import Optional, List, Tuple, Any
+from transformers import AutoModel
+import torch
 
 from config.settings import settings
 
@@ -14,10 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 class RerankerManager:
-    """Manages the cross-encoder reranker lifecycle"""
+    """Manages the Jina Reranker v3 lifecycle"""
 
     _instance: Optional["RerankerManager"] = None
-    _reranker: Optional[CrossEncoder] = None
+    _reranker: Optional[Any] = None
     _is_loaded: bool = False
 
     def __new__(cls):
@@ -31,8 +32,21 @@ class RerankerManager:
             self._reranker = None
             self._is_loaded = False
 
+    def _resolve_device(self) -> str:
+        """Resolve the best available device for the reranker"""
+        device = settings.EMBEDDING_DEVICE.lower()
+
+        if device == "auto":
+            if torch.cuda.is_available():
+                return "cuda"
+            elif torch.backends.mps.is_available():
+                return "mps"
+            else:
+                return "cpu"
+        return device
+
     def load(self) -> bool:
-        """Load the cross-encoder reranker model"""
+        """Load the Jina Reranker v3 model"""
         if not settings.ENABLE_RERANKING:
             logger.info("Reranking is disabled in settings")
             return True
@@ -41,17 +55,24 @@ class RerankerManager:
             logger.info("Reranker already loaded")
             return True
 
-        device = embedding_manager._resolve_device()
+        device = self._resolve_device()
         try:
             logger.info("Loading reranker model: %s", settings.RERANKING_MODEL)
-            self._reranker = CrossEncoder(
+            
+            # Load Jina Reranker v3 with trust_remote_code for custom model code
+            self._reranker = AutoModel.from_pretrained(
                 settings.RERANKING_MODEL,
-                max_length=512,
-                device=device,
+                torch_dtype="auto",
+                trust_remote_code=True,
             )
+            self._reranker.eval()
+            
+            # Move to appropriate device if not MPS (MPS handled internally)
+            if device == "cuda":
+                self._reranker = self._reranker.cuda()
 
             self._is_loaded = True
-            logger.info("Reranker model loaded successfully")
+            logger.info("Reranker model loaded successfully on device: %s", device)
             return True
 
         except (RuntimeError, OSError, ValueError) as e:
@@ -63,7 +84,7 @@ class RerankerManager:
         self, query: str, documents: List[str], top_k: Optional[int] = None
     ) -> List[Tuple[int, float]]:
         """
-        Rerank documents based on relevance to query.
+        Rerank documents based on relevance to query using Jina Reranker v3.
 
         Args:
             query: The search query
@@ -85,18 +106,22 @@ class RerankerManager:
             return []
 
         try:
-            # Create query-document pairs
-            pairs = [[query, doc] for doc in documents]
-
-            # Get relevance scores
-            scores = self._reranker.predict(pairs)
-
-            # Create (index, score) tuples and sort by score descending
-            ranked = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
-
-            # Return top_k results
             k = top_k or settings.RERANKING_TOP_K
-            return ranked[:k]
+            
+            start_time = time.time()
+            
+            # Use Jina Reranker v3's built-in rerank method
+            results = self._reranker.rerank(query, documents)
+            
+            # Convert results to (index, score) tuples
+            # Jina returns list of dicts with 'index', 'relevance_score', 'document'
+            ranked = [(result['index'], result['relevance_score']) for result in results[:k]]
+            
+            elapsed_time = time.time() - start_time
+            logger.info("Reranking completed in %.3f seconds for %d documents, returned top %d", 
+                       elapsed_time, len(documents), len(ranked))
+            
+            return ranked
 
         except Exception as e:
             logger.error("Error during reranking: %s", e)

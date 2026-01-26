@@ -157,7 +157,19 @@ User sees the chat interface:
 | `conversationId` | `null` | No conversation selected |
 | `messages` | `[]` | Empty message array |
 | `conversationTitles` | `[{...}]` | Populated from API |
-| `isFirstMessage` | `false` | Flag for new conversation handling |
+| `isStreaming` | `false` | Whether AI is currently streaming a response |
+| `streamingMessage` | `""` | Current streaming message content |
+
+---
+
+## Sidebar Props
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `conversationTitles` | `Array` | List of conversation objects |
+| `setConversationTitles` | `Function` | Setter for updating conversation list (used for deletion) |
+| `setConversationId` | `Function` | Setter for selecting a conversation |
+| `userId` | `String` | Current user's ID |
 
 ---
 
@@ -165,7 +177,7 @@ User sees the chat interface:
 
 1. **`frontend/src/pages/ChatbotPage.jsx`** - Main orchestration
 2. **`frontend/src/services/api.js`** - `getCurrentUser()` function
-3. **`frontend/src/components/Sidebar.jsx`** - Sidebar rendering
+3. **`frontend/src/components/Sidebar.jsx`** - Sidebar rendering with delete functionality
 4. **`backend/conversation/controllers/conversationController.js`** - API handler
 5. **`backend/conversation/services/conversationService.js`** - Database query
 
@@ -186,9 +198,9 @@ After successful load, the user sees:
 │  ├──────────────────────│              selected)                      ││
 │  │ Chats ▼              │                                             ││
 │  │ ──────────────────── │                                             ││
-│  │ Conv at 12/8/2025... │                                             ││
-│  │ Conv at 12/7/2025... │                                             ││
-│  │ Conv at 12/6/2025... │                                             ││
+│  │ Conv at 12/8/2025 🗑️│                                             ││
+│  │ Conv at 12/7/2025 🗑️│   (🗑️ appears on hover, click to delete)   ││
+│  │ Conv at 12/6/2025 🗑️│                                             ││
 │  │                      │                                             ││
 │  │                      ├─────────────────────────────────────────────││
 │  │ ┌────────────────┐   │ ┌─────────────────────────────────────────┐ ││

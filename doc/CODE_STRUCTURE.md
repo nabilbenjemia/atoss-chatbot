@@ -45,9 +45,9 @@ This document provides a comprehensive understanding of the ATOSS GPT chatbot ap
                                      │   LLM Service (FastAPI)         │
                                      │        Port: 8000               │
                                      │   - RAG Chain                   │
-                                     │   - Ollama LLM (Qwen 3 1.7B)    │
-                                     │   - Embeddings (Qwen 3 0.6B)    │
-                                     │   - Reranker (Jina v3)          │
+                                     │   - Ollama LLM (qwen2.5:7b)     │
+                                     │   - Embeddings (Snowflake)      │
+                                     │   - Reranker (mMiniLM)          │
                                      │   - ChromaDB Vector Store       │
                                      │   - Streaming Responses         │
                                      └─────────────────────────────────┘
@@ -75,7 +75,8 @@ frontend/
 │   ├── index.css            # Global styles
 │   ├── App.css              # App-specific styles
 │   ├── assets/              # Static assets (images, icons)
-│   │   └── index.js         # Asset exports
+│   │   ├── index.js         # Asset exports
+│   │   ├── delete_logo.png  # Delete icon for conversation removal
 │   ├── components/          # Reusable UI components
 │   │   ├── Sidebar.jsx      # Navigation sidebar with chat history
 │   │   ├── Conversation.jsx # Message list display
@@ -111,15 +112,19 @@ This is the central component for the AI chatbot feature. It manages:
   - `conversationId`: Currently active conversation
   - `messages`: Array of messages in current conversation
   - `conversationTitles`: List of all user's conversations (for sidebar)
-  - `isFirstMessage`: Flag to handle first message in new conversation
+  - `isStreaming`: Flag indicating if AI is currently streaming a response
+  - `streamingMessage`: Current content being streamed from AI
 - **Key Functions**:
   - `fetchMessages()`: Retrieves messages for current conversation
   - `fetchConversationTitles()`: Gets all conversations for sidebar
-  - `handleSendMessage()`: Orchestrates sending a message
+  - `handleSendMessage()`: Orchestrates sending a message with streaming
+  - `handleInterrupt()`: Stops the AI streaming and saves partial response
+  - `saveMessages()`: Batch saves user and AI messages to DB
 
 #### 3. `Sidebar.jsx` - Navigation Sidebar
-- Displays chat history list
+- Displays chat history list with delete functionality
 - Provides "New Chat" functionality
+- Conversation deletion with confirmation dropdown
 - Collapsible/minimizable interface
 - Shows user profile section
 
@@ -178,19 +183,18 @@ backend/llm/
 ├── routes/
 │   └── chat_routes.py       # API route definitions
 ├── models/
-│   ├── embedding_model.py   # Qwen 3 Embedding 0.6B manager
+│   ├── embedding_model.py   # Snowflake Arctic Embed manager
 │   ├── llm_model.py         # Ollama/ChatOllama manager
 │   ├── vectorstore.py       # ChromaDB manager
-│   └── reranker_model.py    # Jina Reranker v3 manager
+│   └── reranker_model.py    # mMiniLM cross-encoder manager
 ├── services/
 │   ├── startup_service.py   # Component initialization
 │   ├── retriever_service.py # Document retrieval + reranking
 │   └── rag_chain_service.py # RAG chain orchestration
-├── benchmark/
-│   └── benchmark_llm.py     # LLM benchmarking tools
-└── tests/
-    ├── test_llm.py          # LLM tests
-    └── check_vectorstore.py # Vector store diagnostics
+└── benchmark/
+    ├── __init__.py          # Module init
+    ├── benchmark_llm.py     # LLM benchmarking tools
+    └── ingest.py            # PDF document ingestion pipeline
 ```
 
 ### Authentication Service (Port 4000)
@@ -255,7 +259,7 @@ backend/authentication/
 | POST | `/:conversationId/messages/batch` | Batch save user + AI messages after stream completes |
 | GET | `/:id` | Get single conversation by ID |
 | PUT | `/:id` | Update conversation title |
-| DELETE | `/:id` | Delete conversation and its messages |
+| DELETE | `/:id` | Delete conversation and its messages (graceful handling if no messages exist) |
 
 ### Message Endpoints (Base: `http://localhost:4004/api/conversations`)
 
@@ -303,13 +307,15 @@ App
 ┌─────────────────────────────────────────────────────────────────┐
 │                        ChatbotPage State                         │
 ├─────────────────────────────────────────────────────────────────┤
-│  conversationId ─────────────┬───────► Sidebar (click sets ID)  │
+│  conversationId ───────────┬───────► Sidebar (click sets ID)  │
 │                              │                                   │
-│  messages[] ─────────────────┼───────► Conversation component   │
+│  messages[] ────────────────┼───────► Conversation component   │
 │                              │                                   │
 │  conversationTitles[] ───────┼───────► Sidebar list             │
 │                              │                                   │
-│  isFirstMessage ─────────────┴───────► Internal flag            │
+│  isStreaming ───────────────┼───────► MessageInput (disable)   │
+│                              │                                   │
+│  streamingMessage ──────────┴───────► Conversation (AI typing) │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -345,9 +351,9 @@ App
 
 ### LLM Stack
 - **Ollama** - Local LLM runtime
-- **Qwen 3 1.7B** - Main LLM model for response generation
-- **Qwen 3 Embedding 0.6B** - Document/query embedding model
-- **Jina Reranker v3** - Document reranking for improved retrieval
+- **qwen2.5:7b-instruct-q4_0** - Main LLM model for response generation
+- **Snowflake/snowflake-arctic-embed-l-v2.0** - Document/query embedding model
+- **cross-encoder/mmarco-mMiniLMv2-L12-H384-v1** - Document reranking for improved retrieval (optional)
 
 ---
 
@@ -362,11 +368,11 @@ App
    - Messages are saved to DB after stream completes via `/messages/batch`
 
 3. **RAG Pipeline**: The LLM service implements a full RAG pipeline:
-   - Query embedding using Qwen 3 Embedding 0.6B
-   - Vector search in ChromaDB (k=16 initial documents)
-   - Reranking with Jina Reranker v3 (top k=5)
+   - Query embedding using Snowflake Arctic Embed L v2.0
+   - Vector search in ChromaDB (k=8 initial documents)
+   - Reranking with mMiniLM cross-encoder (top k=5, if enabled)
    - Context formatting with German RAG prompt template
-   - Streaming response generation via Ollama
+   - Streaming response generation via Ollama (qwen2.5:7b-instruct-q4_0)
 
 4. **Conversation Titles**: New conversations start with "Untitled" and are renamed from the first message content (first 30 characters).
 
