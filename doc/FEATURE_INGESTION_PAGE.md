@@ -36,7 +36,7 @@ IngestionPage.jsx
 | Hook | Purpose |
 |------|---------|
 | `useBackendConfig` | Fetches dynamic configuration from backend (available DBs, image classes, embedding models) |
-| `useUndoRedo` | Manages document state with undo/redo history (max 50 steps) |
+| `useCommandHistory` | Command Pattern undo/redo - stores lightweight commands instead of full state copies (memory efficient for large documents) |
 | `useLocalCache` | Persists edit state to localStorage for session recovery |
 
 ### Services
@@ -131,13 +131,16 @@ sequenceDiagram
     participant PageContent
     participant TextItem/ImageItem
     participant IngestionPage
-    participant useUndoRedo
+    participant useCommandHistory
+    participant Commands
     participant useLocalCache
 
     User->>TextItem/ImageItem: Edit content/change classification
     TextItem/ImageItem->>IngestionPage: onEditItem(itemId, newContent) / onClassChange(itemId, newClass)
-    IngestionPage->>useUndoRedo: updateDocument(newState)
-    useUndoRedo->>useUndoRedo: Add to history (limit 50)
+    IngestionPage->>Commands: Create command (e.g., Commands.editItem(id, new, old))
+    IngestionPage->>useCommandHistory: executeCommand(command)
+    useCommandHistory->>useCommandHistory: Store command in past[], execute on present
+    Note over useCommandHistory: Only command object stored (~1KB), not full state (~5MB)
     IngestionPage->>IngestionPage: setHasUnsavedChanges(true)
     useLocalCache->>useLocalCache: Auto-save to localStorage (debounced)
     IngestionPage->>ContentViewer: Re-render with updated state
@@ -150,20 +153,19 @@ sequenceDiagram
     participant User
     participant TextItem/ImageItem
     participant IngestionPage
-    participant useUndoRedo
+    participant useCommandHistory
 
     User->>TextItem/ImageItem: Click delete button
     TextItem/ImageItem->>IngestionPage: onDeleteItem(itemId)
-    IngestionPage->>IngestionPage: Mark item as deleted: true
-    IngestionPage->>useUndoRedo: updateDocument(newState)
+    IngestionPage->>useCommandHistory: executeCommand(Commands.deleteItem(itemId))
+    Note over useCommandHistory: Command stores itemId only, undo() sets deleted=false
     IngestionPage->>User: Toast "Item deleted (can be undone)"
     
     Note over User: Item shows with strikethrough, restore button visible
     
     User->>TextItem/ImageItem: Click restore button
     TextItem/ImageItem->>IngestionPage: onRestoreItem(itemId)
-    IngestionPage->>IngestionPage: Mark item as deleted: false
-    IngestionPage->>useUndoRedo: updateDocument(newState)
+    IngestionPage->>useCommandHistory: executeCommand(Commands.restoreItem(itemId))
     IngestionPage->>User: Toast "Item restored"
 ```
 
@@ -248,30 +250,53 @@ sequenceDiagram
     end
 ```
 
-### 7. Undo/Redo Flow
+### 7. Undo/Redo Flow (Command Pattern)
+
+The undo/redo system uses the **Command Pattern** for memory efficiency. Instead of storing full document snapshots (~5MB each), it stores lightweight command objects (~1KB each).
+
+**Memory Comparison:**
+| Approach | 5MB doc, 50 undo steps |
+|----------|------------------------|
+| Full Snapshots (old) | ~250MB |
+| Command Pattern (new) | ~5MB + ~50KB |
 
 ```mermaid
 sequenceDiagram
     participant User
     participant SaveBar
     participant IngestionPage
-    participant useUndoRedo
+    participant useCommandHistory
 
     Note over User: Keyboard: Ctrl/Cmd+Z (undo), Ctrl/Cmd+Shift+Z (redo)
     Note over User: Or click Undo/Redo buttons in SaveBar
 
     User->>SaveBar: Click Undo / Press Ctrl+Z
     SaveBar->>IngestionPage: onUndo()
-    IngestionPage->>useUndoRedo: undo()
-    useUndoRedo->>useUndoRedo: Move present to future, past[-1] to present
+    IngestionPage->>useCommandHistory: undo()
+    useCommandHistory->>useCommandHistory: Pop command from past[]
+    useCommandHistory->>useCommandHistory: Call command.undo(present) → new state
+    useCommandHistory->>useCommandHistory: Push command to future[]
     IngestionPage->>IngestionPage: setHasUnsavedChanges(true)
     
     User->>SaveBar: Click Redo / Press Ctrl+Shift+Z
     SaveBar->>IngestionPage: onRedo()
-    IngestionPage->>useUndoRedo: redo()
-    useUndoRedo->>useUndoRedo: Move present to past, future[0] to present
+    IngestionPage->>useCommandHistory: redo()
+    useCommandHistory->>useCommandHistory: Pop command from future[]
+    useCommandHistory->>useCommandHistory: Call command.execute(present) → new state
+    useCommandHistory->>useCommandHistory: Push command to past[]
     IngestionPage->>IngestionPage: setHasUnsavedChanges(true)
 ```
+
+**Available Commands:**
+| Command | Usage | Stored Data |
+|---------|-------|-------------|
+| `Commands.editItem(id, new, old)` | Text content edit | itemId, newContent, oldContent |
+| `Commands.deleteItem(id)` | Soft delete | itemId only |
+| `Commands.restoreItem(id)` | Restore deleted | itemId only |
+| `Commands.changeClass(id, new, old)` | Image classification | itemId, newClass, oldClass |
+| `Commands.batchDelete(ids)` | Helper: remove logos/empty | Array of itemIds |
+| `Commands.batchUpdate(changes)` | AI helper results | Array of {itemId, newValues, oldValues} |
+| `Commands.renameDocument(new, old)` | Rename file | newFilename, oldFilename |
 
 ### 8. Session Recovery Flow
 
@@ -627,7 +652,8 @@ useEffect(() => {
 | `src/pages/IngestionPage.jsx` | ~607 | Main page component, state management, handlers |
 | `src/services/ingestionApi.js` | ~276 | API service with mock implementations |
 | `src/hooks/useBackendConfig.js` | ~61 | Backend config fetching hook |
-| `src/hooks/useUndoRedo.js` | ~167 | Undo/redo state management |
+| `src/hooks/useCommandHistory.js` | ~280 | Command Pattern undo/redo (memory efficient) |
+| `src/hooks/useLocalCache.js` | ~200 | LocalStorage persistence |
 | `src/hooks/useLocalCache.js` | ~200 | LocalStorage persistence |
 | `src/config/ingestionConfig.js` | ~119 | Feature configuration |
 | `src/mocks/ingestionMocks.js` | ~161 | Mock data for development |
