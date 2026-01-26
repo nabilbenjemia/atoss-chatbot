@@ -86,8 +86,29 @@ export default function LoginPage() {
         });
       }
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || "Unexpected error. Please try again.";
+      // Handle API errors (like wrong password - 401 status)
+      // Check if it's a wrong password error specifically
+      let errorMessage = "Wrong password. Please try again.";
+      
+      if (error.response?.status === 401) {
+        // For 401 errors, check if it's specifically a wrong password
+        const backendMessage = error.response?.data?.message || '';
+        if (backendMessage.includes('password') || backendMessage.includes('Invalid email or password')) {
+          errorMessage = "Wrong password. Please try again.";
+        } else if (backendMessage.includes('verify')) {
+          // Email verification error - use the backend message
+          errorMessage = backendMessage;
+        } else {
+          errorMessage = backendMessage || "Wrong password. Please try again.";
+        }
+      } else {
+        // For other errors, use the backend message or a generic one
+        errorMessage = error.response?.data?.message || error.message || "Login failed. Please check your credentials.";
+      }
+      
       setStatus({ type: "error", message: errorMessage });
+      // Don't clear the password field - let user try again
+      // Email field is already preserved since we don't modify form.email
     } finally {
       setLoading(false);
     }

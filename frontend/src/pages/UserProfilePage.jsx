@@ -44,6 +44,10 @@ export default function UserProfilePage() {
   // Delete account confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
+  // Add admin functionality
+  const [adminEmail, setAdminEmail] = useState('');
+  const [isAddingAdmin, setIsAddingAdmin] = useState(false);
+  
   // Theme state
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -70,7 +74,7 @@ export default function UserProfilePage() {
       // Make API call with explicit error handling to prevent auto-redirect
       const token = localStorage.getItem('auth_token');
       if (!token) {
-        toast.error('No authentication token found. Please log in again.');
+        toast.error(t.noAuthToken);
         navigate('/');
         return;
       }
@@ -110,17 +114,17 @@ export default function UserProfilePage() {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
-        toast.error('Session expired. Please log in again.');
+        toast.error(t.sessionExpired);
         // Use setTimeout to delay redirect after toast
         setTimeout(() => {
           navigate('/');
         }, 2000);
       } else if (error.code === 'ECONNREFUSED' || error.message?.includes('Network Error')) {
         // Service is not running
-        toast.error('User service is not available. Please check if the service is running.');
+        toast.error(t.serviceUnavailable);
       } else {
         // Other errors
-        toast.error(error.response?.data?.message || 'Failed to load profile information. Please try again.');
+        toast.error(error.response?.data?.message || t.failedToLoadProfile);
       }
     } finally {
       setLoading(false);
@@ -131,11 +135,11 @@ export default function UserProfilePage() {
     try {
       const response = await userAPI.updateUsername(username);
       if (response.success) {
-        toast.success('Username updated successfully');
+        toast.success(t.usernameUpdated);
         loadProfile();
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to update username');
+      toast.error(error.response?.data?.message || t.failedToUpdateUsername);
     }
   };
 
@@ -143,7 +147,7 @@ export default function UserProfilePage() {
     try {
       const response = await userAPI.updateRole(role);
       if (response.success) {
-        toast.success('Role updated successfully');
+        toast.success(t.roleUpdated);
         // Update local storage
         const user = getCurrentUser();
         if (user) {
@@ -153,7 +157,7 @@ export default function UserProfilePage() {
         loadProfile();
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to update role');
+      toast.error(error.response?.data?.message || t.failedToUpdateRole);
     }
   };
 
@@ -161,7 +165,7 @@ export default function UserProfilePage() {
     try {
       const response = await userAPI.updateDepartment(department);
       if (response.success) {
-        toast.success('Department updated successfully');
+        toast.success(t.departmentUpdated);
         // Update local storage
         const user = getCurrentUser();
         if (user) {
@@ -171,7 +175,7 @@ export default function UserProfilePage() {
         loadProfile();
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to update department');
+      toast.error(error.response?.data?.message || t.failedToUpdateDepartment);
     }
   };
 
@@ -180,11 +184,11 @@ export default function UserProfilePage() {
     const errors = {};
     
     if (!passwordData.currentPassword) {
-      errors.currentPassword = 'Current password is required';
+      errors.currentPassword = t.currentPasswordRequired;
     }
     
     if (!passwordData.newPassword) {
-      errors.newPassword = 'New password is required';
+      errors.newPassword = t.newPasswordRequired;
     } else {
       const passwordValidation = validatePassword(passwordData.newPassword);
       if (!passwordValidation.valid) {
@@ -193,7 +197,7 @@ export default function UserProfilePage() {
     }
     
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      errors.confirmPassword = 'Passwords do not match';
+      errors.confirmPassword = t.passwordsDoNotMatch;
     }
     
     if (Object.keys(errors).length > 0) {
@@ -207,7 +211,7 @@ export default function UserProfilePage() {
         passwordData.newPassword
       );
       if (response.success) {
-        toast.success('Password updated successfully');
+        toast.success(t.passwordUpdated);
         setShowPasswordForm(false);
         setPasswordData({
           currentPassword: '',
@@ -217,7 +221,7 @@ export default function UserProfilePage() {
         setPasswordErrors({});
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to update password');
+      toast.error(error.response?.data?.message || t.failedToUpdatePassword);
     }
   };
 
@@ -225,14 +229,14 @@ export default function UserProfilePage() {
     try {
       const response = await userAPI.updatePreferences(preferences);
       if (response.success) {
-        toast.success('Preferences updated successfully');
+        toast.success(t.preferencesUpdated);
         // Update dark mode immediately
         const userTheme = preferences.theme;
         setIsDarkMode(userTheme === 'dark');
         loadProfile();
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to update preferences');
+      toast.error(error.response?.data?.message || t.failedToUpdatePreferences);
     }
   };
 
@@ -241,13 +245,13 @@ export default function UserProfilePage() {
     if (file) {
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        toast.error('Please select an image file');
+        toast.error(t.pleaseSelectImageFile);
         return;
       }
 
       // Validate file size (2MB)
       if (file.size > 2 * 1024 * 1024) {
-        toast.error('Image size must be less than 2MB');
+        toast.error(t.imageSizeTooLarge);
         return;
       }
 
@@ -267,13 +271,13 @@ export default function UserProfilePage() {
       // Use the preview value for saving
       const response = await userAPI.updateProfilePicture(profilePicturePreview);
       if (response.success) {
-        toast.success('Profile picture updated successfully');
+        toast.success(t.profilePictureUpdated);
         setProfilePicture(profilePicturePreview);
         setOriginalProfilePicture(profilePicturePreview);
         loadProfile();
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to update profile picture');
+      toast.error(error.response?.data?.message || t.failedToUpdateProfilePicture);
     }
   };
 
@@ -281,13 +285,13 @@ export default function UserProfilePage() {
     try {
       const response = await userAPI.deleteProfilePicture();
       if (response.success) {
-        toast.success('Profile picture deleted successfully');
+        toast.success(t.profilePictureDeleted);
         setProfilePicture(null);
         setProfilePicturePreview(null);
         loadProfile();
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to delete profile picture');
+      toast.error(error.response?.data?.message || t.failedToDeleteProfilePicture);
     }
   };
 
@@ -295,21 +299,192 @@ export default function UserProfilePage() {
     try {
       const response = await userAPI.deleteAccount();
       if (response.success) {
-        toast.success('Account deleted successfully');
+        toast.success(t.accountDeleted);
         navigate('/');
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to delete account');
+      toast.error(error.response?.data?.message || t.failedToDeleteAccount);
     }
   };
 
-  if (loading) {
-    return (
-      <div className={`flex items-center justify-center h-screen ${isDarkMode ? 'bg-[#212121]' : 'bg-gray-50'}`}>
-        <div className="text-lg text-gray-600">Loading profile...</div>
-      </div>
-    );
-  }
+  const handleAddAdmin = async () => {
+    if (!adminEmail || !adminEmail.trim()) {
+      toast.error(t.pleaseEnterEmail);
+      return;
+    }
+
+    try {
+      setIsAddingAdmin(true);
+      const response = await userAPI.addAdmin(adminEmail.trim());
+      if (response.success) {
+        const successMessage = response.message || t.userPromoted.replace('{email}', adminEmail);
+        toast.success(successMessage);
+        setAdminEmail('');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || t.failedToPromoteUser);
+    } finally {
+      setIsAddingAdmin(false);
+    }
+  };
+
+  // Check if current user is admin
+  const isAdmin = currentUser?.role === 'Admin';
+
+  // Get language from preferences or default to English
+  const language = preferences.language || 'en';
+
+  // Translations
+  const translations = {
+    en: {
+      loadingProfile: 'Loading profile...',
+      backToChat: '← Back to Chat',
+      userProfile: 'User Profile',
+      manageAccountSettings: 'Manage your account settings',
+      profileInformation: 'Profile Information',
+      profilePicture: 'Profile Picture',
+      changePicture: 'Change Picture',
+      uploadPicture: 'Upload Picture',
+      save: 'Save',
+      delete: 'Delete',
+      profilePictureHint: 'Recommended: Square image, max 2MB. Supported formats: JPG, PNG, GIF',
+      email: 'Email',
+      verified: 'Verified',
+      notVerified: 'Not verified',
+      username: 'Username (Display Name)',
+      enterUsername: 'Enter username',
+      role: 'Role',
+      department: 'Department',
+      enterDepartmentName: 'Enter department name',
+      update: 'Update',
+      password: 'Password',
+      changePassword: 'Change Password',
+      cancel: 'Cancel',
+      currentPassword: 'Current Password',
+      newPassword: 'New Password',
+      confirmNewPassword: 'Confirm New Password',
+      updatePassword: 'Update Password',
+      currentPasswordRequired: 'Current password is required',
+      newPasswordRequired: 'New password is required',
+      passwordsDoNotMatch: 'Passwords do not match',
+      preferences: 'Preferences',
+      theme: 'Theme',
+      language: 'Language',
+      savePreferences: 'Save Preferences',
+      addAdmins: 'Add Admins',
+      addAdminsDescription: 'Promote Staff users to Admin by entering their email address. Only users with the \'Staff\' role can be promoted.',
+      userEmail: 'User Email',
+      enterUserEmail: 'Enter user email address',
+      promoteToAdmin: 'Promote to Admin',
+      promoting: 'Promoting...',
+      adminOnly: 'Admin Only',
+      dangerZone: 'Danger Zone',
+      deleteAccountWarning: 'Once you delete your account, there is no going back. Please be certain.',
+      deleteAccount: 'Delete Account',
+      deleteAccountConfirm: 'Are you sure you want to delete your account? This action cannot be undone.',
+      yesDeleteAccount: 'Yes, Delete My Account',
+      usernameUpdated: 'Username updated successfully',
+      roleUpdated: 'Role updated successfully',
+      departmentUpdated: 'Department updated successfully',
+      passwordUpdated: 'Password updated successfully',
+      preferencesUpdated: 'Preferences updated successfully',
+      profilePictureUpdated: 'Profile picture updated successfully',
+      profilePictureDeleted: 'Profile picture deleted successfully',
+      accountDeleted: 'Account deleted successfully',
+      pleaseEnterEmail: 'Please enter an email address',
+      userPromoted: 'User with email {email} has been promoted to Admin successfully',
+      failedToUpdateUsername: 'Failed to update username',
+      failedToUpdateRole: 'Failed to update role',
+      failedToUpdateDepartment: 'Failed to update department',
+      failedToUpdatePassword: 'Failed to update password',
+      failedToUpdatePreferences: 'Failed to update preferences',
+      failedToUpdateProfilePicture: 'Failed to update profile picture',
+      failedToDeleteProfilePicture: 'Failed to delete profile picture',
+      failedToDeleteAccount: 'Failed to delete account',
+      failedToPromoteUser: 'Failed to promote user to admin',
+      pleaseSelectImageFile: 'Please select an image file',
+      imageSizeTooLarge: 'Image size must be less than 2MB',
+      noAuthToken: 'No authentication token found. Please log in again.',
+      sessionExpired: 'Session expired. Please log in again.',
+      serviceUnavailable: 'User service is not available. Please check if the service is running.',
+      failedToLoadProfile: 'Failed to load profile information. Please try again.'
+    },
+    de: {
+      loadingProfile: 'Profil wird geladen...',
+      backToChat: '← Zurück zum Chat',
+      userProfile: 'Benutzerprofil',
+      manageAccountSettings: 'Verwalten Sie Ihre Kontoeinstellungen',
+      profileInformation: 'Profilinformationen',
+      profilePicture: 'Profilbild',
+      changePicture: 'Bild ändern',
+      uploadPicture: 'Bild hochladen',
+      save: 'Speichern',
+      delete: 'Löschen',
+      profilePictureHint: 'Empfohlen: Quadratisches Bild, max. 2MB. Unterstützte Formate: JPG, PNG, GIF',
+      email: 'E-Mail',
+      verified: 'Verifiziert',
+      notVerified: 'Nicht verifiziert',
+      username: 'Benutzername (Anzeigename)',
+      enterUsername: 'Benutzernamen eingeben',
+      role: 'Rolle',
+      department: 'Abteilung',
+      enterDepartmentName: 'Abteilungsname eingeben',
+      update: 'Aktualisieren',
+      password: 'Passwort',
+      changePassword: 'Passwort ändern',
+      cancel: 'Abbrechen',
+      currentPassword: 'Aktuelles Passwort',
+      newPassword: 'Neues Passwort',
+      confirmNewPassword: 'Neues Passwort bestätigen',
+      updatePassword: 'Passwort aktualisieren',
+      currentPasswordRequired: 'Aktuelles Passwort ist erforderlich',
+      newPasswordRequired: 'Neues Passwort ist erforderlich',
+      passwordsDoNotMatch: 'Passwörter stimmen nicht überein',
+      preferences: 'Einstellungen',
+      theme: 'Design',
+      language: 'Sprache',
+      savePreferences: 'Einstellungen speichern',
+      addAdmins: 'Administratoren hinzufügen',
+      addAdminsDescription: 'Befördern Sie Mitarbeiter zu Administratoren, indem Sie deren E-Mail-Adresse eingeben. Nur Benutzer mit der Rolle \'Mitarbeiter\' können befördert werden.',
+      userEmail: 'Benutzer-E-Mail',
+      enterUserEmail: 'E-Mail-Adresse des Benutzers eingeben',
+      promoteToAdmin: 'Zu Administrator befördern',
+      promoting: 'Befördere...',
+      adminOnly: 'Nur für Administratoren',
+      dangerZone: 'Gefahrenzone',
+      deleteAccountWarning: 'Sobald Sie Ihr Konto löschen, gibt es kein Zurück mehr. Bitte seien Sie sich sicher.',
+      deleteAccount: 'Konto löschen',
+      deleteAccountConfirm: 'Sind Sie sicher, dass Sie Ihr Konto löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
+      yesDeleteAccount: 'Ja, mein Konto löschen',
+      usernameUpdated: 'Benutzername erfolgreich aktualisiert',
+      roleUpdated: 'Rolle erfolgreich aktualisiert',
+      departmentUpdated: 'Abteilung erfolgreich aktualisiert',
+      passwordUpdated: 'Passwort erfolgreich aktualisiert',
+      preferencesUpdated: 'Einstellungen erfolgreich aktualisiert',
+      profilePictureUpdated: 'Profilbild erfolgreich aktualisiert',
+      profilePictureDeleted: 'Profilbild erfolgreich gelöscht',
+      accountDeleted: 'Konto erfolgreich gelöscht',
+      pleaseEnterEmail: 'Bitte geben Sie eine E-Mail-Adresse ein',
+      userPromoted: 'Benutzer mit E-Mail {email} wurde erfolgreich zu Administrator befördert',
+      failedToUpdateUsername: 'Benutzername konnte nicht aktualisiert werden',
+      failedToUpdateRole: 'Rolle konnte nicht aktualisiert werden',
+      failedToUpdateDepartment: 'Abteilung konnte nicht aktualisiert werden',
+      failedToUpdatePassword: 'Passwort konnte nicht aktualisiert werden',
+      failedToUpdatePreferences: 'Einstellungen konnten nicht aktualisiert werden',
+      failedToUpdateProfilePicture: 'Profilbild konnte nicht aktualisiert werden',
+      failedToDeleteProfilePicture: 'Profilbild konnte nicht gelöscht werden',
+      failedToDeleteAccount: 'Konto konnte nicht gelöscht werden',
+      failedToPromoteUser: 'Benutzer konnte nicht zu Administrator befördert werden',
+      pleaseSelectImageFile: 'Bitte wählen Sie eine Bilddatei aus',
+      imageSizeTooLarge: 'Bildgröße muss weniger als 2MB betragen',
+      noAuthToken: 'Kein Authentifizierungstoken gefunden. Bitte melden Sie sich erneut an.',
+      sessionExpired: 'Sitzung abgelaufen. Bitte melden Sie sich erneut an.',
+      serviceUnavailable: 'Benutzerservice ist nicht verfügbar. Bitte überprüfen Sie, ob der Service läuft.',
+      failedToLoadProfile: 'Profilinformationen konnten nicht geladen werden. Bitte versuchen Sie es erneut.'
+    }
+  };
+
+  const t = translations[language] || translations.en;
 
   return (
     <div className={`min-h-screen py-8 ${isDarkMode ? 'bg-[#212121]' : 'bg-gray-50'}`}>
@@ -320,20 +495,20 @@ export default function UserProfilePage() {
             onClick={() => navigate('/chatbot')}
             className="px-4 py-2 bg-tum-blue text-white rounded-lg hover:bg-tum-dark-blue transition-colors mb-4 inline-flex items-center"
           >
-            ← Back to Chat
+            {t.backToChat}
           </button>
-          <h1 className={`text-3xl font-bold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>User Profile</h1>
-          <p className={`mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Manage your account settings</p>
+          <h1 className={`text-3xl font-bold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>{t.userProfile}</h1>
+          <p className={`mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{t.manageAccountSettings}</p>
         </div>
 
         {/* Profile Information Section */}
         <div className={`rounded-lg shadow-md p-6 mb-6 ${isDarkMode ? 'bg-[#2f2f2f] border border-gray-700' : 'bg-white'}`}>
-          <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>Profile Information</h2>
+          <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>{t.profileInformation}</h2>
           
           {/* Profile Picture */}
           <div className={`mb-6 pb-6 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
             <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-              Profile Picture
+              {t.profilePicture}
             </label>
             <div className="flex items-center gap-6">
               {/* Profile Picture Preview */}
@@ -355,7 +530,7 @@ export default function UserProfilePage() {
               <div className="flex-1 flex flex-col gap-2">
                 <div className="flex gap-2">
                   <label className="px-3 py-1.5 text-sm bg-tum-blue text-white rounded-xl hover:bg-tum-dark-blue transition-colors cursor-pointer inline-block">
-                    {profilePicturePreview ? 'Change Picture' : 'Upload Picture'}
+                    {profilePicturePreview ? t.changePicture : t.uploadPicture}
                     <input
                       type="file"
                       accept="image/*"
@@ -369,19 +544,19 @@ export default function UserProfilePage() {
                         onClick={handleUpdateProfilePicture}
                         className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors"
                       >
-                        Save
+                        {t.save}
                       </button>
                       <button
                         onClick={handleDeleteProfilePicture}
                         className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
                       >
-                        Delete
+                        {t.delete}
                       </button>
                     </>
                   )}
                 </div>
                 <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  Recommended: Square image, max 2MB. Supported formats: JPG, PNG, GIF
+                  {t.profilePictureHint}
                 </p>
               </div>
             </div>
@@ -390,7 +565,7 @@ export default function UserProfilePage() {
           {/* Email (Read-only) */}
           <div className="mb-4">
             <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-              Email
+              {t.email}
             </label>
             <input
               type="email"
@@ -399,23 +574,23 @@ export default function UserProfilePage() {
               className={`w-full px-4 py-2 border rounded-lg cursor-not-allowed ${isDarkMode ? 'bg-[#1f1f1f] border-gray-600 text-gray-400' : 'border-gray-300 bg-gray-50 text-gray-600'}`}
             />
             {emailVerified ? (
-              <span className="text-sm text-green-600 mt-1 inline-block">✓ Verified</span>
+              <span className="text-sm text-green-600 mt-1 inline-block">✓ {t.verified}</span>
             ) : (
-              <span className="text-sm text-orange-600 mt-1 inline-block">⚠ Not verified</span>
+              <span className="text-sm text-orange-600 mt-1 inline-block">⚠ {t.notVerified}</span>
             )}
           </div>
 
           {/* Username */}
           <div className="mb-4">
             <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-              Username (Display Name)
+              {t.username}
             </label>
             <div className="flex gap-2 items-center">
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter username"
+                placeholder={t.enterUsername}
                 maxLength={50}
                 className={`flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue ${isDarkMode ? 'bg-[#1f1f1f] border-gray-600 text-gray-200' : 'border-gray-300'}`}
               />
@@ -423,7 +598,7 @@ export default function UserProfilePage() {
                 onClick={handleUpdateUsername}
                 className="px-4 py-2 text-sm bg-tum-blue text-white rounded-xl hover:bg-tum-dark-blue transition-colors whitespace-nowrap"
               >
-                Update
+                {t.update}
               </button>
             </div>
           </div>
@@ -431,7 +606,7 @@ export default function UserProfilePage() {
           {/* Role */}
           <div className="mb-4">
             <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-              Role
+              {t.role}
             </label>
             <div className="flex gap-2 items-center">
               <select
@@ -446,7 +621,7 @@ export default function UserProfilePage() {
                 onClick={handleUpdateRole}
                 className="px-4 py-2 text-sm bg-tum-blue text-white rounded-xl hover:bg-tum-dark-blue transition-colors whitespace-nowrap"
               >
-                Update
+                {t.update}
               </button>
             </div>
           </div>
@@ -454,21 +629,21 @@ export default function UserProfilePage() {
           {/* Department */}
           <div className="mb-4">
             <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-              Department
+              {t.department}
             </label>
             <div className="flex gap-2 items-center">
               <input
                 type="text"
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                placeholder="Enter department name"
+                placeholder={t.enterDepartmentName}
                 className={`flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue ${isDarkMode ? 'bg-[#1f1f1f] border-gray-600 text-gray-200' : 'border-gray-300'}`}
               />
               <button
                 onClick={handleUpdateDepartment}
                 className="px-4 py-2 text-sm bg-tum-blue text-white rounded-xl hover:bg-tum-dark-blue transition-colors whitespace-nowrap"
               >
-                Update
+                {t.update}
               </button>
             </div>
           </div>
@@ -477,12 +652,12 @@ export default function UserProfilePage() {
         {/* Password Change Section */}
         <div className={`rounded-lg shadow-md p-6 mb-6 ${isDarkMode ? 'bg-[#2f2f2f] border border-gray-700' : 'bg-white'}`}>
           <div className="flex justify-between items-center mb-4">
-            <h2 className={`text-xl font-semibold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>Password</h2>
+            <h2 className={`text-xl font-semibold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>{t.password}</h2>
             <button
               onClick={() => setShowPasswordForm(!showPasswordForm)}
               className="px-4 py-1.5 text-sm bg-tum-blue text-white rounded-xl hover:bg-tum-dark-blue transition-colors"
             >
-              {showPasswordForm ? 'Cancel' : 'Change Password'}
+              {showPasswordForm ? t.cancel : t.changePassword}
             </button>
           </div>
           
@@ -490,7 +665,7 @@ export default function UserProfilePage() {
             <div className="space-y-4">
               <div>
                 <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Current Password
+                  {t.currentPassword}
                 </label>
                 <input
                   type="password"
@@ -505,7 +680,7 @@ export default function UserProfilePage() {
               
               <div>
                 <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  New Password
+                  {t.newPassword}
                 </label>
                 <input
                   type="password"
@@ -520,7 +695,7 @@ export default function UserProfilePage() {
               
               <div>
                 <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Confirm New Password
+                  {t.confirmNewPassword}
                 </label>
                 <input
                   type="password"
@@ -537,7 +712,7 @@ export default function UserProfilePage() {
                 onClick={handlePasswordChange}
                 className="px-4 py-1.5 text-sm bg-tum-blue text-white rounded-xl hover:bg-tum-dark-blue transition-colors"
               >
-                Update Password
+                {t.updatePassword}
               </button>
             </div>
           )}
@@ -545,12 +720,12 @@ export default function UserProfilePage() {
 
         {/* Preferences Section */}
         <div className={`rounded-lg shadow-md p-6 mb-6 ${isDarkMode ? 'bg-[#2f2f2f] border border-gray-700' : 'bg-white'}`}>
-          <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>Preferences</h2>
+          <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>{t.preferences}</h2>
           
           <div className="space-y-4">
             <div>
               <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Theme
+                {t.theme}
               </label>
               <select
                 value={preferences.theme}
@@ -564,7 +739,7 @@ export default function UserProfilePage() {
             
             <div>
               <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Language
+                {t.language}
               </label>
               <select
                 value={preferences.language}
@@ -580,44 +755,96 @@ export default function UserProfilePage() {
               onClick={handleUpdatePreferences}
               className="px-4 py-1.5 text-sm bg-tum-blue text-white rounded-xl hover:bg-tum-dark-blue transition-colors"
             >
-              Save Preferences
+              {t.savePreferences}
             </button>
           </div>
         </div>
 
+        {/* Add Admins Section */}
+        <div className={`rounded-lg shadow-md p-6 mb-6 relative ${isDarkMode ? 'bg-[#2f2f2f] border border-gray-700' : 'bg-white'} ${!isAdmin ? 'opacity-50' : ''}`}>
+          <div className={!isAdmin ? 'pointer-events-none' : ''}>
+            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+              {t.addAdmins}
+            </h2>
+            <p className={`text-sm mb-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              {t.addAdminsDescription}
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  {t.userEmail}
+                </label>
+                <input
+                  type="email"
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  placeholder={t.enterUserEmail}
+                  disabled={!isAdmin || isAddingAdmin}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue ${
+                    isDarkMode 
+                      ? 'bg-[#1f1f1f] border-gray-600 text-gray-200' 
+                      : 'border-gray-300'
+                  } ${!isAdmin || isAddingAdmin ? 'cursor-not-allowed opacity-60' : ''}`}
+                />
+              </div>
+              
+              <button
+                onClick={handleAddAdmin}
+                disabled={!isAdmin || isAddingAdmin || !adminEmail.trim()}
+                className={`px-4 py-2 text-sm rounded-xl transition-colors ${
+                  isAdmin && !isAddingAdmin && adminEmail.trim()
+                    ? 'bg-tum-blue text-white hover:bg-tum-dark-blue'
+                    : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                }`}
+              >
+                {isAddingAdmin ? t.promoting : t.promoteToAdmin}
+              </button>
+            </div>
+          </div>
+          
+          {!isAdmin && (
+            <div className={`absolute inset-0 flex items-center justify-center ${isDarkMode ? 'bg-[#2f2f2f]/80' : 'bg-white/80'} rounded-lg`}>
+              <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                {t.adminOnly}
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Danger Zone */}
         <div className={`rounded-lg shadow-md p-6 border-2 ${isDarkMode ? 'bg-[#2f2f2f] border-red-800' : 'bg-white border-red-200'}`}>
-          <h2 className="text-xl font-semibold text-red-600 mb-4">Danger Zone</h2>
+          <h2 className="text-xl font-semibold text-red-600 mb-4">{t.dangerZone}</h2>
           
           {!showDeleteConfirm ? (
             <div>
               <p className={`mb-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                Once you delete your account, there is no going back. Please be certain.
+                {t.deleteAccountWarning}
               </p>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
                 className="px-4 py-1.5 text-sm bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
               >
-                Delete Account
+                {t.deleteAccount}
               </button>
             </div>
           ) : (
             <div>
               <p className="text-red-600 font-semibold mb-4">
-                Are you sure you want to delete your account? This action cannot be undone.
+                {t.deleteAccountConfirm}
               </p>
               <div className="flex gap-2">
                 <button
                   onClick={handleDeleteAccount}
                   className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                 >
-                  Yes, Delete My Account
+                  {t.yesDeleteAccount}
                 </button>
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
                   className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
                 >
-                  Cancel
+                  {t.cancel}
                 </button>
               </div>
             </div>

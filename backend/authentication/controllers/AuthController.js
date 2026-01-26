@@ -275,15 +275,17 @@ class AuthController {
 	/**
 	 * Update user role (for user service)
 	 * PATCH /auth/user/:userId/role
+	 * Allows admins to update any user's role, or users to update their own role
 	 */
 	async updateUserRole(req, res) {
 		try {
 			const { userId } = req.params;
 			const { role } = req.body;
 			const requestingUserId = req.user?.id;
+			const requestingUserRole = req.user?.role;
 
-			// Users can only update their own role
-			if (requestingUserId !== userId) {
+			// Check if user is admin or updating their own role
+			if (requestingUserRole !== 'Admin' && requestingUserId !== userId) {
 				return res.status(403).json({
 					success: false,
 					message: 'Forbidden: You can only update your own role'
@@ -308,6 +310,37 @@ class AuthController {
 			res.status(400).json({
 				success: false,
 				message: error.message || 'Failed to update role'
+			});
+		}
+	}
+
+	/**
+	 * Get user by email (for admin use)
+	 * GET /auth/user/email/:email
+	 */
+	async getUserByEmail(req, res) {
+		try {
+			const { email } = req.params;
+			const requestingUserRole = req.user?.role;
+
+			// Only admins can get user by email
+			if (requestingUserRole !== 'Admin') {
+				return res.status(403).json({
+					success: false,
+					message: 'Forbidden: Only admins can access this endpoint'
+				});
+			}
+
+			const user = await authService.getUserByEmail(email);
+
+			res.status(200).json({
+				success: true,
+				data: user
+			});
+		} catch (error) {
+			res.status(404).json({
+				success: false,
+				message: error.message || 'User not found'
 			});
 		}
 	}
