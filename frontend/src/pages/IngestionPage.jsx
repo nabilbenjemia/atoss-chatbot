@@ -13,7 +13,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import useBackendConfig from '../hooks/useBackendConfig';
-import useUndoRedo from '../hooks/useUndoRedo';
+import useCommandHistory, { Commands } from '../hooks/useCommandHistory';
 import useLocalCache, { loadFromCache, clearCache, hasCache } from '../hooks/useLocalCache';
 import {
     uploadDocument,
@@ -48,16 +48,16 @@ export default function IngestionPage() {
     const [selectedDocumentId, setSelectedDocumentId] = useState(null);
     const [isDragging, setIsDragging] = useState(false);
 
-    // Document content state with undo/redo
+    // Document content state with command-based undo/redo (memory efficient)
     const {
         state: documentState,
-        update: updateDocument,
+        execute: executeCommand,
         undo,
         redo,
         reset: resetDocument,
         canUndo,
         canRedo,
-    } = useUndoRedo(null);
+    } = useCommandHistory(null);
 
     // UI state
     const [currentPage, setCurrentPage] = useState(1);
@@ -263,11 +263,11 @@ export default function IngestionPage() {
         if (documentState) {
             const doc = uploadQueue.find(d => d.id === docId);
             if (doc && doc.documentId === selectedDocumentId) {
-                updateDocument({ ...documentState, filename: newFilename });
+                executeCommand(Commands.renameDocument(newFilename, documentState.filename));
             }
         }
         toast.success('File renamed');
-    }, [documentState, uploadQueue, selectedDocumentId, updateDocument]);
+    }, [documentState, uploadQueue, selectedDocumentId, executeCommand]);
 
     // Navigation between pages
     const goToPage = useCallback((page) => {
@@ -278,70 +278,62 @@ export default function IngestionPage() {
         setCurrentPage(newPage);
     }, [documentState]);
 
-    // Edit handlers
+    // Edit handlers - using Command Pattern for memory efficiency
     const handleEditItem = useCallback((itemId, newContent) => {
         console.log('[IngestionPage] 🎯 handleEditItem (USER ACTION)', { itemId, newContent: newContent?.substring(0, 50) + '...' });
         if (!documentState) return;
 
-        const updatedPages = documentState.pages.map((page) => ({
-            ...page,
-            items: page.items.map((item) =>
-                item.id === itemId ? { ...item, content: newContent } : item
-            ),
-        }));
+        // Find the old content for the undo operation
+        let oldContent = '';
+        for (const page of documentState.pages) {
+            const item = page.items.find(i => i.id === itemId);
+            if (item) {
+                oldContent = item.content;
+                break;
+            }
+        }
 
-        updateDocument({ ...documentState, pages: updatedPages });
+        executeCommand(Commands.editItem(itemId, newContent, oldContent));
         setHasUnsavedChanges(true);
-    }, [documentState, updateDocument]);
+    }, [documentState, executeCommand]);
 
     const handleDeleteItem = useCallback((itemId) => {
         console.log('[IngestionPage] 🎯 handleDeleteItem (USER ACTION)', { itemId });
         if (!documentState) return;
 
-        const updatedPages = documentState.pages.map((page) => ({
-            ...page,
-            items: page.items.map((item) =>
-                item.id === itemId ? { ...item, deleted: true } : item
-            ),
-        }));
-
-        updateDocument({ ...documentState, pages: updatedPages });
+        executeCommand(Commands.deleteItem(itemId));
         setHasUnsavedChanges(true);
         toast.info('Item deleted (can be undone)');
-    }, [documentState, updateDocument]);
+    }, [documentState, executeCommand]);
 
     const handleRestoreItem = useCallback((itemId) => {
         console.log('[IngestionPage] 🎯 handleRestoreItem (USER ACTION)', { itemId });
         if (!documentState) return;
 
-        const updatedPages = documentState.pages.map((page) => ({
-            ...page,
-            items: page.items.map((item) =>
-                item.id === itemId ? { ...item, deleted: false } : item
-            ),
-        }));
-
-        updateDocument({ ...documentState, pages: updatedPages });
+        executeCommand(Commands.restoreItem(itemId));
         setHasUnsavedChanges(true);
         toast.info('Item restored');
-    }, [documentState, updateDocument]);
+    }, [documentState, executeCommand]);
 
     const handleClassChange = useCallback((itemId, newClass) => {
         console.log('[IngestionPage] 🎯 handleClassChange (USER ACTION)', { itemId, newClass });
         if (!documentState) return;
 
-        const updatedPages = documentState.pages.map((page) => ({
-            ...page,
-            items: page.items.map((item) =>
-                item.id === itemId ? { ...item, classification: newClass } : item
-            ),
-        }));
+        // Find the old classification for undo
+        let oldClass = '';
+        for (const page of documentState.pages) {
+            const item = page.items.find(i => i.id === itemId);
+            if (item) {
+                oldClass = item.classification || '';
+                break;
+            }
+        }
 
-        updateDocument({ ...documentState, pages: updatedPages });
+        executeCommand(Commands.changeClass(itemId, newClass, oldClass));
         setHasUnsavedChanges(true);
-    }, [documentState, updateDocument]);
+    }, [documentState, executeCommand]);
 
-    // Helper functions
+    // Helper functions - using Command Pattern for batch operations
     const handleRunHelper = useCallback(async (helperId) => {
         console.log('[IngestionPage] 🎯 handleRunHelper (USER ACTION)', { helperId });
         if (!documentState) return;
@@ -355,45 +347,47 @@ export default function IngestionPage() {
         setRunningHelper(helperId);
 
         try {
-            let updatedPages = [...documentState.pages];
             let message = '';
 
             switch (helperId) {
                 case 'remove_logos': {
-                    // Remove all images classified as 'logo'
-                    let count = 0;
-                    updatedPages = updatedPages.map((page) => ({
-                        ...page,
-                        items: page.items.map((item) => {
+                    // Collect all logo item IDs
+                    const logoItemIds = [];
+                    for (const page of documentState.pages) {
+                        for (const item of page.items) {
                             if (item.type === 'image' && item.classification === 'logo' && !item.deleted) {
-                                count++;
-                                return { ...item, deleted: true };
+                                logoItemIds.push(item.id);
                             }
-                            return item;
-                        }),
-                    }));
-                    message = count > 0 ? `${count} logo(s) removed` : 'No logos found';
+                        }
+                    }
+
+                    if (logoItemIds.length > 0) {
+                        executeCommand(Commands.batchDelete(logoItemIds));
+                        setHasUnsavedChanges(true);
+                    }
+                    message = logoItemIds.length > 0 ? `${logoItemIds.length} logo(s) removed` : 'No logos found';
                     break;
                 }
 
                 case 'remove_empty': {
-                    // Remove text items with empty or minimal content
-                    let count = 0;
-                    updatedPages = updatedPages.map((page) => ({
-                        ...page,
-                        items: page.items.map((item) => {
+                    // Collect all empty text item IDs
+                    const emptyItemIds = [];
+                    for (const page of documentState.pages) {
+                        for (const item of page.items) {
                             if (item.type === 'text' && !item.deleted) {
                                 const trimmed = item.content.trim();
-                                // Empty or single character/digit
                                 if (!trimmed || trimmed.length <= 1) {
-                                    count++;
-                                    return { ...item, deleted: true };
+                                    emptyItemIds.push(item.id);
                                 }
                             }
-                            return item;
-                        }),
-                    }));
-                    message = count > 0 ? `${count} empty item(s) removed` : 'No empty items found';
+                        }
+                    }
+
+                    if (emptyItemIds.length > 0) {
+                        executeCommand(Commands.batchDelete(emptyItemIds));
+                        setHasUnsavedChanges(true);
+                    }
+                    message = emptyItemIds.length > 0 ? `${emptyItemIds.length} empty item(s) removed` : 'No empty items found';
                     break;
                 }
 
@@ -401,18 +395,30 @@ export default function IngestionPage() {
                     // Call backend helper (mocked)
                     const result = await runBackendHelper(selectedDocumentId, helperId, {});
                     if (result.success && result.modifiedItems) {
-                        // Apply AI-generated descriptions
-                        const modifiedMap = new Map(result.modifiedItems.map(m => [m.id, m]));
-                        updatedPages = updatedPages.map((page) => ({
-                            ...page,
-                            items: page.items.map((item) => {
-                                const modified = modifiedMap.get(item.id);
-                                if (modified && modified.description) {
-                                    return { ...item, description: modified.description };
+                        // Build batch update changes
+                        const changes = result.modifiedItems
+                            .filter(m => m.description)
+                            .map(m => {
+                                // Find old description
+                                let oldDescription = '';
+                                for (const page of documentState.pages) {
+                                    const item = page.items.find(i => i.id === m.id);
+                                    if (item) {
+                                        oldDescription = item.description || '';
+                                        break;
+                                    }
                                 }
-                                return item;
-                            }),
-                        }));
+                                return {
+                                    itemId: m.id,
+                                    newValues: { description: m.description },
+                                    oldValues: { description: oldDescription },
+                                };
+                            });
+
+                        if (changes.length > 0) {
+                            executeCommand(Commands.batchUpdate(changes));
+                            setHasUnsavedChanges(true);
+                        }
                         message = result.message || 'AI descriptions generated';
                     }
                     break;
@@ -422,8 +428,6 @@ export default function IngestionPage() {
                     message = 'Unknown helper';
             }
 
-            updateDocument({ ...documentState, pages: updatedPages });
-            setHasUnsavedChanges(true);
             toast.success(message);
         } catch (error) {
             console.error('Helper failed:', error);
@@ -431,35 +435,34 @@ export default function IngestionPage() {
         } finally {
             setRunningHelper(null);
         }
-    }, [documentState, selectedDocumentId, updateDocument]);
+    }, [documentState, selectedDocumentId, executeCommand]);
 
-    // Handle regex delete
+    // Handle regex delete - using batch delete command
     const handleRegexDelete = useCallback((pattern) => {
         console.log('[IngestionPage] 🎯 handleRegexDelete (USER ACTION)', { pattern });
         if (!documentState) return;
 
         try {
             const regex = new RegExp(pattern);
-            let count = 0;
+            const matchingItemIds = [];
 
-            const updatedPages = documentState.pages.map((page) => ({
-                ...page,
-                items: page.items.map((item) => {
+            for (const page of documentState.pages) {
+                for (const item of page.items) {
                     if (item.type === 'text' && !item.deleted && regex.test(item.content)) {
-                        count++;
-                        return { ...item, deleted: true };
+                        matchingItemIds.push(item.id);
                     }
-                    return item;
-                }),
-            }));
+                }
+            }
 
-            updateDocument({ ...documentState, pages: updatedPages });
-            setHasUnsavedChanges(true);
-            toast.success(count > 0 ? `${count} item(s) matched and deleted` : 'No matches found');
+            if (matchingItemIds.length > 0) {
+                executeCommand(Commands.batchDelete(matchingItemIds));
+                setHasUnsavedChanges(true);
+            }
+            toast.success(matchingItemIds.length > 0 ? `${matchingItemIds.length} item(s) matched and deleted` : 'No matches found');
         } catch {
             toast.error('Invalid regex pattern');
         }
-    }, [documentState, updateDocument]);
+    }, [documentState, executeCommand]);
 
     // Start ingestion
     const handleStartIngestion = useCallback(async (targetDb) => {
@@ -641,12 +644,17 @@ export default function IngestionPage() {
                                         onBlur={() => {
                                             const trimmed = editingTitleValue.trim();
                                             if (trimmed && trimmed !== documentState.filename) {
-                                                // Update document state
-                                                updateDocument({ ...documentState, filename: trimmed });
+                                                // Update document state using command
+                                                executeCommand(Commands.renameDocument(trimmed, documentState.filename));
+                                                setHasUnsavedChanges(true);
                                                 // Update upload queue
                                                 const doc = uploadQueue.find(d => d.documentId === selectedDocumentId);
                                                 if (doc) {
-                                                    handleRenameFile(doc.id, trimmed);
+                                                    setUploadQueue((prev) =>
+                                                        prev.map((d) =>
+                                                            d.id === doc.id ? { ...d, filename: trimmed } : d
+                                                        )
+                                                    );
                                                 }
                                             }
                                             setIsEditingTitle(false);
