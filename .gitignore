@@ -78,7 +78,7 @@ frontend/.storybook/
 frontend/tests/
 pyrightconfig.json
 backend/llm/docling/
-doc/FEATURE_*.md
+
 
 # Speckit - AI spec generation
 .specify/
