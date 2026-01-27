@@ -143,24 +143,6 @@ export default function UserProfilePage() {
     }
   };
 
-  const handleUpdateRole = async () => {
-    try {
-      const response = await userAPI.updateRole(role);
-      if (response.success) {
-        toast.success(t.roleUpdated);
-        // Update local storage
-        const user = getCurrentUser();
-        if (user) {
-          user.role = role;
-          localStorage.setItem('user', JSON.stringify(user));
-        }
-        loadProfile();
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.message || t.failedToUpdateRole);
-    }
-  };
-
   const handleUpdateDepartment = async () => {
     try {
       const response = await userAPI.updateDepartment(department);
@@ -384,7 +366,6 @@ export default function UserProfilePage() {
       deleteAccountConfirm: 'Are you sure you want to delete your account? This action cannot be undone.',
       yesDeleteAccount: 'Yes, Delete My Account',
       usernameUpdated: 'Username updated successfully',
-      roleUpdated: 'Role updated successfully',
       departmentUpdated: 'Department updated successfully',
       passwordUpdated: 'Password updated successfully',
       preferencesUpdated: 'Preferences updated successfully',
@@ -394,7 +375,6 @@ export default function UserProfilePage() {
       pleaseEnterEmail: 'Please enter an email address',
       userPromoted: 'User with email {email} has been promoted to Admin successfully',
       failedToUpdateUsername: 'Failed to update username',
-      failedToUpdateRole: 'Failed to update role',
       failedToUpdateDepartment: 'Failed to update department',
       failedToUpdatePassword: 'Failed to update password',
       failedToUpdatePreferences: 'Failed to update preferences',
@@ -457,7 +437,6 @@ export default function UserProfilePage() {
       deleteAccountConfirm: 'Sind Sie sicher, dass Sie Ihr Konto löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
       yesDeleteAccount: 'Ja, mein Konto löschen',
       usernameUpdated: 'Benutzername erfolgreich aktualisiert',
-      roleUpdated: 'Rolle erfolgreich aktualisiert',
       departmentUpdated: 'Abteilung erfolgreich aktualisiert',
       passwordUpdated: 'Passwort erfolgreich aktualisiert',
       preferencesUpdated: 'Einstellungen erfolgreich aktualisiert',
@@ -467,7 +446,6 @@ export default function UserProfilePage() {
       pleaseEnterEmail: 'Bitte geben Sie eine E-Mail-Adresse ein',
       userPromoted: 'Benutzer mit E-Mail {email} wurde erfolgreich zu Administrator befördert',
       failedToUpdateUsername: 'Benutzername konnte nicht aktualisiert werden',
-      failedToUpdateRole: 'Rolle konnte nicht aktualisiert werden',
       failedToUpdateDepartment: 'Abteilung konnte nicht aktualisiert werden',
       failedToUpdatePassword: 'Passwort konnte nicht aktualisiert werden',
       failedToUpdatePreferences: 'Einstellungen konnten nicht aktualisiert werden',
@@ -603,27 +581,17 @@ export default function UserProfilePage() {
             </div>
           </div>
 
-          {/* Role */}
+          {/* Role (Read-only) */}
           <div className="mb-4">
             <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
               {t.role}
             </label>
-            <div className="flex gap-2 items-center">
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className={`flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-tum-blue ${isDarkMode ? 'bg-[#1f1f1f] border-gray-600 text-gray-200' : 'border-gray-300'}`}
-              >
-                <option value="Staff">Staff</option>
-                <option value="Admin">Admin</option>
-              </select>
-              <button
-                onClick={handleUpdateRole}
-                className="px-4 py-2 text-sm bg-tum-blue text-white rounded-xl hover:bg-tum-dark-blue transition-colors whitespace-nowrap"
-              >
-                {t.update}
-              </button>
-            </div>
+            <input
+              type="text"
+              value={role}
+              disabled
+              className={`w-full px-4 py-2 border rounded-lg cursor-not-allowed ${isDarkMode ? 'bg-[#1f1f1f] border-gray-600 text-gray-400' : 'border-gray-300 bg-gray-50 text-gray-600'}`}
+            />
           </div>
 
           {/* Department */}
