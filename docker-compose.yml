@@ -11,6 +11,7 @@ services:
       - llm
       - authentication
       - conversation
+      - ingestion
     networks:
       - atoss-network
 
@@ -66,6 +67,23 @@ services:
         condition: service_healthy
       authentication:
         condition: service_started
+    networks:
+      - atoss-network
+    restart: unless-stopped
+
+  ingestion:
+    build:
+      context: ./backend/ingestion
+      dockerfile: Dockerfile
+    ports:
+      - "4005:4005"
+    env_file:
+      - ./backend/ingestion/.env
+    environment:
+      - LLM_SERVICE_URL=http://llm:8000
+    depends_on:
+      llm:
+        condition: service_healthy
     networks:
       - atoss-network
     restart: unless-stopped

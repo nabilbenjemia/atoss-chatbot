@@ -17,8 +17,6 @@ import useCommandHistory, { Commands } from '../hooks/useCommandHistory';
 import useLocalCache, { loadFromCache, clearCache, hasCache } from '../hooks/useLocalCache';
 import {
     uploadDocument,
-    getProcessingStatus,
-    getExtractedContent,
     runBackendHelper,
     previewEmbeddings,
 } from '../services/ingestionApi';
@@ -247,71 +245,11 @@ export default function IngestionPage() {
             return;
         }
 
-        // Normal flow: load content for editing from backend
-        try {
-            const content = await getExtractedContent(documentId);
-
-            // Save to cache
-            saveFileContent(documentId, content);
-
-            resetDocument(content);
-            setSelectedDocumentId(documentId);
-            setCurrentPage(1);
-            setHasUnsavedChanges(false);
-            setContentType(CONTENT_TYPE.EDITOR);
-            setStoredEmbeddings(null);
-        } catch (error) {
-            console.error('Failed to load document:', error);
-            toast.error('Failed to load document content');
-        }
+        // No cached content - this shouldn't happen normally
+        // Content should be cached when file is uploaded
+        console.warn('[IngestionPage] No cached content found for', documentId);
+        toast.error('Document content not found. Please re-upload the file.');
     }, [resetDocument, isPreviewMode]);
-
-    // Poll for processing completion
-    const pollProcessingStatus = useCallback((queueId, documentId, filename) => {
-        console.log('[IngestionPage] pollProcessingStatus called', { queueId, documentId });
-        const poll = async () => {
-            try {
-                const status = await getProcessingStatus(documentId);
-
-                setUploadQueue((prev) =>
-                    prev.map((d) =>
-                        d.id === queueId
-                            ? { ...d, status: status.status, progress: status.progress }
-                            : d
-                    )
-                );
-
-                if (status.status === 'ready') {
-                    toast.success('Document ready for review');
-
-                    // Save to uploaded files cache
-                    addUploadedFile({
-                        id: queueId,
-                        documentId,
-                        filename,
-                        status: DOC_STATUS.READY,
-                    });
-
-                    // Auto-select if no document selected
-                    setSelectedDocumentId((currentId) => {
-                        if (!currentId) {
-                            selectDocument(documentId);
-                        }
-                        return currentId;
-                    });
-                } else if (status.status === 'error') {
-                    toast.error(`Processing failed: ${status.error}`);
-                } else {
-                    // Continue polling
-                    setTimeout(poll, INGESTION_CONFIG.polling.processingStatusMs);
-                }
-            } catch (error) {
-                console.error('Status poll failed:', error);
-            }
-        };
-
-        poll();
-    }, [selectDocument]);
 
     // Handle files selected from upload zone
     const handleFilesSelected = useCallback(async (files) => {
@@ -336,18 +274,44 @@ export default function IngestionPage() {
             );
 
             try {
+                // Upload returns extracted content directly (stateless backend)
                 const result = await uploadDocument(doc.file);
+                
+                if (!result.success || !result.content) {
+                    throw new Error(result.error || 'Failed to process document');
+                }
 
+                const documentId = result.content.documentId;
+
+                // Cache the content in localStorage
+                saveFileContent(documentId, result.content);
+
+                // Update queue status to ready
                 setUploadQueue((prev) =>
                     prev.map((d) =>
                         d.id === doc.id
-                            ? { ...d, documentId: result.documentId, status: DOC_STATUS.PROCESSING, progress: 30 }
+                            ? { ...d, documentId, status: DOC_STATUS.READY, progress: 100 }
                             : d
                     )
                 );
 
-                // Poll for processing status (pass filename for caching)
-                pollProcessingStatus(doc.id, result.documentId, doc.filename);
+                // Save to uploaded files cache
+                addUploadedFile({
+                    id: doc.id,
+                    documentId,
+                    filename: doc.filename,
+                    status: DOC_STATUS.READY,
+                });
+
+                toast.success(`Document ready: ${doc.filename}`);
+
+                // Auto-select if no document selected
+                setSelectedDocumentId((currentId) => {
+                    if (!currentId) {
+                        selectDocument(documentId);
+                    }
+                    return currentId || documentId;
+                });
             } catch (error) {
                 console.error('Upload failed:', error);
                 setUploadQueue((prev) =>
@@ -358,7 +322,7 @@ export default function IngestionPage() {
                 toast.error(`Upload failed: ${doc.filename}`);
             }
         }
-    }, [pollProcessingStatus]);
+    }, [selectDocument]);
 
     // Handle drag state
     const handleDragOver = useCallback(() => { console.log('[IngestionPage] 🎯 handleDragOver (USER ACTION)'); setIsDragging(true); }, []);
@@ -518,8 +482,8 @@ export default function IngestionPage() {
                 }
 
                 case 'ai_image_descriptions': {
-                    // Call backend helper (mocked)
-                    const result = await runBackendHelper(selectedDocumentId, helperId, {});
+                    // Call backend AI helper with document content
+                    const result = await runBackendHelper(helperId, documentState, {});
                     if (result.success && result.modifiedItems) {
                         // Build batch update changes
                         const changes = result.modifiedItems
@@ -613,7 +577,7 @@ export default function IngestionPage() {
         setIsPreviewMode(true);
 
         try {
-            const preview = await previewEmbeddings(selectedDocumentId, strategy, documentState);
+            const preview = await previewEmbeddings(strategy, documentState);
             setEmbeddingPreview(preview);
         } catch (error) {
             console.error('Failed to generate preview:', error);

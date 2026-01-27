@@ -50,7 +50,14 @@ IngestionPage.jsx
 | Config File | Purpose |
 |-------------|---------|
 | `ingestionConfig.js` | File upload settings, helper definitions, polling intervals, UI settings |
-| `ingestionMocks.js` | Mock data for development (backend config, extracted content) |
+| `ingestionMocks.js` | Mock data for development (replaced by backend in production) |
+
+### Backend Services
+
+| Service | Directory | Purpose |
+|---------|-----------|---------|
+| `ingestion` | `backend/ingestion/` | Document upload, processing status, content management |
+| `llm` | `backend/llm/` | Document processing, embedding generation |
 
 ---
 
@@ -64,7 +71,8 @@ sequenceDiagram
     participant UploadZone
     participant IngestionPage
     participant ingestionApi
-    participant Backend
+    participant IngestionService
+    participant LLMService
 
     User->>UploadZone: Drop/select PDF file
     UploadZone->>UploadZone: validateFiles(file)
@@ -76,15 +84,16 @@ sequenceDiagram
         IngestionPage->>IngestionPage: Add to uploadQueue (QUEUED)
         IngestionPage->>IngestionPage: Update status (UPLOADING)
         IngestionPage->>ingestionApi: uploadDocument(file)
-        
-        Note over ingestionApi,Backend: TODO: POST /api/ingestion/upload
-        
+        ingestionApi->>IngestionService: POST /api/ingestion/upload
+        IngestionService->>LLMService: Process document (async)
+        IngestionService-->>ingestionApi: {documentId, status: 'processing'}
         ingestionApi-->>IngestionPage: {documentId, status: 'processing'}
         IngestionPage->>IngestionPage: Update status (PROCESSING)
         
         loop Poll until ready/error
             IngestionPage->>ingestionApi: getProcessingStatus(documentId)
-            Note over ingestionApi,Backend: TODO: GET /api/ingestion/{documentId}/status
+            ingestionApi->>IngestionService: GET /api/ingestion/{documentId}/status
+            IngestionService-->>ingestionApi: {status, progress}
             ingestionApi-->>IngestionPage: {status, progress}
         end
         
