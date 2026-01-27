@@ -26,7 +26,7 @@ const userProfileSchema = new mongoose.Schema({
 		theme: {
 			type: String,
 			enum: ['light', 'dark', 'auto'],
-			default: 'auto'
+			default: 'light'
 		},
 		language: {
 			type: String,

@@ -39,4 +39,7 @@ router.delete('/me/profile-picture', authMiddleware, userController.deleteProfil
 // Delete account
 router.delete('/me', authMiddleware, userController.deleteAccount.bind(userController));
 
+// Add admin (promote staff to admin by email) - only for admins
+router.post('/add-admin', authMiddleware, userController.addAdmin.bind(userController));
+
 module.exports = router;

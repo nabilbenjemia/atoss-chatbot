@@ -394,6 +394,34 @@ class AuthService {
 	}
 
 	/**
+	 * Get user by email
+	 * @param {string} email - User email
+	 * @returns {Promise<Object>} - User credentials
+	 */
+	async getUserByEmail(email) {
+		try {
+			const userCredentials = await UserCredentials.findOne({ email: email.toLowerCase() });
+			
+			if (!userCredentials) {
+				throw new Error('User not found');
+			}
+
+			return {
+				id: userCredentials.id,
+				email: userCredentials.email,
+				role: userCredentials.role,
+				department: userCredentials.department,
+				emailVerified: userCredentials.emailVerified,
+				lastLogin: userCredentials.lastLogin,
+				createdAt: userCredentials.createdAt,
+				updatedAt: userCredentials.updatedAt
+			};
+		} catch (error) {
+			throw error;
+		}
+	}
+
+	/**
 	 * Update user role
 	 * @param {string} userId - User ID
 	 * @param {string} role - New role
