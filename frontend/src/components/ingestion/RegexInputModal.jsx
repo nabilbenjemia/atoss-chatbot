@@ -69,12 +69,21 @@ export default function RegexInputModal({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-tum-black/40 backdrop-blur-sm flex items-center justify-center z-50">
             <div
-                className="bg-white rounded-2xl shadow-xl p-6 w-96 max-w-[90vw]"
+                className="bg-white rounded-2xl shadow-xl p-6 w-96 max-w-[90vw] relative"
                 onClick={(e) => e.stopPropagation()}
             >
-                <h2 className="text-lg font-bold text-tum-grey-1 mb-4">
+                <button
+                    onClick={onClose}
+                    className="absolute top-4 right-4 text-tum-grey-4 hover:text-red-500 bg-transparent hover:bg-red-50 rounded-full p-1 transition-colors"
+                >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+
+                <h2 className="text-lg font-bold text-tum-grey-1 mb-4 pr-8">
                     Delete by Regex
                 </h2>
 

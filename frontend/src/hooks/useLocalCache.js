@@ -112,6 +112,50 @@ export const hasCache = (key) => {
 };
 
 /**
+ * Get all keys matching a prefix
+ * @param {string} prefix - The prefix to match
+ * @returns {string[]} - Array of matching keys
+ */
+export const getKeysWithPrefix = (prefix) => {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(prefix)) {
+            keys.push(key);
+        }
+    }
+    return keys;
+};
+
+/**
+ * Clear all keys matching a prefix
+ * @param {string} prefix - The prefix to match
+ * @returns {number} - Number of keys cleared
+ */
+export const clearKeysWithPrefix = (prefix) => {
+    const keys = getKeysWithPrefix(prefix);
+    keys.forEach(key => localStorage.removeItem(key));
+    return keys.length;
+};
+
+/**
+ * Get storage usage for keys matching a prefix
+ * @param {string} prefix - The prefix to match
+ * @returns {number} - Bytes used
+ */
+export const getStorageUsageForPrefix = (prefix) => {
+    let total = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(prefix)) {
+            const value = localStorage.getItem(key);
+            total += (key.length + (value?.length || 0)) * 2; // UTF-16
+        }
+    }
+    return total;
+};
+
+/**
  * Get cache metadata (timestamp, etc.)
  * @param {string} key - The storage key
  * @returns {Object|null} - Metadata or null

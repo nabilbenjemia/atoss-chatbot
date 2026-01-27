@@ -139,23 +139,25 @@ export default function ImageItem({
             {/* Lightbox */}
             {showLightbox && (
                 <div
-                    className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+                    className="fixed inset-0 bg-tum-black/85 backdrop-blur-md flex items-center justify-center z-50 p-4"
                     onClick={() => setShowLightbox(false)}
                 >
                     <div className="relative max-w-full max-h-full overflow-auto">
                         <img
                             src={item.imageUrl}
                             alt="Document image (full size)"
-                            className="max-w-none"
+                            className="max-w-none shadow-2xl rounded-sm"
                             onClick={(e) => e.stopPropagation()}
                         />
                         <button
                             onClick={() => setShowLightbox(false)}
-                            className="absolute top-4 right-4 text-white bg-black/50 
-                                rounded-full w-8 h-8 flex items-center justify-center
-                                hover:bg-black/70 transition-colors"
+                            className="absolute top-4 right-4 text-tum-black bg-white/90 
+                                rounded-full w-10 h-10 flex items-center justify-center
+                                hover:bg-white transition-colors shadow-lg z-50"
                         >
-                            ✕
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
                         </button>
                     </div>
                 </div>

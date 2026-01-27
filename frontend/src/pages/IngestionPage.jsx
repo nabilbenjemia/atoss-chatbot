@@ -19,24 +19,38 @@ import {
     uploadDocument,
     getProcessingStatus,
     getExtractedContent,
-    startIngestion,
-    getIngestionStatus,
     runBackendHelper,
+    previewEmbeddings,
 } from '../services/ingestionApi';
 import { INGESTION_CONFIG } from '../config/ingestionConfig';
-import { mockCurrentUser, shouldUseMockAuth } from '../mocks/ingestionMocks';
+import { mockCurrentUser, shouldUseMockAuth, convertPreviewToIngestedFormat, delay } from '../mocks/ingestionMocks';
 import { getCurrentUser } from '../services/api';
+import {
+    getUploadedFiles,
+    addUploadedFile,
+    removeUploadedFile,
+    saveFileContent,
+    getFileContent,
+    updateUploadedFile,
+    getIngestedFiles,
+    markFileAsIngested,
+    removeIngestedFile,
+} from '../utils/fileCacheManager';
 
 // Import components
 import {
     UploadZone,
     FileQueue,
     DOC_STATUS,
+    CONTENT_TYPE,
     ContentViewer,
     HelperPanel,
     IngestionModal,
     RegexInputModal,
     SaveBar,
+    EmbeddingPreviewViewer,
+    CacheManagement,
+    HelperFileSelectModal,
 } from '../components/ingestion';
 
 export default function IngestionPage() {
@@ -73,6 +87,36 @@ export default function IngestionPage() {
     // Sidebar state
     const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
     const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
+
+    // Preview mode state
+    const [isPreviewMode, setIsPreviewMode] = useState(false);
+    const [embeddingPreview, setEmbeddingPreview] = useState(null);
+    const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+    const [previewConfig, setPreviewConfig] = useState({ targetDb: '', strategy: '' });
+
+    // Store right sidebar state before preview mode
+    const [rightSidebarStateBeforePreview, setRightSidebarStateBeforePreview] = useState(false);
+
+    // Content type: editor (pages/items) or embedding (stored embeddings)
+    const [contentType, setContentType] = useState(CONTENT_TYPE.EDITOR);
+    const [storedEmbeddings, setStoredEmbeddings] = useState(null);
+
+    // Multi-select state
+    const [multiSelectMode, setMultiSelectMode] = useState(false);
+    const [checkedDocumentIds, setCheckedDocumentIds] = useState(new Set());
+
+    // Cache management modal
+    const [showCacheManagement, setShowCacheManagement] = useState(false);
+
+    // Helper file selection modal
+    const [showHelperFileModal, setShowHelperFileModal] = useState(false);
+    const [pendingHelper, setPendingHelper] = useState(null);
+
+    // Ingested files from cache
+    const [ingestedFilesList, setIngestedFilesList] = useState([]);
+
+    // Preview mode document IDs (for multi-file preview)
+    const [previewDocumentIds, setPreviewDocumentIds] = useState(new Set());
 
     // Auto-collapse sidebars on small screens
     useEffect(() => {
@@ -144,25 +188,86 @@ export default function IngestionPage() {
                 }
             }
         }
+
+        // Load uploaded files from cache
+        const cachedUploadedFiles = getUploadedFiles();
+        if (cachedUploadedFiles.length > 0) {
+            // Restore upload queue from cache
+            const restoredQueue = cachedUploadedFiles.map(f => ({
+                id: f.id || `cached_${f.documentId}`,
+                documentId: f.documentId,
+                filename: f.filename,
+                status: f.status || DOC_STATUS.READY,
+                progress: 100,
+            }));
+            setUploadQueue(restoredQueue);
+        }
+
+        // Load ingested files from cache
+        const cachedIngestedFiles = getIngestedFiles();
+        setIngestedFilesList(cachedIngestedFiles);
     }, [resetDocument]);
 
     // Select a document to view/edit
     const selectDocument = useCallback(async (documentId) => {
-        console.log('[IngestionPage] selectDocument called', { documentId });
+        console.log('[IngestionPage] selectDocument called', { documentId, isPreviewMode });
+
+        // In preview mode, don't allow switching to content viewer
+        if (isPreviewMode) {
+            console.log('[IngestionPage] In preview mode, selection ignored');
+            return;
+        }
+
+        // Check if this document has stored embeddings (ingested)
+        const embeddingKey = `${INGESTION_CONFIG.storage.embeddingCachePrefix}${documentId}`;
+        const storedEmb = loadFromCache(embeddingKey);
+
+        if (storedEmb) {
+            // Show stored embeddings in read-only mode
+            console.log('[IngestionPage] Loading stored embeddings for', documentId);
+            setStoredEmbeddings(storedEmb);
+            setContentType(CONTENT_TYPE.EMBEDDING);
+            setSelectedDocumentId(documentId);
+            setCurrentPage(1);
+            setHasUnsavedChanges(false);
+            resetDocument(null); // Clear editor state
+            return;
+        }
+
+        // Check if we have cached content for this file
+        const cachedContent = getFileContent(documentId);
+        if (cachedContent) {
+            console.log('[IngestionPage] Loading cached content for', documentId);
+            resetDocument(cachedContent);
+            setSelectedDocumentId(documentId);
+            setCurrentPage(1);
+            setHasUnsavedChanges(false);
+            setContentType(CONTENT_TYPE.EDITOR);
+            setStoredEmbeddings(null);
+            return;
+        }
+
+        // Normal flow: load content for editing from backend
         try {
             const content = await getExtractedContent(documentId);
+
+            // Save to cache
+            saveFileContent(documentId, content);
+
             resetDocument(content);
             setSelectedDocumentId(documentId);
             setCurrentPage(1);
             setHasUnsavedChanges(false);
+            setContentType(CONTENT_TYPE.EDITOR);
+            setStoredEmbeddings(null);
         } catch (error) {
             console.error('Failed to load document:', error);
             toast.error('Failed to load document content');
         }
-    }, [resetDocument]);
+    }, [resetDocument, isPreviewMode]);
 
     // Poll for processing completion
-    const pollProcessingStatus = useCallback((queueId, documentId) => {
+    const pollProcessingStatus = useCallback((queueId, documentId, filename) => {
         console.log('[IngestionPage] pollProcessingStatus called', { queueId, documentId });
         const poll = async () => {
             try {
@@ -178,6 +283,15 @@ export default function IngestionPage() {
 
                 if (status.status === 'ready') {
                     toast.success('Document ready for review');
+
+                    // Save to uploaded files cache
+                    addUploadedFile({
+                        id: queueId,
+                        documentId,
+                        filename,
+                        status: DOC_STATUS.READY,
+                    });
+
                     // Auto-select if no document selected
                     setSelectedDocumentId((currentId) => {
                         if (!currentId) {
@@ -232,8 +346,8 @@ export default function IngestionPage() {
                     )
                 );
 
-                // Poll for processing status
-                pollProcessingStatus(doc.id, result.documentId);
+                // Poll for processing status (pass filename for caching)
+                pollProcessingStatus(doc.id, result.documentId, doc.filename);
             } catch (error) {
                 console.error('Upload failed:', error);
                 setUploadQueue((prev) =>
@@ -250,24 +364,6 @@ export default function IngestionPage() {
     const handleDragOver = useCallback(() => { console.log('[IngestionPage] 🎯 handleDragOver (USER ACTION)'); setIsDragging(true); }, []);
     const handleDragLeave = useCallback(() => { console.log('[IngestionPage] 🎯 handleDragLeave (USER ACTION)'); setIsDragging(false); }, []);
     const handleDrop = useCallback(() => { console.log('[IngestionPage] 🎯 handleDrop (USER ACTION)'); setIsDragging(false); }, []);
-
-    // Handle file rename
-    const handleRenameFile = useCallback((docId, newFilename) => {
-        console.log('[IngestionPage] 🎯 handleRenameFile (USER ACTION)', { docId, newFilename });
-        setUploadQueue((prev) =>
-            prev.map((d) =>
-                d.id === docId ? { ...d, filename: newFilename } : d
-            )
-        );
-        // Also update documentState filename if it's the currently selected document
-        if (documentState) {
-            const doc = uploadQueue.find(d => d.id === docId);
-            if (doc && doc.documentId === selectedDocumentId) {
-                executeCommand(Commands.renameDocument(newFilename, documentState.filename));
-            }
-        }
-        toast.success('File renamed');
-    }, [documentState, uploadQueue, selectedDocumentId, executeCommand]);
 
     // Navigation between pages
     const goToPage = useCallback((page) => {
@@ -336,11 +432,41 @@ export default function IngestionPage() {
     // Helper functions - using Command Pattern for batch operations
     const handleRunHelper = useCallback(async (helperId) => {
         console.log('[IngestionPage] 🎯 handleRunHelper (USER ACTION)', { helperId });
-        if (!documentState) return;
+
+        // Get helper info from config
+        const allHelpers = [...INGESTION_CONFIG.helpers.local, ...INGESTION_CONFIG.helpers.backend];
+        const helper = allHelpers.find(h => h.id === helperId);
+
+        // Show file selection modal instead of running immediately
+        setPendingHelper(helper || { id: helperId, label: helperId });
+        setShowHelperFileModal(true);
+    }, []);
+
+    // Execute helper on selected files
+    const executeHelperOnFiles = useCallback(async (selectedDocumentIds) => {
+        console.log('[IngestionPage] 🎯 executeHelperOnFiles (USER ACTION)', { helper: pendingHelper?.id, files: selectedDocumentIds });
+
+        if (!pendingHelper || selectedDocumentIds.length === 0) {
+            setShowHelperFileModal(false);
+            setPendingHelper(null);
+            return;
+        }
+
+        const helperId = pendingHelper.id;
+        setShowHelperFileModal(false);
 
         // Handle helpers with input
         if (helperId === 'delete_regex') {
             setShowRegexModal(true);
+            setPendingHelper(null);
+            return;
+        }
+
+        // For now, execute on currently selected document
+        // In a full implementation, you'd loop through selectedDocumentIds
+        if (!documentState) {
+            toast.warning('No document loaded to apply helper');
+            setPendingHelper(null);
             return;
         }
 
@@ -434,8 +560,9 @@ export default function IngestionPage() {
             toast.error('Helper failed: ' + error.message);
         } finally {
             setRunningHelper(null);
+            setPendingHelper(null);
         }
-    }, [documentState, selectedDocumentId, executeCommand]);
+    }, [documentState, selectedDocumentId, executeCommand, pendingHelper]);
 
     // Handle regex delete - using batch delete command
     const handleRegexDelete = useCallback((pattern) => {
@@ -464,63 +591,242 @@ export default function IngestionPage() {
         }
     }, [documentState, executeCommand]);
 
-    // Start ingestion
-    const handleStartIngestion = useCallback(async (targetDb) => {
-        console.log('[IngestionPage] 🎯 handleStartIngestion (USER ACTION)', { targetDb, documentId: selectedDocumentId });
-        if (!targetDb || !documentState) return;
+    // Start ingestion - now shows preview first
+    const handleStartIngestion = useCallback(async (targetDb, strategy) => {
+        console.log('[IngestionPage] 🎯 handleStartIngestion (USER ACTION) - showing preview', { targetDb, strategy, documentId: selectedDocumentId });
+        if (!targetDb || !strategy || !documentState) return;
+
+        // Store config for later use
+        setPreviewConfig({ targetDb, strategy });
+        setShowIngestionModal(false);
+
+        // Store right sidebar state and collapse it
+        setRightSidebarStateBeforePreview(rightSidebarCollapsed);
+        setRightSidebarCollapsed(true);
+
+        // Set preview document IDs (currently only single file, but supports multi)
+        const previewIds = new Set([selectedDocumentId]);
+        setPreviewDocumentIds(previewIds);
+
+        // Generate preview
+        setIsLoadingPreview(true);
+        setIsPreviewMode(true);
+
+        try {
+            const preview = await previewEmbeddings(selectedDocumentId, strategy, documentState);
+            setEmbeddingPreview(preview);
+        } catch (error) {
+            console.error('Failed to generate preview:', error);
+            toast.error('Failed to generate embedding preview');
+            setIsPreviewMode(false);
+            setPreviewDocumentIds(new Set());
+            setRightSidebarCollapsed(rightSidebarStateBeforePreview);
+        } finally {
+            setIsLoadingPreview(false);
+        }
+    }, [documentState, selectedDocumentId, rightSidebarCollapsed, rightSidebarStateBeforePreview]);
+
+    // Cancel preview mode
+    const handleCancelPreview = useCallback(() => {
+        console.log('[IngestionPage] 🎯 handleCancelPreview (USER ACTION)');
+        setIsPreviewMode(false);
+        setEmbeddingPreview(null);
+        setPreviewConfig({ targetDb: '', strategy: '' });
+        setPreviewDocumentIds(new Set());
+        // Restore right sidebar state
+        setRightSidebarCollapsed(rightSidebarStateBeforePreview);
+    }, [rightSidebarStateBeforePreview]);
+
+    // Confirm ingestion from preview (single file)
+    const handleConfirmIngestion = useCallback(async () => {
+        console.log('[IngestionPage] 🎯 handleConfirmIngestion (USER ACTION)', { config: previewConfig, documentId: selectedDocumentId });
+        const { targetDb, strategy } = previewConfig;
+        if (!targetDb || !strategy || !embeddingPreview) return;
 
         setIsIngesting(true);
         setIngestionProgress(0);
 
         try {
-            const result = await startIngestion(
-                selectedDocumentId,
-                targetDb,
-                { pages: documentState.pages }
+            // Simulate ingestion delay (1 second as requested)
+            await delay(1000);
+            setIngestionProgress(100);
+
+            // Convert preview to ingested format (base64 → server URLs)
+            const ingestedData = convertPreviewToIngestedFormat(embeddingPreview);
+
+            // Use file cache manager to mark as ingested
+            markFileAsIngested(selectedDocumentId, ingestedData);
+
+            // Clear editor state cache
+            clearCache(INGESTION_CONFIG.storage.editStateKey);
+
+            // Update queue status to INGESTED
+            setUploadQueue((prev) =>
+                prev.filter((d) => d.documentId !== selectedDocumentId)
             );
 
-            // Poll for ingestion status
-            const pollIngestion = async () => {
-                const status = await getIngestionStatus(result.jobId);
-                setIngestionProgress(status.progress);
+            // Update ingested files list
+            setIngestedFilesList(getIngestedFiles());
 
-                if (status.status === 'completed') {
-                    setIsIngesting(false);
-                    setShowIngestionModal(false);
-                    toast.success('Document ingested successfully!');
-                    clearCache(INGESTION_CONFIG.storage.editStateKey);
-                    setHasUnsavedChanges(false);
+            // Exit preview mode
+            setIsIngesting(false);
+            setIsPreviewMode(false);
+            setEmbeddingPreview(null);
+            setPreviewConfig({ targetDb: '', strategy: '' });
+            setPreviewDocumentIds(new Set());
+            setHasUnsavedChanges(false);
 
-                    // Update queue status
-                    setUploadQueue((prev) =>
-                        prev.map((d) =>
-                            d.documentId === selectedDocumentId
-                                ? { ...d, status: DOC_STATUS.COMPLETED }
-                                : d
-                        )
-                    );
-                } else if (status.status === 'failed') {
-                    setIsIngesting(false);
-                    toast.error(`Ingestion failed: ${status.error}`);
-                } else {
-                    setTimeout(pollIngestion, INGESTION_CONFIG.polling.ingestionStatusMs);
-                }
-            };
+            // Reset to empty state (document is now ingested)
+            resetDocument(null);
+            setContentType(CONTENT_TYPE.EMBEDDING);
+            setStoredEmbeddings(ingestedData);
 
-            pollIngestion();
+            // Restore right sidebar state
+            setRightSidebarCollapsed(rightSidebarStateBeforePreview);
+
+            toast.success('Document ingested successfully! Embeddings saved.');
         } catch (error) {
             console.error('Ingestion failed:', error);
             setIsIngesting(false);
-            toast.error('Failed to start ingestion');
+            toast.error('Failed to ingest document');
         }
-    }, [documentState, selectedDocumentId]);
+    }, [embeddingPreview, selectedDocumentId, previewConfig, rightSidebarStateBeforePreview, resetDocument]);
 
-    // Save changes (mark as saved locally)
+    // Confirm ingestion for ALL files in multi-file preview
+    const handleConfirmIngestionAll = useCallback(async () => {
+        console.log('[IngestionPage] 🎯 handleConfirmIngestionAll (USER ACTION)', { previewIds: [...previewDocumentIds] });
+
+        // For now, this is similar to single file ingestion
+        // In a full implementation, you'd loop through all preview document IDs
+        await handleConfirmIngestion();
+
+        toast.success(`All ${previewDocumentIds.size} file(s) ingested successfully!`);
+    }, [handleConfirmIngestion, previewDocumentIds]);
+
+    // Save changes (mark as saved locally and update cache)
     const handleSave = useCallback(() => {
         console.log('[IngestionPage] 🎯 handleSave (USER ACTION)');
+
+        // Update the content cache with current document state
+        if (documentState && selectedDocumentId) {
+            saveFileContent(selectedDocumentId, documentState);
+
+            // Also sync the filename to uploaded files metadata
+            updateUploadedFile(selectedDocumentId, { filename: documentState.filename });
+
+            // Update local uploadQueue state to reflect the filename
+            setUploadQueue((prev) =>
+                prev.map((d) =>
+                    d.documentId === selectedDocumentId
+                        ? { ...d, filename: documentState.filename }
+                        : d
+                )
+            );
+
+            console.log('[IngestionPage] Content saved to cache for', selectedDocumentId);
+        }
+
         setHasUnsavedChanges(false);
         toast.success('Changes saved');
+    }, [documentState, selectedDocumentId]);
+
+    // Multi-select handlers
+    const handleCheckDocument = useCallback((documentId) => {
+        console.log('[IngestionPage] 🎯 handleCheckDocument (USER ACTION)', { documentId });
+        setCheckedDocumentIds(prev => {
+            const next = new Set(prev);
+            if (next.has(documentId)) {
+                next.delete(documentId);
+            } else {
+                next.add(documentId);
+            }
+            return next;
+        });
     }, []);
+
+    const toggleMultiSelectMode = useCallback(() => {
+        console.log('[IngestionPage] 🎯 toggleMultiSelectMode (USER ACTION)');
+        setMultiSelectMode(prev => {
+            if (prev) {
+                // Exiting multi-select mode, clear selections
+                setCheckedDocumentIds(new Set());
+            }
+            return !prev;
+        });
+    }, []);
+
+    // Handle batch ingestion for multi-selected files - use the same modal
+    // eslint-disable-next-line no-unused-vars
+    const handleBatchIngest = useCallback(() => {
+        console.log('[IngestionPage] 🎯 handleBatchIngest (USER ACTION)', { checked: [...checkedDocumentIds] });
+        if (checkedDocumentIds.size === 0) {
+            toast.warning('No files selected');
+            return;
+        }
+        // Show the ingestion modal - batch ingestion logic is handled separately
+        setShowIngestionModal(true);
+    }, [checkedDocumentIds]);
+
+    // Handle removing a file from preview mode
+    const handleRemoveFromPreview = useCallback((documentId) => {
+        console.log('[IngestionPage] 🎯 handleRemoveFromPreview (USER ACTION)', { documentId });
+        setPreviewDocumentIds(prev => {
+            const next = new Set(prev);
+            next.delete(documentId);
+
+            // If no files left in preview, exit preview mode
+            if (next.size === 0) {
+                setIsPreviewMode(false);
+                setEmbeddingPreview(null);
+                setPreviewConfig({ targetDb: '', strategy: '' });
+                setRightSidebarCollapsed(rightSidebarStateBeforePreview);
+                toast.info('Preview cancelled - no files remaining');
+            }
+
+            return next;
+        });
+    }, [rightSidebarStateBeforePreview]);
+
+    // Handle removing a file from content view (uploaded files)
+    const handleRemoveFromContent = useCallback((documentId) => {
+        console.log('[IngestionPage] 🎯 handleRemoveFromContent (USER ACTION)', { documentId });
+
+        // Remove from upload queue
+        setUploadQueue(prev => prev.filter(d => d.documentId !== documentId));
+
+        // Remove from cache
+        removeUploadedFile(documentId);
+
+        // If this was the selected document, clear selection
+        if (documentId === selectedDocumentId) {
+            setSelectedDocumentId(null);
+            resetDocument(null);
+            setContentType(CONTENT_TYPE.EDITOR);
+            setStoredEmbeddings(null);
+        }
+
+        toast.info('File removed');
+    }, [selectedDocumentId, resetDocument]);
+
+    // Handle removing an ingested file
+    const handleRemoveIngestedFile = useCallback((documentId) => {
+        console.log('[IngestionPage] 🎯 handleRemoveIngestedFile (USER ACTION)', { documentId });
+
+        // Remove from cache
+        removeIngestedFile(documentId);
+
+        // Update local state
+        setIngestedFilesList(getIngestedFiles());
+
+        // If this was the selected document, clear selection
+        if (documentId === selectedDocumentId) {
+            setSelectedDocumentId(null);
+            setStoredEmbeddings(null);
+            setContentType(CONTENT_TYPE.EDITOR);
+        }
+
+        toast.info('Ingested file removed from cache');
+    }, [selectedDocumentId]);
 
     // Keyboard shortcuts
     useEffect(() => {
@@ -547,12 +853,14 @@ export default function IngestionPage() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [canUndo, canRedo, undo, redo]);
 
-    // Warn on navigation with unsaved changes
+    // Warn on navigation with unsaved changes (browser refresh/close)
     useEffect(() => {
         const handleBeforeUnload = (e) => {
             if (hasUnsavedChanges) {
                 e.preventDefault();
-                e.returnValue = '';
+                // Chrome requires returnValue to be set
+                e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+                return e.returnValue;
             }
         };
 
@@ -598,21 +906,67 @@ export default function IngestionPage() {
                         {/* Upload Zone */}
                         <UploadZone
                             onFilesSelected={handleFilesSelected}
-                            disabled={isIngesting}
+                            disabled={isIngesting || isPreviewMode}
                             isDragging={isDragging}
                             onDragOver={handleDragOver}
                             onDragLeave={handleDragLeave}
                             onDrop={handleDrop}
                         />
 
+                        {/* Multi-select toggle (disabled in preview mode and cache management) */}
+                        {!isPreviewMode && (
+                            <div className="mt-3 flex items-center justify-between">
+                                <button
+                                    onClick={toggleMultiSelectMode}
+                                    disabled={isPreviewMode}
+                                    className={`text-xs px-2 py-1 rounded transition-colors ${multiSelectMode
+                                        ? 'bg-tum-blue text-white'
+                                        : 'bg-tum-grey-9 text-tum-grey-3 hover:bg-tum-grey-8'
+                                        } ${isPreviewMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    title={multiSelectMode ? 'Exit multi-select' : 'Enable multi-select'}
+                                >
+                                    {multiSelectMode ? '✓ Multi-Select' : '☐ Multi-Select'}
+                                </button>
+                            </div>
+                        )}
+
                         {/* File Queue */}
-                        <div className="mt-4 flex-1 overflow-y-auto">
+                        <div className="mt-3 flex-1 overflow-y-auto">
                             <FileQueue
                                 files={uploadQueue}
+                                ingestedFiles={ingestedFilesList}
                                 selectedDocumentId={selectedDocumentId}
+                                checkedDocumentIds={checkedDocumentIds}
                                 onSelect={selectDocument}
-                                onRename={handleRenameFile}
+                                onCheck={handleCheckDocument}
+                                multiSelectMode={multiSelectMode}
+                                isPreviewMode={isPreviewMode}
+                                previewDocumentIds={previewDocumentIds}
+                                onRemoveFromPreview={handleRemoveFromPreview}
+                                onRemoveFromContent={isPreviewMode ? handleRemoveFromPreview : (
+                                    contentType === CONTENT_TYPE.EMBEDDING
+                                        ? handleRemoveIngestedFile
+                                        : handleRemoveFromContent
+                                )}
+                                showIngestedSection={!isPreviewMode}
                             />
+                        </div>
+
+                        {/* Cache Management Button */}
+                        <div className="mt-3 pt-3 border-t border-tum-grey-7">
+                            <button
+                                onClick={() => setShowCacheManagement(true)}
+                                disabled={isPreviewMode}
+                                className={`w-full text-xs px-3 py-2 bg-tum-grey-9 text-tum-grey-3 
+                                    rounded-lg hover:bg-tum-grey-8 hover:text-tum-black transition-colors
+                                    flex items-center justify-center gap-2
+                                    ${isPreviewMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Manage Cache
+                            </button>
                         </div>
                     </div>
                 )}
@@ -630,95 +984,114 @@ export default function IngestionPage() {
 
             {/* Main Content Area */}
             <main className="flex-1 flex flex-col overflow-hidden">
-                {/* Header / Save Bar */}
-                <div className="bg-white border-b border-tum-grey-7 px-6 py-4">
-                    {/* Title row */}
-                    <div className="flex items-center justify-between mb-3">
-                        <div className="flex-1">
-                            {documentState ? (
-                                isEditingTitle ? (
-                                    <input
-                                        type="text"
-                                        value={editingTitleValue}
-                                        onChange={(e) => setEditingTitleValue(e.target.value)}
-                                        onBlur={() => {
-                                            const trimmed = editingTitleValue.trim();
-                                            if (trimmed && trimmed !== documentState.filename) {
-                                                // Update document state using command
-                                                executeCommand(Commands.renameDocument(trimmed, documentState.filename));
-                                                setHasUnsavedChanges(true);
-                                                // Update upload queue
-                                                const doc = uploadQueue.find(d => d.documentId === selectedDocumentId);
-                                                if (doc) {
-                                                    setUploadQueue((prev) =>
-                                                        prev.map((d) =>
-                                                            d.id === doc.id ? { ...d, filename: trimmed } : d
-                                                        )
-                                                    );
+                {/* Header / Save Bar - hidden in preview mode, different for embedding mode */}
+                {!isPreviewMode && contentType !== CONTENT_TYPE.EMBEDDING && (
+                    <div className="bg-white border-b border-tum-grey-7 px-6 py-4">
+                        {/* Title row */}
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex-1">
+                                {documentState ? (
+                                    isEditingTitle ? (
+                                        <input
+                                            type="text"
+                                            value={editingTitleValue}
+                                            onChange={(e) => setEditingTitleValue(e.target.value)}
+                                            onBlur={() => {
+                                                const trimmed = editingTitleValue.trim();
+                                                if (trimmed && trimmed !== documentState.filename) {
+                                                    // Update document state using command
+                                                    executeCommand(Commands.renameDocument(trimmed, documentState.filename));
+                                                    setHasUnsavedChanges(true);
+                                                    // Update upload queue
+                                                    const doc = uploadQueue.find(d => d.documentId === selectedDocumentId);
+                                                    if (doc) {
+                                                        setUploadQueue((prev) =>
+                                                            prev.map((d) =>
+                                                                d.id === doc.id ? { ...d, filename: trimmed } : d
+                                                            )
+                                                        );
+                                                    }
                                                 }
-                                            }
-                                            setIsEditingTitle(false);
-                                        }}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                e.target.blur();
-                                            } else if (e.key === 'Escape') {
-                                                setEditingTitleValue(documentState.filename);
                                                 setIsEditingTitle(false);
-                                            }
-                                        }}
-                                        autoFocus
-                                        className="w-full text-xl font-bold text-tum-black bg-white border border-tum-blue 
-                                            px-3 py-2 focus:outline-none focus:ring-1 focus:ring-tum-blue"
-                                    />
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.target.blur();
+                                                } else if (e.key === 'Escape') {
+                                                    setEditingTitleValue(documentState.filename);
+                                                    setIsEditingTitle(false);
+                                                }
+                                            }}
+                                            autoFocus
+                                            className="w-full text-xl font-bold text-tum-black bg-white border border-tum-blue 
+                                                px-3 py-2 focus:outline-none focus:ring-1 focus:ring-tum-blue"
+                                        />
+                                    ) : (
+                                        <h1
+                                            className="text-xl font-bold text-tum-black cursor-text hover:bg-tum-blue-light-5 
+                                                px-3 py-2 -mx-3 -my-2 transition-colors border border-transparent hover:border-tum-grey-7"
+                                            onClick={() => {
+                                                setEditingTitleValue(documentState.filename);
+                                                setIsEditingTitle(true);
+                                            }}
+                                            title="Click to edit filename"
+                                        >
+                                            {documentState.filename}
+                                        </h1>
+                                    )
                                 ) : (
-                                    <h1
-                                        className="text-xl font-bold text-tum-black cursor-text hover:bg-tum-blue-light-5 
-                                            px-3 py-2 -mx-3 -my-2 transition-colors border border-transparent hover:border-tum-grey-7"
-                                        onClick={() => {
-                                            setEditingTitleValue(documentState.filename);
-                                            setIsEditingTitle(true);
-                                        }}
-                                        title="Click to edit filename"
-                                    >
-                                        {documentState.filename}
+                                    <h1 className="text-xl font-bold text-tum-grey-4 px-3 py-2 -mx-3 -my-2">
+                                        Select a document
                                     </h1>
-                                )
-                            ) : (
-                                <h1 className="text-xl font-bold text-tum-grey-4 px-3 py-2 -mx-3 -my-2">
-                                    Select a document
-                                </h1>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Actions row */}
+                        <div className="flex items-center justify-between">
+                            {documentState && (
+                                <p className="text-sm text-tum-grey-4">
+                                    Page {currentPage} of {totalPages}
+                                </p>
                             )}
+                            {!documentState && <div />}
+
+                            <SaveBar
+                                hasUnsavedChanges={hasUnsavedChanges}
+                                onSave={handleSave}
+                                canUndo={canUndo}
+                                canRedo={canRedo}
+                                onUndo={() => { undo(); setHasUnsavedChanges(true); }}
+                                onRedo={() => { redo(); setHasUnsavedChanges(true); }}
+                                onIngest={() => setShowIngestionModal(true)}
+                                canIngest={!!documentState && !isIngesting && !isPreviewMode}
+                            />
                         </div>
                     </div>
+                )}
 
-                    {/* Actions row */}
-                    <div className="flex items-center justify-between">
-                        {documentState && (
-                            <p className="text-sm text-tum-grey-4">
-                                Page {currentPage} of {totalPages}
-                            </p>
-                        )}
-                        {!documentState && <div />}
-
-                        <SaveBar
-                            hasUnsavedChanges={hasUnsavedChanges}
-                            onSave={handleSave}
-                            canUndo={canUndo}
-                            canRedo={canRedo}
-                            onUndo={() => { undo(); setHasUnsavedChanges(true); }}
-                            onRedo={() => { redo(); setHasUnsavedChanges(true); }}
-                            onIngest={() => setShowIngestionModal(true)}
-                            canIngest={!!documentState && !isIngesting}
-                        />
-                    </div>
-                </div>
-
-                {/* Content Viewer */}
+                {/* Content Viewer or Preview Viewer */}
                 {configLoading ? (
                     <div className="flex-1 flex items-center justify-center">
                         <div className="text-tum-grey-4">Loading configuration...</div>
                     </div>
+                ) : isPreviewMode ? (
+                    <EmbeddingPreviewViewer
+                        preview={embeddingPreview}
+                        isLoading={isLoadingPreview}
+                        onCancel={handleCancelPreview}
+                        onConfirm={handleConfirmIngestion}
+                        onConfirmAll={handleConfirmIngestionAll}
+                        isMultiFile={previewDocumentIds.size > 1}
+                        totalFilesInPreview={previewDocumentIds.size}
+                    />
+                ) : contentType === CONTENT_TYPE.EMBEDDING && storedEmbeddings ? (
+                    // Show stored embeddings in read-only mode
+                    <EmbeddingPreviewViewer
+                        preview={storedEmbeddings}
+                        isLoading={false}
+                        readOnly={true}
+                    />
                 ) : (
                     <ContentViewer
                         document={documentState}
@@ -733,53 +1106,55 @@ export default function IngestionPage() {
                 )}
             </main>
 
-            {/* Right Panel - Helpers */}
-            <div
-                className={`
-                    ${rightSidebarCollapsed ? 'w-12' : 'w-48 lg:w-56'} 
-                    bg-white border-l border-tum-grey-7 flex flex-col
-                    transition-all duration-300 ease-in-out flex-shrink-0
-                `}
-            >
-                {/* Header with toggle */}
-                <div className={`p-4 flex items-center ${rightSidebarCollapsed ? 'justify-center' : 'justify-between'} border-b border-tum-grey-7`}>
-                    <button
-                        onClick={() => setRightSidebarCollapsed(!rightSidebarCollapsed)}
-                        className="w-8 h-8 bg-tum-blue-light-5 border border-tum-grey-7
-                            flex items-center justify-center
-                            hover:bg-tum-blue-light-3 transition-colors"
-                        title={rightSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                    >
-                        <span className="text-sm text-tum-blue font-bold">
-                            {rightSidebarCollapsed ? '«' : '»'}
-                        </span>
-                    </button>
+            {/* Right Panel - Helpers (hidden in preview mode and embedding mode) */}
+            {!isPreviewMode && contentType !== CONTENT_TYPE.EMBEDDING && (
+                <div
+                    className={`
+                        ${rightSidebarCollapsed ? 'w-12' : 'w-48 lg:w-56'} 
+                        bg-white border-l border-tum-grey-7 flex flex-col
+                        transition-all duration-300 ease-in-out flex-shrink-0
+                    `}
+                >
+                    {/* Header with toggle */}
+                    <div className={`p-4 flex items-center ${rightSidebarCollapsed ? 'justify-center' : 'justify-between'} border-b border-tum-grey-7`}>
+                        <button
+                            onClick={() => setRightSidebarCollapsed(!rightSidebarCollapsed)}
+                            className="w-8 h-8 bg-tum-blue-light-5 border border-tum-grey-7
+                                flex items-center justify-center
+                                hover:bg-tum-blue-light-3 transition-colors"
+                            title={rightSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                        >
+                            <span className="text-sm text-tum-blue font-bold">
+                                {rightSidebarCollapsed ? '«' : '»'}
+                            </span>
+                        </button>
+                        {!rightSidebarCollapsed && (
+                            <h3 className="text-sm font-semibold text-tum-blue">Helpers</h3>
+                        )}
+                    </div>
+
                     {!rightSidebarCollapsed && (
-                        <h3 className="text-sm font-semibold text-tum-blue">Helpers</h3>
+                        <HelperPanel
+                            onRunHelper={handleRunHelper}
+                            disabled={!documentState || isIngesting}
+                            runningHelper={runningHelper}
+                        />
+                    )}
+
+                    {/* Collapsed state icon */}
+                    {rightSidebarCollapsed && (
+                        <div className="flex flex-col items-center pt-4">
+                            <span className="text-2xl" title="Helpers">🛠️</span>
+                        </div>
                     )}
                 </div>
-
-                {!rightSidebarCollapsed && (
-                    <HelperPanel
-                        onRunHelper={handleRunHelper}
-                        disabled={!documentState || isIngesting}
-                        runningHelper={runningHelper}
-                    />
-                )}
-
-                {/* Collapsed state icon */}
-                {rightSidebarCollapsed && (
-                    <div className="flex flex-col items-center pt-4">
-                        <span className="text-2xl" title="Helpers">🛠️</span>
-                    </div>
-                )}
-            </div>
+            )}
 
             {/* Ingestion Modal */}
             <IngestionModal
                 isOpen={showIngestionModal}
                 onClose={() => setShowIngestionModal(false)}
-                onConfirm={handleStartIngestion}
+                onShowPreview={handleStartIngestion}
                 backendConfig={backendConfig}
                 isIngesting={isIngesting}
                 progress={ingestionProgress}
@@ -790,6 +1165,33 @@ export default function IngestionPage() {
                 isOpen={showRegexModal}
                 onClose={() => setShowRegexModal(false)}
                 onConfirm={handleRegexDelete}
+            />
+
+            {/* Cache Management Modal */}
+            {showCacheManagement && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div
+                        className="fixed inset-0 bg-tum-black/40 backdrop-blur-sm"
+                        onClick={() => setShowCacheManagement(false)}
+                    />
+                    <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden">
+                        <CacheManagement onClose={() => setShowCacheManagement(false)} />
+                    </div>
+                </div>
+            )}
+
+            {/* Helper File Selection Modal */}
+            <HelperFileSelectModal
+                isOpen={showHelperFileModal}
+                onClose={() => {
+                    setShowHelperFileModal(false);
+                    setPendingHelper(null);
+                }}
+                onConfirm={executeHelperOnFiles}
+                files={uploadQueue.filter(f => f.status === DOC_STATUS.READY)}
+                helper={pendingHelper}
+                currentDocumentId={selectedDocumentId}
+                currentFilename={documentState?.filename}
             />
         </div>
     );

@@ -11,5 +11,14 @@ export const DOC_STATUS = {
     READY: 'ready',
     INGESTING: 'ingesting',
     COMPLETED: 'completed',
+    INGESTED: 'ingested', // File has been ingested, embeddings stored locally
     ERROR: 'error',
+};
+
+/**
+ * Content type - whether file is showing editor or embedding view
+ */
+export const CONTENT_TYPE = {
+    EDITOR: 'editor',       // ContentViewer - pages with items
+    EMBEDDING: 'embedding', // EmbeddingPreviewViewer - embeddings (read-only)
 };

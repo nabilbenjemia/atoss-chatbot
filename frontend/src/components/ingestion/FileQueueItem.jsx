@@ -2,10 +2,10 @@
  * FileQueueItem Component
  * 
  * Displays a single file in the upload queue with status and progress.
- * Double-click on filename to edit it.
+ * Supports removable mode with hover X button.
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { DOC_STATUS } from './constants';
 
 /**
@@ -17,6 +17,8 @@ const getStatusIcon = (status) => {
     switch (status) {
         case DOC_STATUS.COMPLETED:
             return '✅';
+        case DOC_STATUS.INGESTED:
+            return '🧠';
         case DOC_STATUS.ERROR:
             return '❌';
         case DOC_STATUS.READY:
@@ -35,96 +37,96 @@ const getStatusIcon = (status) => {
  * @param {Object} props
  * @param {Object} props.doc - Document object
  * @param {boolean} props.isSelected - Whether this document is selected
+ * @param {boolean} props.isChecked - Whether this document is checked (multi-select)
  * @param {Function} props.onSelect - Selection handler
+ * @param {Function} props.onCheck - Check handler for multi-select
  * @param {Function} props.onRemove - Remove handler (optional)
- * @param {Function} props.onRename - Rename handler (optional) - (docId, newFilename)
+ * @param {boolean} props.showCheckbox - Whether to show checkbox for multi-select
+ * @param {boolean} props.removableMode - Whether to show hover X for removal
+ * @param {Function} props.onRemoveFromSelection - Handler for removing from selection (for preview mode)
  */
 export default function FileQueueItem({
     doc,
     isSelected = false,
+    isChecked = false,
     onSelect,
+    onCheck,
     onRemove,
-    onRename,
+    showCheckbox = false,
+    removableMode = false,
+    onRemoveFromSelection,
 }) {
-    const [isEditing, setIsEditing] = useState(false);
-    const [editName, setEditName] = useState(doc.filename);
-    const inputRef = useRef(null);
+    const [isHovered, setIsHovered] = useState(false);
 
     const showProgress = [DOC_STATUS.UPLOADING, DOC_STATUS.PROCESSING, DOC_STATUS.INGESTING].includes(doc.status);
 
-    // Focus input when editing starts
-    useEffect(() => {
-        if (isEditing && inputRef.current) {
-            inputRef.current.focus();
-            inputRef.current.select();
-        }
-    }, [isEditing]);
-
-    // Reset edit name when doc changes
-    useEffect(() => {
-        setEditName(doc.filename);
-    }, [doc.filename]);
-
-    const handleSave = () => {
-        const trimmedName = editName.trim();
-        if (trimmedName && trimmedName !== doc.filename && onRename) {
-            onRename(doc.id, trimmedName);
-        }
-        setIsEditing(false);
-    };
-
-    const handleCancel = () => {
-        setEditName(doc.filename);
-        setIsEditing(false);
-    };
-
-    const handleKeyDown = (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            handleSave();
-        } else if (e.key === 'Escape') {
-            handleCancel();
+    const handleRemoveClick = (e) => {
+        e.stopPropagation();
+        if (onRemoveFromSelection) {
+            onRemoveFromSelection(doc.documentId);
         }
     };
 
     return (
         <li
             className={`
-                p-3 cursor-pointer transition-all border-b border-white
+                relative p-3 cursor-pointer transition-all border-b border-white group
                 ${isSelected
-                    ? 'bg-tum-blue text-white'
-                    : 'bg-tum-blue-light-5 hover:bg-tum-blue-light-3 text-tum-black'}
+                    ? 'bg-tum-blue/20 text-tum-black shadow-inner border-l-4 border-tum-blue'
+                    : isChecked
+                        ? 'bg-tum-blue-light-3 text-tum-black border-l-4 border-transparent'
+                        : 'bg-tum-blue-light-5 hover:bg-tum-blue-light-3 text-tum-black border-l-4 border-transparent'}
             `}
-            onClick={() => !isEditing && doc.documentId && onSelect && onSelect(doc.documentId)}
+            onClick={() => doc.documentId && onSelect && onSelect(doc.documentId)}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
         >
             <div className="flex items-center justify-between">
-                {isEditing ? (
+                {/* Checkbox for multi-select */}
+                {showCheckbox && (
                     <input
-                        ref={inputRef}
-                        type="text"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        onBlur={handleSave}
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex-1 text-sm px-2 py-1 rounded border border-tum-grey-7 
-                            bg-white text-tum-grey-1 focus:outline-none focus:ring-2 focus:ring-tum-blue-light"
-                    />
-                ) : (
-                    <span
-                        className="text-sm truncate flex-1 cursor-text"
-                        title={`${doc.filename} (double-click to rename)`}
-                        onDoubleClick={(e) => {
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
                             e.stopPropagation();
-                            setIsEditing(true);
+                            onCheck && onCheck(doc.documentId);
                         }}
+                        onClick={(e) => e.stopPropagation()}
+                        className={`
+                            w-4 h-4 mr-2 rounded border-tum-grey-4 cursor-pointer
+                            text-tum-blue focus:ring-1 focus:ring-tum-blue
+                        `}
+                    />
+                )}
+                <span
+                    className={`text-sm truncate flex-1 ${isSelected ? 'font-semibold' : ''}`}
+                    title={doc.filename}
+                >
+                    {doc.filename}
+                </span>
+
+                {/* Hover X button for removable mode */}
+                {removableMode && isHovered && onRemoveFromSelection && (
+                    <button
+                        onClick={handleRemoveClick}
+                        className={`
+                            ml-2 p-1 rounded-full transition-colors flex items-center justify-center bg-transparent
+                            text-tum-grey-4 hover:bg-tum-red/10 hover:text-tum-red
+                        `}
+                        title="Remove from selection"
                     >
-                        {doc.filename}
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                )}
+
+                {/* Status icon (hidden when showing X) */}
+                {(!removableMode || !isHovered) && (
+                    <span className="text-xs ml-2">
+                        {getStatusIcon(doc.status)}
                     </span>
                 )}
-                <span className="text-xs ml-2">
-                    {getStatusIcon(doc.status)}
-                </span>
             </div>
 
             {/* Progress bar */}
@@ -144,8 +146,8 @@ export default function FileQueueItem({
                 </p>
             )}
 
-            {/* Remove button for queued files */}
-            {doc.status === DOC_STATUS.QUEUED && onRemove && (
+            {/* Remove button for queued files (only when not in removable mode) */}
+            {!removableMode && doc.status === DOC_STATUS.QUEUED && onRemove && (
                 <button
                     onClick={(e) => {
                         e.stopPropagation();
