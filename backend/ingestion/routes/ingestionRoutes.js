@@ -1,0 +1,60 @@
+const express = require('express');
+const multer = require('multer');
+const router = express.Router();
+const ingestionController = require('../controllers/ingestionController');
+
+/**
+ * Ingestion Routes
+ * 
+ * All routes are stateless - frontend manages document state in localStorage.
+ * Backend only provides processing/AI functionality.
+ */
+
+// Configure multer for file upload (memory storage for processing)
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB limit
+    },
+    fileFilter: (req, file, cb) => {
+        // Only allow PDF files
+        if (file.mimetype === 'application/pdf') {
+            cb(null, true);
+        } else {
+            cb(new Error('Only PDF files are allowed'), false);
+        }
+    }
+});
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+// GET /api/ingestion/config - Get backend configuration
+router.get('/config', ingestionController.getConfig);
+
+// ============================================================================
+// DOCUMENT PROCESSING
+// ============================================================================
+
+// POST /api/ingestion/upload - Upload document for content extraction
+router.post('/upload', upload.single('file'), ingestionController.uploadDocument);
+
+// ============================================================================
+// EMBEDDING & INGESTION
+// ============================================================================
+
+// POST /api/ingestion/preview - Generate embedding preview from document state
+router.post('/preview', ingestionController.previewEmbeddings);
+
+// POST /api/ingestion/ingest - Ingest document into vector database
+router.post('/ingest', ingestionController.startIngestion);
+
+// ============================================================================
+// AI HELPERS
+// ============================================================================
+
+// POST /api/ingestion/helper - Run AI helper on document content
+router.post('/helper', ingestionController.runHelper);
+
+module.exports = router;
