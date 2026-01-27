@@ -55,7 +55,7 @@ const generateImageDescriptions = async (content) => {
  */
 const generateMockImageDescriptions = (content) => {
     const modifiedItems = [];
-    
+
     if (content?.pages) {
         for (const page of content.pages) {
             for (const item of page.items || []) {
