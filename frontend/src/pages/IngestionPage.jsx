@@ -276,7 +276,7 @@ export default function IngestionPage() {
             try {
                 // Upload returns extracted content directly (stateless backend)
                 const result = await uploadDocument(doc.file);
-                
+
                 if (!result.success || !result.content) {
                     throw new Error(result.error || 'Failed to process document');
                 }
