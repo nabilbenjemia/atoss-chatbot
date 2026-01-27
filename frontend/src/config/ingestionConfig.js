@@ -74,6 +74,11 @@ export const INGESTION_CONFIG = {
     storage: {
         editStateKey: 'ingestion_edit_state',
         documentCacheKey: 'ingestion_document_cache',
+        embeddingCachePrefix: 'ingestion_embeddings_', // Per-file: ingestion_embeddings_{documentId}
+        ingestedFilesKey: 'ingestion_ingested_files', // List of ingested file IDs
+        // New: Separate cache for uploaded files list and ingested files list
+        uploadedFilesKey: 'ingestion_uploaded_files', // Array of uploaded file metadata
+        contentFilesPrefix: 'ingestion_content_', // Per-file content: ingestion_content_{documentId}
     },
 
     // UI settings

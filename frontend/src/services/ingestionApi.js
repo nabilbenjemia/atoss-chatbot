@@ -13,6 +13,7 @@ import {
     mockExtractedContent,
     delay,
     generateId,
+    generateMockEmbeddingPreview,
 } from '../mocks/ingestionMocks';
 import { INGESTION_CONFIG } from '../config/ingestionConfig';
 
@@ -262,6 +263,26 @@ export const cancelJob = async (id) => {
     return { success: true };
 };
 
+/**
+ * Preview embeddings that will be created from a document
+ * @param {string} documentId - The document ID
+ * @param {string} strategy - The ingestion strategy (embed_per_page, chunked_document, etc.)
+ * @param {Object} documentState - The current document state with pages
+ * @returns {Promise<Object>} - Preview of embeddings to be created
+ */
+// TODO: Connect to backend - POST /api/ingestion/{documentId}/preview
+export const previewEmbeddings = async (documentId, strategy, documentState) => {
+    // documentId will be used when connecting to real backend
+    void documentId;
+
+    await delay(800); // Simulate processing time
+
+    // Generate preview from current document state
+    const preview = generateMockEmbeddingPreview(documentState, strategy);
+
+    return preview;
+};
+
 // Export all functions as named exports
 export default {
     uploadDocument,
@@ -272,4 +293,5 @@ export default {
     startIngestion,
     getIngestionStatus,
     cancelJob,
+    previewEmbeddings,
 };

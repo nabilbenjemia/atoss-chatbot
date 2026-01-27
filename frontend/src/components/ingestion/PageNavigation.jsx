@@ -2,9 +2,10 @@
  * PageNavigation Component
  * 
  * Page navigation controls with previous/next buttons.
+ * Supports clickable page indicator to jump to specific pages.
  */
 
-import { useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 /**
  * @param {Object} props
@@ -19,6 +20,9 @@ export default function PageNavigation({
     onPageChange,
     enableKeyboard = true,
 }) {
+    const [isEditingPage, setIsEditingPage] = useState(false);
+    const [pageInputValue, setPageInputValue] = useState('');
+
     // Go to a specific page (clamped to valid range)
     const goToPage = useCallback((page) => {
         const newPage = Math.max(1, Math.min(page, totalPages));
@@ -26,6 +30,16 @@ export default function PageNavigation({
             onPageChange(newPage);
         }
     }, [currentPage, totalPages, onPageChange]);
+
+    // Handle page input submission
+    const handlePageInputSubmit = useCallback(() => {
+        const pageNum = parseInt(pageInputValue, 10);
+        if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
+            goToPage(pageNum);
+        }
+        setIsEditingPage(false);
+        setPageInputValue('');
+    }, [pageInputValue, totalPages, goToPage]);
 
     // Keyboard navigation
     useEffect(() => {
@@ -60,9 +74,43 @@ export default function PageNavigation({
                 ← Previous
             </button>
 
-            <span className="text-sm font-bold text-tum-black">
-                Page {currentPage} of {totalPages}
-            </span>
+            {isEditingPage ? (
+                <div className="flex items-center gap-1">
+                    <span className="text-sm font-bold text-tum-black">Page</span>
+                    <input
+                        type="number"
+                        min={1}
+                        max={totalPages}
+                        value={pageInputValue}
+                        onChange={(e) => setPageInputValue(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                handlePageInputSubmit();
+                            } else if (e.key === 'Escape') {
+                                setIsEditingPage(false);
+                                setPageInputValue('');
+                            }
+                        }}
+                        onBlur={handlePageInputSubmit}
+                        autoFocus
+                        className="w-16 px-2 py-1 text-sm font-bold text-tum-black text-center 
+                            border border-tum-blue rounded focus:outline-none focus:ring-1 focus:ring-tum-blue"
+                        placeholder={String(currentPage)}
+                    />
+                    <span className="text-sm font-medium text-tum-grey-4">of {totalPages}</span>
+                </div>
+            ) : (
+                <button
+                    onClick={() => {
+                        setPageInputValue(String(currentPage));
+                        setIsEditingPage(true);
+                    }}
+                    className="px-4 py-1.5 rounded-full text-sm font-medium text-tum-grey-4 bg-white border border-tum-grey-7 hover:border-tum-blue hover:text-tum-blue transition-all shadow-sm"
+                    title="Click to jump to a specific page"
+                >
+                    Page {currentPage} of {totalPages}
+                </button>
+            )}
 
             <button
                 onClick={() => goToPage(currentPage + 1)}
