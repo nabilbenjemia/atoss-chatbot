@@ -264,8 +264,11 @@ export const CONTENT_TYPE = {
 | `/api/ingestion/upload` | POST | File drop/select | `FormData(file)` |
 | `/api/ingestion/ingest` | POST | Preview confirm | `{targetDb, embeddingPreview, strategy}` |
 | `/api/ingestion/helper` | POST | Backend helper run | `{helperId, content, params}` |
+| `/api/ingestion/preview-strategy` | POST | Backend strategy preview | `{strategy, documentState}` |
 
-> **Note**: `previewEmbeddings` is now a **frontend-only** operation (pure data transformation, no backend call).
+> **Note**: Strategy preview follows a **hybrid pattern** (like helpers):
+> - **Local strategies** (`embed_per_page`): Frontend-only, no backend call
+> - **Backend strategies** (`semantic_sections`): Requires LLM service for AI processing
 
 ### Trigger Flow 1: Upload Document
 ```
@@ -321,7 +324,7 @@ executeCommand(Commands.batchUpdate(changes))
 setHasUnsavedChanges(true)
 ```
 
-### Trigger Flow 3: Preview Embeddings (Frontend-Only)
+### Trigger Flow 3: Preview Embeddings (Hybrid Pattern)
 ```
 User Action: Click "Ingest" → Select strategy → Confirm
      │
@@ -331,23 +334,40 @@ handleStartIngestion(targetDb, strategy)
      ├─► setIsPreviewMode(true)
      │
      ▼
-generateEmbeddingPreview(documentState, strategy) ◄── LOCAL (no backend)
-     │
-     ├─► Pure data transformation:
-     │   - Filter deleted items
-     │   - Merge text items per page/strategy
-     │   - Collect images
-     │   - Format as chunks
-     │
-     ├─► Returns: {chunks: [{id, text, metadata, images}]}
-     │
-     ▼
-setEmbeddingPreview(preview)
+isLocalStrategy(strategy) ? ─────────────────────────────────────┐
+     │                                                            │
+     │ YES (embed_per_page, chunked_fixed)                        │ NO (semantic_sections)
+     │                                                            │
+     ▼                                                            ▼
+generateEmbeddingPreview()          previewEmbeddingsBackend() ◄── BACKEND CALL
+     │ LOCAL (no backend)                     │
+     │                                        ├─► POST /api/ingestion/preview-strategy
+     │                                        ├─► LLM service uses NLP/AI to:
+     │                                        │   - Detect topic boundaries
+     │                                        │   - Split by semantic meaning
+     │                                        │   - Generate section summaries
+     │                                        │
+     └────────────────┬───────────────────────┘
+                      │
+                      ▼
+              Returns: {chunks: [{id, text, metadata, images}]}
+                      │
+                      ▼
+              setEmbeddingPreview(preview)
 ```
 
-> **Why frontend?** This is pure data restructuring with no AI or external services needed.
-> The frontend already has the documentState in memory, so sending it to backend
-> just to restructure and send back adds unnecessary latency.
+**Local Strategy Processing** (Frontend):
+- Filter deleted items
+- Merge text items per page/strategy
+- Collect images
+- Format as chunks
+- **No network latency**
+
+**Backend Strategy Processing** (LLM Service):
+- Uses Python NLP libraries (langchain, spacy)
+- AI-based topic detection
+- Semantic boundary detection
+- **Requires LLM service**
 
 ### Trigger Flow 4: Confirm Ingestion
 ```
@@ -574,15 +594,20 @@ setIsPreviewMode(false)
 ### IngestionModal.jsx
 **Purpose**: Select target DB and ingestion strategy
 
-**Strategies**:
-| Strategy | Description | Status |
-|----------|-------------|--------|
-| `embed_per_page` | One embedding per page | ✅ Enabled |
-| `chunked_document` | Chunked by token limit | ✅ Enabled |
-| `semantic_sections` | AI-detected sections | ⏳ Coming Soon |
-| `hierarchical` | Multi-level embeddings | ⏳ Coming Soon |
-| `knowledge_graph` | Entity-relationship | ⏳ Coming Soon |
-| `custom` | User-defined rules | ⏳ Coming Soon |
+**Strategies** (Hybrid Pattern - like helpers):
+
+| Strategy | Type | Description | Status |
+|----------|------|-------------|--------|
+| `embed_per_page` | `local` | Merge all text per page into one chunk | ✅ Enabled |
+| `chunked_fixed` | `local` | Split into fixed-size chunks (~500 tokens) | ✅ Enabled |
+| `semantic_sections` | `backend` | AI detects topic boundaries (uses LLM) | 🔨 In Development |
+| `hierarchical` | `backend` | Multi-level embeddings with AI summaries | ⏳ Coming Soon |
+
+**Strategy Types**:
+- `local`: Pure data transformation in frontend (no backend call)
+- `backend`: Requires LLM service for AI/NLP processing
+
+**Configuration**: Loaded from `INGESTION_CONFIG.strategies` (similar to helpers)
 
 **Props**:
 ```javascript
