@@ -165,6 +165,112 @@ export const CONTENT_TYPE = {
 | `useCommandHistory` | Custom | Undo/redo with command pattern |
 | `useLocalCache` | Custom | localStorage persistence |
 | `useBackendConfig` | Custom | Fetch backend config on mount |
+| `useIngestionEvent` | Custom | Subscribe to component events (Pub/Sub) |
+| `useIngestionEmit` | Custom | Publish events to other components |
+
+---
+
+## Event-Driven Architecture (Pub/Sub)
+
+> **ADR-002**: Components communicate via events for loose coupling and separation of concerns.
+> See `doc/ingestion/ADR.md` for the full decision record.
+
+### Core Principle
+
+Each component:
+1. **Owns its own state** - No God Class orchestrating everything
+2. **Publishes events** when something meaningful happens
+3. **Subscribes to events** from other components that affect it
+4. **Reacts autonomously** - Knows "when X happens, I do Y"
+
+### Event Flow Example: "Confirm & Ingest"
+
+```
+User clicks "Confirm & Ingest"
+           │
+           ▼
+┌──────────────────────────────┐
+│    EmbeddingPreview          │
+│    emit('ingestion:complete')│
+└──────────────────────────────┘
+           │
+   ┌───────┼───────┬───────┬───────┐
+   ▼       ▼       ▼       ▼       ▼
+┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
+│Pending│ │Ingest│ │Doc   │ │Content│ │Toast │
+│File  │ │File  │ │Editor│ │Viewer │ │      │
+│List  │ │List  │ │      │ │       │ │      │
+│──────│ │──────│ │──────│ │───────│ │──────│
+│Remove│ │Add   │ │Set   │ │Set    │ │Show  │
+│file  │ │file  │ │mode: │ │read-  │ │success
+│      │ │      │ │read- │ │only   │ │      │
+│      │ │      │ │only  │ │       │ │      │
+└──────┘ └──────┘ └──────┘ └───────┘ └──────┘
+```
+
+### Event Types
+
+Located in `frontend/src/utils/eventBus.js`:
+
+| Event | Payload | Published By | Subscribers |
+|-------|---------|--------------|-------------|
+| `file:uploaded` | `{ id, filename }` | UploadZone | FileQueue |
+| `file:selected` | `{ fileId }` | FileQueue | ContentViewer, HelperPanel |
+| `file:deleted` | `{ fileId }` | FileQueue | ContentViewer |
+| `processing:complete` | `{ fileId, documentState }` | UploadZone | FileQueue, ContentViewer |
+| `content:modified` | `{ fileId, changeType }` | ContentViewer | SaveBar (dirty flag) |
+| `preview:started` | `{ fileId, strategy }` | SaveBar | ContentViewer |
+| `preview:generated` | `{ fileId, chunks }` | ContentViewer | EmbeddingPreview |
+| `preview:cancelled` | `{ fileId }` | EmbeddingPreview | ContentViewer (back to editing) |
+| `ingestion:complete` | `{ fileId, filename, chunkCount }` | EmbeddingPreview | FileQueue, IngestedList, ContentViewer |
+| `mode:changed` | `{ fileId, mode }` | ContentViewer | HelperPanel |
+
+### Usage Pattern
+
+**Publisher** (e.g., EmbeddingPreview):
+```jsx
+import { useIngestionEmit, IngestionEvents } from '../hooks/useIngestionEvent';
+
+const EmbeddingPreview = () => {
+    const emitComplete = useIngestionEmit(IngestionEvents.INGESTION_COMPLETE);
+    
+    const handleConfirm = async () => {
+        await ingestToVectorDB(chunks);
+        emitComplete({ fileId, filename, chunkCount });
+    };
+};
+```
+
+**Subscriber** (e.g., PendingFileList):
+```jsx
+import { useIngestionEvent, IngestionEvents } from '../hooks/useIngestionEvent';
+
+const PendingFileList = () => {
+    const [files, setFiles] = useState([]);
+    
+    // "When ingestion completes, I remove the file"
+    useIngestionEvent(
+        IngestionEvents.INGESTION_COMPLETE,
+        ({ fileId }) => {
+            setFiles(prev => prev.filter(f => f.id !== fileId));
+        },
+        []
+    );
+};
+```
+
+### Debugging Events
+
+In development mode, all events are logged to console:
+```
+[EventBus] ingestion:complete { fileId: "abc123", filename: "doc.pdf", chunkCount: 42 }
+```
+
+Also available in browser console:
+```javascript
+window.__ingestionEventBus.listSubscribers()
+// { "ingestion:complete": 4, "file:selected": 2, ... }
+```
 
 ---
 
