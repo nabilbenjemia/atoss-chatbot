@@ -5,7 +5,9 @@ const axios = require('axios');
  * 
  * Component-level operations for ContentViewer and related components.
  * Handles AI helpers, content transformations, and item operations.
- * Communicates with the Python LLM backend.
+ * 
+ * NOTE: Currently returns MOCK DATA. LLM service AI helpers not implemented.
+ * When LLM service is ready, uncomment the actual API calls.
  */
 
 const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL || 'http://localhost:8000';
@@ -16,26 +18,44 @@ const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL || 'http://localhost:8000';
 
 /**
  * Run AI helper function on document content
+ * 
+ * NOTE: Currently returns MOCK DATA. LLM service /api/helper/* not implemented.
+ * 
  * @param {string} helperId - Helper function ID
  * @param {Object} content - Document content
  * @param {Object} params - Additional parameters
+ * @returns {Promise<Object>} - Helper result with modifiedItems
  */
 const runAiHelper = async (helperId, content, params = {}) => {
-    try {
-        const response = await axios.post(
-            `${LLM_SERVICE_URL}/api/helper/${helperId}`,
-            { content, params },
-            { timeout: 30000 }
-        );
-        return response.data;
-    } catch (error) {
-        console.error('LLM service helper error:', error.message);
-        // Return mock response for development
-        if (helperId === 'ai_image_descriptions') {
-            return generateMockImageDescriptions(content);
-        }
-        throw error;
+    // TODO: When LLM service is ready, uncomment this:
+    // try {
+    //     const response = await axios.post(
+    //         `${LLM_SERVICE_URL}/api/helper/${helperId}`,
+    //         { content, params },
+    //         { timeout: 30000 }
+    //     );
+    //     return response.data;
+    // } catch (error) {
+    //     console.error('LLM service helper error:', error.message);
+    //     if (helperId === 'ai_image_descriptions') {
+    //         return generateMockImageDescriptions(content);
+    //     }
+    //     throw error;
+    // }
+
+    // For now, return mock response directly
+    console.log(`[MOCK] Running mock AI helper: ${helperId} (LLM service not implemented)`);
+
+    if (helperId === 'ai_image_descriptions') {
+        return generateMockImageDescriptions(content);
     }
+
+    // Generic mock response for unknown helpers
+    return {
+        success: false,
+        error: `Helper '${helperId}' not implemented (LLM service not available)`,
+        modifiedItems: [],
+    };
 };
 
 /**

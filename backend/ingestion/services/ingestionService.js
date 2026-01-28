@@ -1,13 +1,15 @@
-const axios = require('axios');
-const FormData = require('form-data');
-
 /**
  * Ingestion Service
  * 
  * Page-level operations for the IngestionPage.
  * Handles document upload, configuration, and vector DB ingestion.
- * Communicates with the Python LLM backend.
+ * 
+ * NOTE: Currently returns MOCK DATA. LLM service integration not yet implemented.
+ * When LLM service is ready, uncomment the actual API calls.
  */
+
+const axios = require('axios');
+const FormData = require('form-data');
 
 const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL || 'http://localhost:8000';
 
@@ -16,25 +18,76 @@ const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL || 'http://localhost:8000';
 // ============================================================================
 
 /**
- * Get backend configuration from LLM service
- * Returns available target DBs, image classes, embedding models, etc.
+ * Get backend configuration
+ * 
+ * ADR-001: Returns metadata that controls frontend behavior.
+ * Currently returns mock data. Will call LLM service when implemented.
+ * 
+ * @returns {Promise<Object>} Configuration with strategies, helpers, collections
  */
 const getConfig = async () => {
-    try {
-        const response = await axios.get(`${LLM_SERVICE_URL}/api/config`);
-        return response.data;
-    } catch (error) {
-        console.error('LLM service config error:', error.message);
-        // Return default config for development
-        return getDefaultConfig();
-    }
+    // TODO: When LLM service is ready, uncomment this:
+    // try {
+    //     const response = await axios.get(`${LLM_SERVICE_URL}/api/config`);
+    //     return response.data;
+    // } catch (error) {
+    //     console.error('LLM service config error:', error.message);
+    //     return getDefaultConfig();
+    // }
+
+    // For now, return mock config directly
+    console.log('[MOCK] Returning mock configuration (LLM service not implemented)');
+    return getDefaultConfig();
 };
 
 /**
  * Default configuration when LLM service is unavailable
+ * 
+ * ADR-001: Hybrid Approach - Backend provides metadata/control, frontend provides local execution code.
+ * This config controls which strategies/helpers are visible and enabled in the frontend.
+ * Local strategies/helpers have their implementation code in the frontend bundle.
+ * Backend strategies/helpers call back to this service (which will proxy to LLM service).
  */
 const getDefaultConfig = () => {
     return {
+        // Embedding strategies - how to chunk documents for embedding
+        // Type 'local' = frontend executes, 'backend' = calls API
+        strategies: [
+            { id: 'embed_per_page', label: 'One Embedding per Page', type: 'local', enabled: true },
+            { id: 'chunked_fixed', label: 'Fixed-Size Chunks', type: 'local', enabled: true },
+            { id: 'semantic_sections', label: 'Semantic Sections (AI)', type: 'backend', enabled: false }, // Not implemented yet
+            { id: 'hierarchical', label: 'Hierarchical (AI)', type: 'backend', enabled: false }, // Not implemented yet
+        ],
+        // Helper functions - document manipulation
+        // Type 'local' = frontend executes, 'backend' = calls API
+        helpers: [
+            { id: 'remove_logos', label: 'Remove All Logos', type: 'local', enabled: true },
+            { id: 'remove_empty', label: 'Remove Empty Text', type: 'local', enabled: true },
+            { id: 'delete_regex', label: 'Delete by Regex', type: 'local', enabled: true, hasInput: true },
+            { id: 'ai_image_descriptions', label: 'AI Image Descriptions', type: 'backend', enabled: false }, // Not implemented yet
+        ],
+        // Target vector databases (always from backend)
+        collections: [
+            { id: 'chroma_default', label: 'ChromaDB (Default)' },
+            { id: 'chroma_snowflake', label: 'ChromaDB (Snowflake Collection)' },
+        ],
+        // Image classification options
+        imageClasses: [
+            'logo',
+            'figure',
+            'chart',
+            'diagram',
+            'photo',
+            'screenshot',
+            'table_image',
+            'other',
+        ],
+        // Embedding models (for display/selection)
+        embeddingModels: [
+            { id: 'default', label: 'Snowflake Arctic Embed', disabled: false },
+            { id: 'openai', label: 'OpenAI Ada-002', disabled: true },
+        ],
+        // Legacy aliases for backward compatibility
         availableTargetDbs: [
             { id: 'chroma_default', label: 'ChromaDB (Default)' },
             { id: 'chroma_snowflake', label: 'ChromaDB (Snowflake Collection)' },
@@ -49,10 +102,6 @@ const getDefaultConfig = () => {
             'table_image',
             'other',
         ],
-        embeddingModels: [
-            { id: 'default', label: 'Snowflake Arctic Embed', disabled: false },
-            { id: 'openai', label: 'OpenAI Ada-002', disabled: true },
-        ],
     };
 };
 
@@ -61,37 +110,43 @@ const getDefaultConfig = () => {
 // ============================================================================
 
 /**
- * Upload a file to the LLM service for processing
+ * Upload a file for processing (content extraction)
+ * 
+ * NOTE: Currently returns MOCK DATA. LLM service /api/docling/process not implemented.
+ * 
  * @param {Buffer} fileBuffer - File content as buffer
  * @param {string} filename - Original filename
  * @param {string} mimeType - File MIME type
  * @returns {Promise<Object>} - Extracted content with pages/items
  */
 const uploadForProcessing = async (fileBuffer, filename, mimeType) => {
-    const formData = new FormData();
-    formData.append('file', fileBuffer, {
-        filename,
-        contentType: mimeType
-    });
+    // TODO: When LLM service is ready, uncomment this:
+    // const formData = new FormData();
+    // formData.append('file', fileBuffer, {
+    //     filename,
+    //     contentType: mimeType
+    // });
+    // 
+    // try {
+    //     const response = await axios.post(
+    //         `${LLM_SERVICE_URL}/api/docling/process`,
+    //         formData,
+    //         {
+    //             headers: {
+    //                 ...formData.getHeaders()
+    //             },
+    //             timeout: 60000 // 60 second timeout for processing
+    //         }
+    //     );
+    //     return response.data;
+    // } catch (error) {
+    //     console.error('LLM service upload error:', error.message);
+    //     return generateMockContent(filename);
+    // }
 
-    try {
-        const response = await axios.post(
-            `${LLM_SERVICE_URL}/api/docling/process`,
-            formData,
-            {
-                headers: {
-                    ...formData.getHeaders()
-                },
-                timeout: 60000 // 60 second timeout for processing
-            }
-        );
-
-        return response.data;
-    } catch (error) {
-        console.error('LLM service upload error:', error.message);
-        // Return mock response for development
-        return generateMockContent(filename);
-    }
+    // For now, return mock content directly
+    console.log(`[MOCK] Returning mock content for: ${filename} (LLM service not implemented)`);
+    return generateMockContent(filename);
 };
 
 // ============================================================================
@@ -100,22 +155,39 @@ const uploadForProcessing = async (fileBuffer, filename, mimeType) => {
 
 /**
  * Ingest content into vector database
+ * 
+ * NOTE: Currently returns MOCK DATA. LLM service /api/ingest not implemented.
+ * 
  * @param {string} targetDb - Target database ID
- * @param {Object} content - Document content to ingest
+ * @param {Object} documentState - Document content to ingest
  * @param {string} strategy - Embedding strategy ('embed_per_page' | 'chunked_document')
+ * @returns {Promise<Object>} - Ingestion result
  */
-const ingestToVectorDb = async (targetDb, content, strategy = 'embed_per_page') => {
-    try {
-        const response = await axios.post(
-            `${LLM_SERVICE_URL}/api/ingest`,
-            { targetDb, content, strategy },
-            { timeout: 120000 } // 2 minute timeout for ingestion
-        );
-        return response.data;
-    } catch (error) {
-        console.error('LLM service ingest error:', error.message);
-        throw error;
-    }
+const ingestToVectorDb = async (targetDb, documentState, strategy = 'embed_per_page') => {
+    // TODO: When LLM service is ready, uncomment this:
+    // try {
+    //     const response = await axios.post(
+    //         `${LLM_SERVICE_URL}/api/ingest`,
+    //         { targetDb, content: documentState, strategy },
+    //         { timeout: 120000 } // 2 minute timeout for ingestion
+    //     );
+    //     return response.data;
+    // } catch (error) {
+    //     console.error('LLM service ingest error:', error.message);
+    //     throw error;
+    // }
+
+    // For now, return mock success
+    const preview = generateEmbeddingPreview(documentState, strategy);
+    console.log(`[MOCK] Mock ingestion to ${targetDb}: ${preview.total_embeddings} chunks (LLM service not implemented)`);
+
+    return {
+        success: true,
+        targetDb,
+        strategy,
+        documentCount: preview.total_embeddings,
+        message: `[MOCK] Successfully ingested ${preview.total_embeddings} embeddings to ${targetDb}`,
+    };
 };
 
 /**
