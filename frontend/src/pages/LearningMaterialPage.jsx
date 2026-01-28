@@ -170,10 +170,15 @@ const LearningMaterialPage = () => {
                     className="px-4 py-2 border rounded-lg"
                 >
                     <option value="">All Categories</option>
-                    <option value="tutorial">Tutorial</option>
-                    <option value="demo">Demo</option>
-                    <option value="guide">Guide</option>
-                    <option value="other">Other</option>
+                    <option value="Technisch">Technisch</option>
+                    <option value="Anwendung">Anwendung</option>
+                    <option value="Schulung/Doku">Schulung/Doku</option>
+                    <option value="Dienstplanung">Dienstplanung</option>
+                    <option value="Prozessfragen">Prozessfragen</option> 
+                    <option value="Benutzer & Rollen">Benutzer & Rollen</option>
+                    <option value="Zeitwirtschaft/Abrechnung">Zeitwirtschaft/Abrechnung</option>
+                                                     
+                    
                 </select>
             </div>
 

@@ -179,7 +179,7 @@ const uploadVideo = async (req, res) => {
             url: `/uploads/videos/${req.file.filename}`,
             duration: duration,
             thumbnail: `/uploads/thumbnails/${thumbnailFilename}`,
-            category: req.body.category || 'other',
+            category: req.body.category || 'Anwendung',
             tags: tags,
             uploadedBy: req.body.uploadedBy || null
         };

@@ -5,7 +5,7 @@ const VideoUploadModal = ({ isOpen, onClose, onSuccess, editVideo = null }) => {
     const [formData, setFormData] = useState({
         title: '',
         description: '',
-        category: 'tutorial',
+        category: '',
         tags: ''
     });
     const [videoFile, setVideoFile] = useState(null);
@@ -21,14 +21,14 @@ const VideoUploadModal = ({ isOpen, onClose, onSuccess, editVideo = null }) => {
             setFormData({
                 title: editVideo.title || '',
                 description: editVideo.description || '',
-                category: editVideo.category || 'tutorial',
+                category: editVideo.category || 'Anwendung',
                 tags: editVideo.tags?.join(', ') || ''
             });
         } else {
             setFormData({
                 title: '',
                 description: '',
-                category: 'tutorial',
+                category: 'Anwendung',
                 tags: ''
             });
         }
@@ -214,10 +214,13 @@ const VideoUploadModal = ({ isOpen, onClose, onSuccess, editVideo = null }) => {
                                     disabled={uploading}
                                     required
                                 >
-                                    <option value="tutorial">Tutorial</option>
-                                    <option value="demo">Demo</option>
-                                    <option value="guide">Guide</option>
-                                    <option value="other">Other</option>
+                                    <option value="Technisch">Technisch</option>
+                                    <option value="Anwendung">Anwendung</option>
+                                    <option value="Schulung/Doku">Schulung/Doku</option>
+                                    <option value="Dienstplanung">Dienstplanung</option>
+                                    <option value="Prozessfragen">Prozessfragen</option>                                  
+                                    <option value="Benutzer & Rollen">Benutzer & Rollen</option>
+                                    <option value="Zeitwirtschaft/Abrechnung">Zeitwirtschaft/Abrechnung</option>
                                 </select>
                             </div>
 

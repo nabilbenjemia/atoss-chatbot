@@ -28,8 +28,8 @@ const videoSchema = new mongoose.Schema({
     },
     category: {
         type: String,
-        enum: ['tutorial', 'demo', 'guide', 'other'], //TODO adjust later
-        default: 'other'
+        enum: ['Technisch', 'Anwendung', 'Zeitwirtschaft/Abrechnung', 'Dienstplanung', 'Benutzer & Rollen', 'Prozessfragen', 'Schulung/Doku'],
+        default: 'Anwendung'
     },
     tags: [{
         type: String,
