@@ -244,6 +244,56 @@ class AnalyticsService {
         
         return messages.map(m => m._id);
     }
+
+    /**
+     * Export analyzed queries as CSV
+     */
+    async exportQueriesAsCSV(userId = null, startDate = null, endDate = null) {
+        const match = (userId && userId !== 'null') ? { userId } : {};
+        
+        // Filter by message creation time if dates provided
+        if (startDate || endDate) {
+            const messageIds = await this._getMessageIdsInDateRange(startDate, endDate);
+            match.messageId = { $in: messageIds };
+        }
+        
+        // Get all matching queries sorted by date
+        const queries = await QueryAnalytics.find(match)
+            .populate({
+                path: 'messageId',
+                select: 'createdAt'
+            })
+            .sort({ 'messageId.createdAt': -1 });
+        
+        // Generate CSV
+        let csv = 'Query,Keywords,Category,Query Time\n';
+        
+        for (const query of queries) {
+            const queryText = this._escapeCsvField(query.query);
+            const keywords = this._escapeCsvField(query.keywords.join(', '));
+            const category = this._escapeCsvField(query.category);
+            const timestamp = query.messageId && query.messageId.createdAt 
+                ? new Date(query.messageId.createdAt).toLocaleString() 
+                : '';
+            
+            csv += `${queryText},${keywords},${category},${timestamp}\n`;
+        }
+        
+        return csv;
+    }
+    }
+
+    /**
+     * Helper: Escape CSV field (handle quotes and commas)
+     */
+    _escapeCsvField(field) {
+        if (field === null || field === undefined) return '';
+        const str = String(field);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+    }
 }
 
 module.exports = new AnalyticsService();

@@ -97,11 +97,29 @@ const getDashboardData = async (req, res) => {
     }
 };
 
+/**
+ * Export analyzed queries as CSV
+ */
+const exportQueriesAsCSV = async (req, res) => {
+    try {
+        const { userId, startDate, endDate } = req.query;
+        const csv = await analyticsService.exportQueriesAsCSV(userId, startDate, endDate);
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="analyzed_queries.csv"');
+        res.send(csv);
+    } catch (error) {
+        console.error('Error exporting queries:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
 module.exports = {
     processQueries,
     getKeywordStats,
     getCategoryStats,
     getQueriesOverTime,
     getOverallStats,
-    getDashboardData
+    getDashboardData,
+    exportQueriesAsCSV
 };

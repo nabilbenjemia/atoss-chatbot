@@ -57,6 +57,30 @@ const AnalyticsDashboard = () => {
         }
     };
 
+    const downloadCSV = async () => {
+        try {
+            let url = `${CONVERSATION_API}/api/analytics/export?userId=${userId}`;
+            if (startDate) url += `&startDate=${startDate}`;
+            if (endDate) url += `&endDate=${endDate}`;
+            
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Failed to export data');
+            
+            const blob = await response.blob();
+            const csvUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = csvUrl;
+            link.setAttribute('download', `analyzed_queries_${new Date().toISOString().slice(0, 10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(csvUrl);
+        } catch (err) {
+            console.error('Error downloading CSV:', err);
+            alert('Error downloading CSV: ' + err.message);
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen bg-gray-900">
@@ -121,13 +145,21 @@ const AnalyticsDashboard = () => {
                             <h1 className="text-3xl font-bold mb-2">Analytics Dashboard</h1>
                             <p className="text-gray-400">Query analysis and insights</p>
                         </div>
-                        <button
-                            onClick={processQueries}
-                            disabled={processing}
-                            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors"
-                        >
-                            {processing ? 'Processing...' : 'Process New Queries'}
-                        </button>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={downloadCSV}
+                                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors"
+                            >
+                                Download CSV
+                            </button>
+                            <button
+                                onClick={processQueries}
+                                disabled={processing}
+                                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors"
+                            >
+                                {processing ? 'Processing...' : 'Process New Queries'}
+                            </button>
+                        </div>
                     </div>
                     
                     {/* Date Range Filters */}

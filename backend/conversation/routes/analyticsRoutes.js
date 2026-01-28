@@ -14,4 +14,7 @@ router.get('/overall', analyticsController.getOverallStats);
 // Get all dashboard data
 router.get('/dashboard', analyticsController.getDashboardData);
 
+// Export queries as CSV
+router.get('/export', analyticsController.exportQueriesAsCSV);
+
 module.exports = router;
