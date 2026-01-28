@@ -15,6 +15,12 @@ class LLMClassificationService {
      */
     async analyzeQuery(query) {
         try {
+            // Skip single-word queries silently
+            const wordCount = query.trim().split(/\s+/).length;
+            if (wordCount < 2) {
+                return null;
+            }
+
             const prompt = `You are an expert classifier for support queries regarding the ATOSS workforce management system at TUM Klinikum. Analyze this user query and extract relevant keywords and the correct category.
 
 Query: "${query}"

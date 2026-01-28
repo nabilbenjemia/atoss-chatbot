@@ -26,9 +26,16 @@ class AnalyticsService {
             let processed = 0;
             for (const message of unanalyzed) {
                 try {
-                    const { keywords, category } = await llmClassificationService.analyzeQuery(
+                    const result = await llmClassificationService.analyzeQuery(
                         message.content
                     );
+                    
+                    // Skip if analyzeQuery returns null (single-word queries)
+                    if (!result) {
+                        continue;
+                    }
+                    
+                    const { keywords, category } = result;
                     
                     // Get conversation to find userId
                     const conversation = await Conversation.findById(message.conversationId);
