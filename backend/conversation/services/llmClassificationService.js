@@ -15,7 +15,8 @@ class LLMClassificationService {
      */
     async analyzeQuery(query) {
         try {
-            const prompt = `Analyze this user query and extract keywords and category.
+            const prompt = `You are an expert classifier for support queries regarding the ATOSS workforce management system at TUM Klinikum. Analyze this user query and extract relevant keywords and the correct category.
+
 Query: "${query}"
 
 Respond ONLY with valid JSON in this exact format:
@@ -25,10 +26,20 @@ Respond ONLY with valid JSON in this exact format:
 }
 
 Instructions:
-1. Extract 2-4 relevant keywords.
-2. Create an appropriate category based on the query intent (e.g., "login_issue", "billing_inquiry", "python_error").
-3. Keep the category short, descriptive, and use snake_case.
-4. Respond only with the JSON object.`;
+1. Extract 2-4 relevant keywords from the query.
+2. CLASSIFY the query into exactly ONE of the following categories based on the definitions below. Do not invent new categories.
+
+ALLOWED CATEGORIES:
+- "Technisch": For technical issues, bugs, login errors/password resets, interface errors, or app/browser functionality issues (Incidents).
+- "Anwendung": For functional questions on HOW to use the system (e.g., "How do I create a roster?", "How do I enter leave?", "How do I change working time profiles?"), or handling error messages caused by incorrect usage.
+- "Zeitwirtschaft/Abrechnung": For questions regarding time valuation, payroll/salary transfer, balances, surcharges, or calculation rules.
+- "Dienstplanung": For planning logic, staffing rules, qualifications in planning, shift proposals, or missing working time models (e.g., "Why isn't a shift being suggested to me?", "How do I change staffing rules?", "How can I take qualifications into account in the schedule?", "We have a new work schedule model, why isn't it showing up for me?").
+- "Benutzer/Rollen": For questions about access rights, permissions, user profiles, or data visibility.
+- "Prozessfragen": For organizational questions not caused by technical faults (e.g., "How do I report sick?", "Approval workflows", "What is the vacation approval process?", "How does internal shift swapping work?").
+- "Schulung/Doku": For requests regarding missing manuals, tutorials, or training needs (e.g., "Where can I find instructions for...?", "Can someone show me how... works?").
+- "Sonstiges": For queries that do not fit into any of the above categories.
+
+3. Respond only with the JSON object.`;
 
             const response = await axios.post(`${this.ollamaUrl}/api/generate`, {
                 model: this.model,
@@ -45,46 +56,33 @@ Instructions:
             
             // Extract JSON from response
             const jsonMatch = text.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                const result = JSON.parse(jsonMatch[0]);
-                
-                // Validate and clean keywords
-                const keywords = Array.isArray(result.keywords) 
-                    ? result.keywords.slice(0, 5).map(k => String(k).toLowerCase().trim())
-                    : [];
-                
-                const category = result.category || 'other';
-                
-                return { keywords, category };
+            if (!jsonMatch) {
+                throw new Error('Failed to extract JSON from LLM response');
             }
             
-            return this.fallbackAnalysis(query);
+            const result = JSON.parse(jsonMatch[0]);
+            
+            // Validate and clean keywords
+            const keywords = Array.isArray(result.keywords) 
+                ? result.keywords.slice(0, 5).map(k => String(k).toLowerCase().trim())
+                : [];
+            
+            const category = result.category;
+            if (!category) {
+                throw new Error('LLM did not return a valid category');
+            }
+            
+            return { keywords, category };
             
         } catch (error) {
             console.error('LLM analysis error:', error.message);
-            return this.fallbackAnalysis(query);
+            throw new Error(`Failed to analyze query: ${error.message}`);
         }
-    }
-
-    /**
-     * Fallback keyword extraction without LLM
-     */
-    fallbackAnalysis(query) {
-        const stopWords = ['the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'but', 'in', 'with', 'to', 'for', 'of', 'how', 'what', 'when', 'where', 'why', 'can', 'could', 'would', 'should'];
-        
-        const words = query.toLowerCase()
-            .replace(/[^\w\s]/g, ' ')
-            .split(/\s+/)
-            .filter(word => word.length > 3 && !stopWords.includes(word));
-        
-        const keywords = [...new Set(words)].slice(0, 5);
-        
-        return {
-            keywords,
-            category: 'general_question'
-        };
     }
 }
 
+
 module.exports = new LLMClassificationService();
+
+
 
