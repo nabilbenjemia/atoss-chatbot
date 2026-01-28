@@ -47,7 +47,6 @@ const AnalyticsDashboard = () => {
             if (!response.ok) throw new Error('Failed to process queries');
             const result = await response.json();
             console.log('Process result:', result); // Debug log
-            alert(result.message);
             await fetchDashboardData(); // Wait for refresh to complete
         } catch (err) {
             console.error('Error processing queries:', err);
@@ -83,16 +82,16 @@ const AnalyticsDashboard = () => {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-screen bg-gray-900">
-                <div className="text-white text-xl">Loading analytics...</div>
+            <div className="flex items-center justify-center h-screen bg-tum-blue-dark">
+                <div className="text-tum-white text-xl">Loading analytics...</div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="flex items-center justify-center h-screen bg-gray-900">
-                <div className="text-red-500 text-xl">Error: {error}</div>
+            <div className="flex items-center justify-center h-screen bg-tum-blue-dark">
+                <div className="text-tum-red text-xl">Error: {error}</div>
             </div>
         );
     }
@@ -111,7 +110,7 @@ const AnalyticsDashboard = () => {
         x: keywords.map(k => k.keyword),
         y: keywords.map(k => k.count),
         type: 'bar',
-        marker: { color: '#3b82f6' }
+        marker: { color: '#3070B3' }
     }] : [];
 
     // Prepare data for category pie chart
@@ -121,7 +120,7 @@ const AnalyticsDashboard = () => {
         type: 'pie',
         hole: 0.4,
         marker: {
-            colors: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+            colors: ['#3070B3', '#9FBA36', '#E37222', '#EA7237', '#8F81EA', '#B55CA5', '#FED702', '#5E94D4']
         }
     }] : [];
 
@@ -131,31 +130,31 @@ const AnalyticsDashboard = () => {
         y: timeline.map(t => t.count),
         type: 'scatter',
         mode: 'lines+markers',
-        line: { color: '#3b82f6', width: 2 },
-        marker: { size: 8, color: '#3b82f6' }
+        line: { color: '#3070B3', width: 2 },
+        marker: { size: 8, color: '#3070B3' }
     }] : [];
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white p-6">
+        <div className="min-h-screen bg-tum-blue-dark text-tum-white p-6">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
                     <div className="flex justify-between items-center mb-4">
                         <div>
-                            <h1 className="text-3xl font-bold mb-2">Analytics Dashboard</h1>
-                            <p className="text-gray-400">Query analysis and insights</p>
+                            <h1 className="text-3xl font-bold mb-2 text-tum-white">Analytics Dashboard</h1>
+                            <p className="text-tum-grey-7">Query analysis and insights</p>
                         </div>
                         <div className="flex gap-3">
                             <button
                                 onClick={downloadCSV}
-                                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors"
+                                className="bg-tum-green-1 hover:bg-tum-green-dark text-white px-6 py-2 rounded-lg transition-colors"
                             >
                                 Download CSV
                             </button>
                             <button
                                 onClick={processQueries}
                                 disabled={processing}
-                                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors"
+                                className="bg-tum-blue-brand hover:bg-tum-blue disabled:bg-tum-grey-4 text-white px-6 py-2 rounded-lg transition-colors"
                             >
                                 {processing ? 'Processing...' : 'Process New Queries'}
                             </button>
@@ -163,29 +162,29 @@ const AnalyticsDashboard = () => {
                     </div>
                     
                     {/* Date Range Filters */}
-                    <div className="flex gap-4 items-center bg-gray-800 p-4 rounded-lg border border-gray-700">
+                    <div className="flex gap-4 items-center bg-tum-blue-dark-1 p-4 rounded-xl border border-tum-blue-dark-3 shadow-lg">
                         <div className="flex items-center gap-2">
-                            <label className="text-gray-400 text-sm">From:</label>
+                            <label className="text-tum-grey-7 text-sm font-medium">From:</label>
                             <input
                                 type="date"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
-                                className="bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                                className="bg-tum-blue-dark-2 text-tum-white px-3 py-2 rounded-xl border border-tum-blue-dark-4 focus:border-tum-blue-brand focus:ring-2 focus:ring-tum-blue-brand focus:outline-none"
                             />
                         </div>
                         <div className="flex items-center gap-2">
-                            <label className="text-gray-400 text-sm">To:</label>
+                            <label className="text-tum-grey-7 text-sm font-medium">To:</label>
                             <input
                                 type="date"
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
-                                className="bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                                className="bg-tum-blue-dark-2 text-tum-white px-3 py-2 rounded-xl border border-tum-blue-dark-4 focus:border-tum-blue-brand focus:ring-2 focus:ring-tum-blue-brand focus:outline-none"
                             />
                         </div>
                         {(startDate || endDate) && (
                             <button
                                 onClick={() => { setStartDate(''); setEndDate(''); }}
-                                className="text-gray-400 hover:text-white text-sm underline"
+                                className="text-tum-blue-light hover:text-tum-white text-sm font-medium transition-colors"
                             >
                                 Clear filters
                             </button>
@@ -195,41 +194,28 @@ const AnalyticsDashboard = () => {
 
                 {/* Overall Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                        <div className="text-gray-400 text-sm mb-2">Processed Queries <span className="text-xs">(1 word queries skipped)</span></div>
-                        <div className="text-4xl font-bold">{overall?.totalQueries || 0}</div>
+                    <div className="bg-tum-blue-dark-1 rounded-xl p-6 border border-tum-blue-dark-3 shadow-lg">
+                        <div className="text-tum-grey-7 text-sm mb-2 font-medium">Processed Queries <span className="text-xs font-normal">(1 word queries skipped)</span></div>
+                        <div className="text-4xl font-bold text-tum-white">{overall?.totalQueries || 0}</div>
                     </div>
-                    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                        <div className="text-gray-400 text-sm mb-2">Total Queries <span className="text-xs">(including 1 word queries)</span></div>
-                        <div className="text-4xl font-bold">{overall?.totalQueriesIncludingOneWord || 0}</div>
+                    <div className="bg-tum-blue-dark-1 rounded-xl p-6 border border-tum-blue-dark-3 shadow-lg">
+                        <div className="text-tum-grey-7 text-sm mb-2 font-medium">Total Queries <span className="text-xs font-normal">(including 1 word queries)</span></div>
+                        <div className="text-4xl font-bold text-tum-white">{overall?.totalQueriesIncludingOneWord || 0}</div>
                     </div>
-                    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                        <div className="text-gray-400 text-sm mb-2">Total Users</div>
-                        <div className="text-4xl font-bold">{overall?.uniqueUsers || 0}</div>
+                    <div className="bg-tum-blue-dark-1 rounded-xl p-6 border border-tum-blue-dark-3 shadow-lg">
+                        <div className="text-tum-grey-7 text-sm mb-2 font-medium">Total Users</div>
+                        <div className="text-4xl font-bold text-tum-white">{overall?.uniqueUsers || 0}</div>
                     </div>
-                    <div className="bg-green-900/30 rounded-lg p-6 border border-green-700">
-                        <div className="text-green-400 text-sm mb-2">🟢 Active Now (15min)</div>
-                        <div className="text-4xl font-bold text-green-500">{overall?.activeUsersNow || 0}</div>
+                    <div className="bg-tum-blue-dark-1 rounded-xl p-6 border border-tum-green-dark shadow-lg">
+                        <div className="text-tum-grey-7 text-sm mb-2 font-medium">🟢 Active Now (15min)</div>
+                        <div className="text-4xl font-bold text-tum-green-2">{overall?.activeUsersNow || 0}</div>
                     </div>
                 </div>
-
-                {/* Debug Info */}
-                {dashboardData && (
-                    <div className="bg-gray-800 rounded-lg p-4 border border-yellow-700 mb-6">
-                        <details>
-                            <summary className="text-yellow-400 cursor-pointer">🐛 Debug Info (click to expand)</summary>
-                            <pre className="text-xs text-gray-300 mt-2 overflow-auto">
-                                {JSON.stringify(dashboardData, null, 2)}
-                            </pre>
-                        </details>
-                    </div>
-                )}
-
                 {/* Charts Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                     {/* Top Keywords Chart */}
-                    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                        <h2 className="text-xl font-semibold mb-4">Top Keywords</h2>
+                    <div className="bg-tum-blue-dark-1 rounded-xl p-6 border border-tum-blue-dark-3 shadow-lg">
+                        <h2 className="text-xl font-semibold mb-4 text-tum-white">Top Keywords</h2>
                         {keywords && keywords.length > 0 ? (
                             <Plot
                                 data={keywordData}
@@ -253,13 +239,13 @@ const AnalyticsDashboard = () => {
                                 useResizeHandler={true}
                             />
                         ) : (
-                            <div className="text-gray-400 text-center py-10">No keyword data available</div>
+                            <div className="text-tum-grey-7 text-center py-10">No keyword data available</div>
                         )}
                     </div>
 
                     {/* Category Distribution Chart */}
-                    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                        <h2 className="text-xl font-semibold mb-4">Query Categories</h2>
+                    <div className="bg-tum-blue-dark-1 rounded-xl p-6 border border-tum-blue-dark-3 shadow-lg">
+                        <h2 className="text-xl font-semibold mb-4 text-tum-white">Query Categories</h2>
                         {categories && categories.length > 0 ? (
                             <Plot
                                 data={categoryData}
@@ -281,18 +267,18 @@ const AnalyticsDashboard = () => {
                                 useResizeHandler={true}
                             />
                         ) : (
-                            <div className="text-gray-400 text-center py-10">No category data available</div>
+                            <div className="text-tum-grey-7 text-center py-10">No category data available</div>
                         )}
                     </div>
                 </div>
 
                 {/* Timeline Chart - Full Width */}
-                <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                    <h2 className="text-xl font-semibold mb-4">
+                <div className="bg-tum-blue-dark-1 rounded-xl p-6 border border-tum-blue-dark-3 shadow-lg">
+                    <h2 className="text-xl font-semibold mb-4 text-tum-white">
                         Queries Over Time
-                        {!startDate && !endDate && <span className="text-gray-400 text-sm ml-2">(Last 7 Days)</span>}
+                        {!startDate && !endDate && <span className="text-tum-grey-7 text-sm ml-2">(Last 7 Days)</span>}
                         {(startDate || endDate) && (
-                            <span className="text-blue-400 text-sm ml-2">
+                            <span className="text-tum-grey-7 text-sm ml-2">
                                 ({startDate || '...'} to {endDate || 'now'})
                             </span>
                         )}
@@ -320,13 +306,13 @@ const AnalyticsDashboard = () => {
                             useResizeHandler={true}
                         />
                     ) : (
-                        <div className="text-gray-400 text-center py-10">No timeline data available</div>
+                        <div className="text-tum-grey-7 text-center py-10">No timeline data available</div>
                     )}
                 </div>
 
                 {/* Info Box */}
-                <div className="mt-6 bg-blue-900/20 border border-blue-800 rounded-lg p-4">
-                    <p className="text-sm text-blue-300">
+                <div className="mt-6 bg-tum-blue-dark-1 border border-tum-blue-dark-3 rounded-xl p-4 shadow-lg">
+                    <p className="text-sm text-tum-grey-7">
                         <strong>Note:</strong> Analytics are powered by a small LLM that classifies queries into keywords and categories. 
                         Click "Process New Queries" to analyze recent chat messages.
                     </p>
