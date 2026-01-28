@@ -69,33 +69,48 @@ services:
       - atoss-network
     restart: unless-stopped
 
-  ollama:
-    image: ollama/ollama:latest
+  user:
+    build:
+      context: ./backend/user
+      dockerfile: Dockerfile
     ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-      - ./init-ollama.sh:/usr/local/bin/init-ollama.sh:ro
+      - "4001:4001"
     env_file:
-      - ./backend/llm/.env
+      - ./backend/user/.env
+    depends_on:
+      authentication:
+        condition: service_started
     networks:
       - atoss-network
-    entrypoint: ["/bin/sh", "/usr/local/bin/init-ollama.sh"]
-    #deploy:
-    #  resources:
-    #    reservations:
-    #      devices:
-    #        - driver: nvidia
-    #          count: all
-    #          capabilities: [gpu]
-    healthcheck:
-      test: ["CMD-SHELL", "ollama list || exit 1"]
-      interval: 10s
-      timeout: 10s
-      retries: 12
-      start_period: 90s
     restart: unless-stopped
 
+  #ollama:
+  #  image: ollama/ollama:latest
+  #  ports:
+  #    - "11434:11434"
+  #  volumes:
+  #    - ollama_data:/root/.ollama
+  #    - ./init-ollama.sh:/usr/local/bin/init-ollama.sh:ro
+  #  env_file:
+  #    - ./backend/llm/.env
+  #  networks:
+  #    - atoss-network
+  #  entrypoint: ["/bin/sh", "/usr/local/bin/init-ollama.sh"]
+  #  deploy:
+  #    resources:
+  #      reservations:
+  #      devices:
+  #        - driver: nvidia
+  #          count: all
+  #          capabilities: [gpu]
+  #  healthcheck:
+  #    test: ["CMD-SHELL", "ollama list || exit 1"]
+  #    interval: 10s
+  #    timeout: 10s
+  #    retries: 12
+  #    start_period: 90s
+  #  restart: unless-stopped
+  
 networks:
   atoss-network:
     driver: bridge

@@ -1,8 +1,6 @@
 const axios = require('axios');
 const UserProfile = require('../models/UserProfile');
-const bcrypt = require('bcryptjs');
-const Role = require('../../authentication/models/Role');
-const Department = require('../../authentication/models/Department');
+const Role = require('../models/Role');
 
 /**
  * UserService
@@ -11,7 +9,7 @@ const Department = require('../../authentication/models/Department');
  */
 class UserService {
 	constructor() {
-		this.authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:4000';
+		this.authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:4003';
 	}
 
 	/**
