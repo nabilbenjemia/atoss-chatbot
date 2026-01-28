@@ -132,31 +132,28 @@ The page uses **Connected Components** that own their business logic:
 ### Component Hierarchy
 
 ```
-IngestionPage.jsx (or IngestionPageRefactored.jsx)
+IngestionPage.jsx (entry point)
 ├── IngestionProvider (Context provider)
-│   └── IngestionPageContent
+│   └── IngestionPageLayout.jsx (~400 lines - layout-only)
 │       ├── LeftSidebar
-│       │   ├── UploadZone.jsx          # Drag-and-drop file upload
-│       │   ├── FileQueue.jsx           # List of uploaded documents
-│       │   │   └── FileQueueItem.jsx   # Individual file item with status
-│       │   └── CacheManagement.jsx     # Cache management (modal)
+│       │   ├── ConnectedUploadZone.jsx    # Drag-drop upload (owns upload logic)
+│       │   ├── ConnectedFileQueue.jsx     # File list (owns selection logic)
+│       │   │   └── FileQueueItem.jsx      # Individual file item (pure UI)
+│       │   └── CacheManagement.jsx        # Cache management (pure UI)
 │       ├── Main Content
-│       │   ├── ContentHeader (inline)  # Title and SaveBar
-│       │   │   └── SaveBar.jsx         # Undo/redo and save controls
-│       │   ├── ContentViewer.jsx       # Main content viewing area
-│       │   │   ├── PageNavigation.jsx  # Page navigation controls
-│       │   │   └── PageContent.jsx     # Page content renderer
-│       │   │       ├── TextItem.jsx    # Editable text block
-│       │   │       ├── ImageItem.jsx   # Image with classification dropdown
-│       │   │       └── TableItem.jsx   # Table display component
-│       │   └── EmbeddingPreviewViewer.jsx  # Preview/readonly mode
-│       │       └── EmbeddingPreview.jsx    # Single embedding chunk
+│       │   ├── ConnectedContentViewer.jsx # Content viewer (owns edit logic)
+│       │   │   ├── PageNavigation.jsx     # Page nav buttons (pure UI)
+│       │   │   └── PageContent.jsx        # Page items renderer (pure UI)
+│       │   │       ├── TextItem.jsx       # Editable text (pure UI)
+│       │   │       ├── ImageItem.jsx      # Image with classification (pure UI)
+│       │   │       └── TableItem.jsx      # Table display (pure UI)
+│       │   └── EmbeddingPreviewViewer.jsx # Preview/readonly mode (pure UI)
+│       │       └── EmbeddingPreview.jsx   # Single embedding chunk (pure UI)
 │       ├── RightSidebar
-│       │   └── HelperPanel.jsx         # Sidebar with helper function buttons
-│       └── Modals
-│           ├── IngestionModal.jsx      # Modal for target DB selection
-│           ├── RegexInputModal.jsx     # Modal for regex pattern input
-│           ├── CacheManagement.jsx     # Cache management modal
+│       │   └── ConnectedHelperPanel.jsx   # Helpers (owns execution logic)
+│       └── Modals (pure UI)
+│           ├── IngestionModal.jsx         # Target DB selection
+│           ├── RegexInputModal.jsx        # Regex pattern input
 │           └── HelperFileSelectModal.jsx  # File selection for helpers
 ```
 
