@@ -47,7 +47,7 @@ The send message flow involves three services:
      │   │ CASE A: No conversationId (New Conversation)                                       │
      │   └────────────────────────────────────────────────────────────────────────────────────┤
      │                │                   │                  │                │               │
-     │                │                   │ 6a. setIsFirstMessage(true)       │               │
+     │                │                   │ 6a. setIsStreaming(true)          │               │
      │                │                   │─────────┐        │                │               │
      │                │                   │         │        │                │               │
      │                │                   │<────────┘        │                │               │
@@ -435,11 +435,11 @@ const createMessageBatch = async (req, res) => {
 │  ┌────────────────────────────────────────────────────────────────────────────────┐│
 │  │ chat_controller.stream_response() → rag_chain_service.stream_response()       ││
 │  │                                                                                ││
-│  │ 1. Embed query (Qwen3-Embedding-0.6B)                                          ││
-│  │ 2. Search ChromaDB (k=16 documents)                                            ││
-│  │ 3. Rerank with Jina Reranker v3 (top_k=5)                                      ││
+│  │ 1. Embed query (Snowflake Arctic Embed)                                      ││
+│  │ 2. Search ChromaDB (k=8 documents)                                            ││
+│  │ 3. Rerank with mMiniLM cross-encoder (top_k=5) - if enabled                   ││
 │  │ 4. Format German RAG prompt with context                                       ││
-│  │ 5. Stream tokens from Ollama (qwen3:1.7b)                                      ││
+│  │ 5. Stream tokens from Ollama (qwen2.5:7b-instruct-q4_0)                         ││
 │  │ 6. Yield SSE events: {"content": "..."} for each token                         ││
 │  │ 7. Yield final event: {"done": true}                                           ││
 │  └────────────────────────────────────────────────────────────────────────────────┘│

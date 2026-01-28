@@ -1,8 +1,6 @@
 const axios = require('axios');
 const UserProfile = require('../models/UserProfile');
-const bcrypt = require('bcryptjs');
-const Role = require('../../authentication/models/Role');
-const Department = require('../../authentication/models/Department');
+const Role = require('../models/Role');
 
 /**
  * UserService
@@ -11,7 +9,7 @@ const Department = require('../../authentication/models/Department');
  */
 class UserService {
 	constructor() {
-		this.authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:4000';
+		this.authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:4003';
 	}
 
 	/**
@@ -396,6 +394,65 @@ class UserService {
 			return !!profile;
 		} catch (error) {
 			return false;
+		}
+	}
+
+	/**
+	 * Add admin - promote a staff user to admin by email
+	 * Only admins can use this functionality
+	 * @param {string} email - Email of the user to promote
+	 * @param {string} token - Auth token
+	 * @returns {Promise<Object>} - Updated user credentials
+	 */
+	async addAdmin(email, token = null) {
+		try {
+			if (!email || typeof email !== 'string' || email.trim() === '') {
+				throw new Error('Email is required');
+			}
+
+			const headers = { 'Content-Type': 'application/json' };
+			if (token) {
+				headers['Authorization'] = `Bearer ${token}`;
+			} else if (process.env.INTERNAL_SERVICE_TOKEN) {
+				headers['Authorization'] = `Bearer ${process.env.INTERNAL_SERVICE_TOKEN}`;
+			}
+
+			// First, get user by email to check if they exist and get their current role
+			const getUserResponse = await axios.get(
+				`${this.authServiceUrl}/auth/user/email/${encodeURIComponent(email)}`,
+				{
+					timeout: 5000,
+					headers
+				}
+			);
+
+			const user = getUserResponse.data.data;
+
+			// Check if user has Staff role
+			if (user.role !== Role.STAFF) {
+				throw new Error(`User with email ${email} has role '${user.role}'. Only Staff users can be promoted to Admin.`);
+			}
+
+			// Update role to Admin
+			const updateResponse = await axios.patch(
+				`${this.authServiceUrl}/auth/user/${user.id}/role`,
+				{ role: Role.ADMIN },
+				{
+					timeout: 5000,
+					headers
+				}
+			);
+
+			return updateResponse.data.data;
+		} catch (error) {
+			console.error('UserService.addAdmin error:', error.response?.data || error.message);
+			if (error.response && error.response.status === 404) {
+				throw new Error(`User with email ${email} does not exist. Please check the email address and try again.`);
+			}
+			if (error.response && error.response.status === 403) {
+				throw new Error('Forbidden: Only admins can promote users to admin');
+			}
+			throw new Error(error.response?.data?.message || error.message || 'Failed to promote user to admin');
 		}
 	}
 }

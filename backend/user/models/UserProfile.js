@@ -9,8 +9,7 @@ const userProfileSchema = new mongoose.Schema({
 	userId: {
 		type: String,
 		required: true,
-		unique: true,
-		index: true
+		unique: true, // This already creates a unique index
 	},
 	username: {
 		type: String,
@@ -26,7 +25,7 @@ const userProfileSchema = new mongoose.Schema({
 		theme: {
 			type: String,
 			enum: ['light', 'dark', 'auto'],
-			default: 'auto'
+			default: 'light'
 		},
 		language: {
 			type: String,
@@ -58,8 +57,5 @@ userProfileSchema.pre('save', function(next) {
 	this.updatedAt = Date.now();
 	next();
 });
-
-// Index for faster lookups
-userProfileSchema.index({ userId: 1 });
 
 module.exports = mongoose.model('UserProfile', userProfileSchema);

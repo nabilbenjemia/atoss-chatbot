@@ -345,6 +345,51 @@ class UserController {
 			});
 		}
 	}
+
+	/**
+	 * Add admin - promote a staff user to admin by email
+	 * POST /users/add-admin
+	 * Only admins can use this functionality
+	 */
+	async addAdmin(req, res) {
+		try {
+			const requestingUserRole = req.user?.role;
+			const token = req.headers.authorization?.replace('Bearer ', '');
+
+			// Check if requesting user is an admin
+			if (requestingUserRole !== 'Admin') {
+				return res.status(403).json({
+					success: false,
+					message: 'Forbidden: Only admins can promote users to admin'
+				});
+			}
+
+			const { email } = req.body;
+
+			if (!email) {
+				return res.status(400).json({
+					success: false,
+					message: 'Email is required'
+				});
+			}
+
+			const result = await userService.addAdmin(email, token);
+
+			res.status(200).json({
+				success: true,
+				message: `User with email ${email} has been promoted to Admin successfully`,
+				data: result
+			});
+		} catch (error) {
+			console.error('Error promoting user to admin:', error);
+			const statusCode = error.message.includes('Forbidden') ? 403 : 
+			                   error.message.includes('not found') ? 404 : 400;
+			res.status(statusCode).json({
+				success: false,
+				message: error.message || 'Failed to promote user to admin'
+			});
+		}
+	}
 }
 
 module.exports = new UserController();

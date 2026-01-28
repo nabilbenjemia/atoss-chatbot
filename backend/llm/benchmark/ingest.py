@@ -49,7 +49,7 @@ def extract_text_chunks(pdf_path: str) -> List[Dict[str, Any]]:
     Returns:
         List of chunk dictionaries with id, text, page, and source
     """
-    logger.info(f"Extracting text from: {pdf_path}")
+    logger.info(f"Extracting text from:, {pdf_path}")
 
     try:
         doc = fitz.open(pdf_path)

@@ -16,11 +16,11 @@ export default function ChatbotPage() {
     const [conversationId, setConversationId] = useState(null);
     const [messages, setMessages] = useState([]);
     const [conversationTitles, setConversationTitles] = useState([]);
-    
+
     // Theme state
     const [theme, setTheme] = useState('auto');
 
-   // NEW: Streaming states
+    // NEW: Streaming states
     const [isStreaming, setIsStreaming] = useState(false);
     const [streamingMessage, setStreamingMessage] = useState("");
     const eventSourceRef = useRef(null);
@@ -112,7 +112,7 @@ export default function ChatbotPage() {
                 console.error('Failed to load preferences:', error);
             }
         };
-        
+
         if (userId) {
             loadPreferences();
         }
@@ -125,7 +125,7 @@ export default function ChatbotPage() {
             navigate('/');
         }
     }, [userId, navigate]);
-    
+
     // Determine if dark mode should be applied
     const isDarkMode = theme === 'dark';
 
@@ -164,12 +164,12 @@ export default function ChatbotPage() {
     }, [userId, fetchConversationTitles]);
 
     useEffect(() => {
-    console.log("conversationId changed:", conversationId);
-    if (!conversationId || conversationId === 'new') return; // Skip for new conversations
+        console.log("conversationId changed:", conversationId);
+        if (!conversationId || conversationId === 'new') return; // Skip for new conversations
 
-    // Fetch previous messages for existing conversations
-    fetchMessages();
-}, [conversationId, fetchMessages]);
+        // Fetch previous messages for existing conversations
+        fetchMessages();
+    }, [conversationId, fetchMessages]);
 
 
 
@@ -252,7 +252,7 @@ export default function ChatbotPage() {
                     }
                 } catch (e) {
                     // Fallback for non-JSON data
-                    console.warn('Non-JSON SSE data:', event.data);
+                    console.warn('Non-JSON SSE data:', event.data, e);
                 }
             };
 
@@ -283,11 +283,11 @@ export default function ChatbotPage() {
 
     return (
         <div className={`flex h-screen ${isDarkMode ? 'bg-[#212121]' : 'bg-white'}`}>
-            <Sidebar 
+            <Sidebar
                 conversationTitles={conversationTitles}
                 setConversationTitles={setConversationTitles}
                 setConversationId={setConversationId}
-                conversationId={conversationId}  
+                conversationId={conversationId}
                 userId={userId}
                 onNewChat={handleNewChat}
                 isDarkMode={isDarkMode}

@@ -1,5 +1,26 @@
+# Root level gitignore
+
+# Frontend
+frontend/.env
+frontend/.env.local
+frontend/node_modules
+frontend/dist
+
+# Backend
+backend/**/.env
+backend/**/node_modules
+
+# Learning Material Service
+backend/learning-material/.env
+backend/learning-material/uploads/videos/*
+backend/learning-material/uploads/thumbnails/*
+!backend/learning-material/uploads/videos/.gitkeep
+!backend/learning-material/uploads/thumbnails/.gitkeep
+
+# Authentication Service
+backend/authentication/.env
+
 # Logs
-logs
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -55,3 +76,32 @@ backend/llm/chroma_db_snowflake_600chunks_300overlapping/*.sqlite3
 # Chroma DB directories (if there are other files)
 **/chroma_db*/
 
+# Chroma DB files
+backend/llm/chroma_db_snowflake_600chunks_300overlapping/chroma.sqlite3
+backend/llm/chroma_db_snowflake_600chunks_300overlapping/*.sqlite3
+
+# Or more generally, ignore all sqlite files
+*.sqlite3
+*.db
+
+# Chroma DB directories (if there are other files)
+**/chroma_db*/
+
+
+*storybook.log
+storybook-static
+
+# Testing & Development (not for production)
+frontend/.storybook/
+frontend/tests/
+pyrightconfig.json
+backend/llm/docling/
+doc/FEATURE_*.md
+
+# Speckit - AI spec generation
+.specify/
+**/.specify/
+.github/prompts/speckit.*
+**/.github/prompts/speckit.*
+.github/agents/
+**/.github/agents/

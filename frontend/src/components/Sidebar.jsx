@@ -168,7 +168,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
 
   return ( 
     <div className={`${isDarkMode ? 'bg-[#1f1f1f]' : 'bg-tum-blue-light-4'} ${isMinimized ? 'w-12' : 'w-64'} ${isDarkMode ? 'text-gray-200' : 'text-black'} h-screen p-2 rounded-r-2xl flex flex-col transition-all duration-300`}>
-      <div className={`flex ${isMinimized ? 'justify-center' : (isDarkMode ? 'justify-center' : 'justify-between')} items-start mb-1`}>
+      <div className={`flex ${isMinimized ? 'justify-center' : (isDarkMode ? 'justify-between' : 'justify-between')} items-start mb-1`}>
         {!isMinimized && (
           <img 
             src={isDarkMode ? tum_logo_darkmode : tum_klinikum_logo} 
