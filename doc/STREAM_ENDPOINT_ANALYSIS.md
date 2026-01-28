@@ -145,7 +145,7 @@ EventSource → GET /api/conversations/:id/stream?query=...&history=...
     ↓
 Node.js Backend proxies POST to FastAPI /api/chat/stream
     ↓
-FastAPI RAG Chain generates response with Qwen 3 1.7B
+FastAPI RAG Chain generates response with qwen2.5:7b-instruct-q4_0
     ↓
 FastAPI returns ServerSentEvent stream
     ↓

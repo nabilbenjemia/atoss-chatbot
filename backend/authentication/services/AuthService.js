@@ -15,7 +15,7 @@ class AuthService {
 		this.jwtSecret = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 		this.jwtExpiration = process.env.JWT_EXPIRATION || '24h';
 		this.refreshTokenSecret = process.env.REFRESH_TOKEN_SECRET || 'your-refresh-secret-key-change-in-production';
-		this.userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:4001';
+		this.userServiceUrl = process.env.USER_SERVICE_URL || 'http://authentication:4003';
 	}
 
 	/**
@@ -373,6 +373,34 @@ class AuthService {
 	async getUserById(userId) {
 		try {
 			const userCredentials = await UserCredentials.findOne({ id: userId });
+			
+			if (!userCredentials) {
+				throw new Error('User not found');
+			}
+
+			return {
+				id: userCredentials.id,
+				email: userCredentials.email,
+				role: userCredentials.role,
+				department: userCredentials.department,
+				emailVerified: userCredentials.emailVerified,
+				lastLogin: userCredentials.lastLogin,
+				createdAt: userCredentials.createdAt,
+				updatedAt: userCredentials.updatedAt
+			};
+		} catch (error) {
+			throw error;
+		}
+	}
+
+	/**
+	 * Get user by email
+	 * @param {string} email - User email
+	 * @returns {Promise<Object>} - User credentials
+	 */
+	async getUserByEmail(email) {
+		try {
+			const userCredentials = await UserCredentials.findOne({ email: email.toLowerCase() });
 			
 			if (!userCredentials) {
 				throw new Error('User not found');

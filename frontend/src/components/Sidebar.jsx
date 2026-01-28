@@ -135,8 +135,11 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
     try {
       console.log("Deleting conversation:", convId);
       
+      // Use environment variable or default to localhost
+      const API_BASE_URL = import.meta.env.VITE_CONVERSATION_URL || 'http://localhost:4004';
+      
       // Call DELETE API
-      const response = await fetch(`http://localhost:4004/api/conversations/${convId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/conversations/${convId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -165,7 +168,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
 
   return ( 
     <div className={`${isDarkMode ? 'bg-[#1f1f1f]' : 'bg-tum-blue-light-4'} ${isMinimized ? 'w-12' : 'w-64'} ${isDarkMode ? 'text-gray-200' : 'text-black'} h-screen p-2 rounded-r-2xl flex flex-col transition-all duration-300`}>
-      <div className={`flex ${isMinimized ? 'justify-center' : (isDarkMode ? 'justify-center' : 'justify-between')} items-start mb-1`}>
+      <div className={`flex ${isMinimized ? 'justify-center' : (isDarkMode ? 'justify-between' : 'justify-between')} items-start mb-1`}>
         {!isMinimized && (
           <img 
             src={isDarkMode ? tum_logo_darkmode : tum_klinikum_logo} 

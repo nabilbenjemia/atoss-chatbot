@@ -67,7 +67,7 @@ FastAPI's lifespan context manager triggers `startup_service.initialize_all()` w
 async def lifespan(app_instance: FastAPI):
     await startup_service.initialize_all(progress_callback=progress_callback)
     yield
-    await startup_service.shutdown()
+    startup_service.shutdown()  # Synchronous shutdown
 ```
 
 ### Step 2: Load Embedding Model (25%)

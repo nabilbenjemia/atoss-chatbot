@@ -44,11 +44,13 @@ authApi.interceptors.response.use(
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
       
-      // Only redirect if we're not already on the profile page
+      // Don't redirect if we're on the login page (allow login errors to be displayed)
+      // or on the profile page (let it handle its own redirect)
       const currentPath = window.location.pathname;
-      if (currentPath !== '/profile') {
+      if (currentPath !== '/profile' && currentPath !== '/') {
         window.location.href = '/';
       }
+      // If on login page or profile page, let the component handle the error/redirect
     }
     return Promise.reject(error);
   }
@@ -194,6 +196,12 @@ export const userAPI = {
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
     }
+    return response.data;
+  },
+
+  // Add admin - promote a staff user to admin by email (admin only)
+  addAdmin: async (email) => {
+    const response = await api.post('/users/add-admin', { email });
     return response.data;
   },
 };

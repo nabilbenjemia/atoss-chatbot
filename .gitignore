@@ -76,3 +76,32 @@ backend/llm/chroma_db_snowflake_600chunks_300overlapping/*.sqlite3
 # Chroma DB directories (if there are other files)
 **/chroma_db*/
 
+# Chroma DB files
+backend/llm/chroma_db_snowflake_600chunks_300overlapping/chroma.sqlite3
+backend/llm/chroma_db_snowflake_600chunks_300overlapping/*.sqlite3
+
+# Or more generally, ignore all sqlite files
+*.sqlite3
+*.db
+
+# Chroma DB directories (if there are other files)
+**/chroma_db*/
+
+
+*storybook.log
+storybook-static
+
+# Testing & Development (not for production)
+frontend/.storybook/
+frontend/tests/
+pyrightconfig.json
+backend/llm/docling/
+doc/FEATURE_*.md
+
+# Speckit - AI spec generation
+.specify/
+**/.specify/
+.github/prompts/speckit.*
+**/.github/prompts/speckit.*
+.github/agents/
+**/.github/agents/

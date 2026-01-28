@@ -40,8 +40,13 @@ class RAGChainService:
         context_str = ""
         for doc in docs:
             source = doc.metadata.get("source", "Unknown")
-            page = doc.metadata.get("page", "?")
-            source_info = f"{source} (Page {page})"
+            # Support both "page" (old) and "page_num" (new) metadata keys
+            page = doc.metadata.get("page_num") or doc.metadata.get("page", "?")
+            image_path = doc.metadata.get("image_path", "")
+            
+            source_info = f"{source} (Seite {page})"
+            if image_path:
+                source_info += f", image_path: {image_path}"
 
             content = doc.page_content.replace("\n", " ").strip()
 

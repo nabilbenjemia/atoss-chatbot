@@ -5,6 +5,8 @@ import MessageInput from '../components/MessageInput'
 import Conversation from '../components/Conversation'
 import { getCurrentUser, userAPI } from '../services/api'
 
+const CONVERSATION_API = import.meta.env.VITE_CONVERSATION_URL || 'http://localhost:4004';
+
 export default function ChatbotPage() {
     const navigate = useNavigate();
     const currentUser = getCurrentUser();
@@ -14,11 +16,11 @@ export default function ChatbotPage() {
     const [conversationId, setConversationId] = useState(null);
     const [messages, setMessages] = useState([]);
     const [conversationTitles, setConversationTitles] = useState([]);
-    
+
     // Theme state
     const [theme, setTheme] = useState('auto');
 
-   // NEW: Streaming states
+    // NEW: Streaming states
     const [isStreaming, setIsStreaming] = useState(false);
     const [streamingMessage, setStreamingMessage] = useState("");
     const eventSourceRef = useRef(null);
@@ -66,7 +68,7 @@ export default function ChatbotPage() {
 
         try {
             const response = await fetch(
-                `http://localhost:4004/api/conversations/${conversationId || 'new'}/messages/batch`,
+                `${CONVERSATION_API}/api/conversations/${conversationId || 'new'}/messages/batch`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -110,7 +112,7 @@ export default function ChatbotPage() {
                 console.error('Failed to load preferences:', error);
             }
         };
-        
+
         if (userId) {
             loadPreferences();
         }
@@ -123,13 +125,13 @@ export default function ChatbotPage() {
             navigate('/');
         }
     }, [userId, navigate]);
-    
+
     // Determine if dark mode should be applied
     const isDarkMode = theme === 'dark';
 
     const fetchMessages = useCallback(async () => {
         try {
-            const response = await fetch(`http://localhost:4004/api/conversations/${conversationId}/messages`, {
+            const response = await fetch(`${CONVERSATION_API}/api/conversations/${conversationId}/messages`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -143,7 +145,7 @@ export default function ChatbotPage() {
     const fetchConversationTitles = useCallback(async () => {
         if (!userId) return;
         try {
-            const response = await fetch(`http://localhost:4004/api/conversations/user/${userId}`, {
+            const response = await fetch(`${CONVERSATION_API}/api/conversations/user/${userId}`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -162,12 +164,12 @@ export default function ChatbotPage() {
     }, [userId, fetchConversationTitles]);
 
     useEffect(() => {
-    console.log("conversationId changed:", conversationId);
-    if (!conversationId || conversationId === 'new') return; // Skip for new conversations
+        console.log("conversationId changed:", conversationId);
+        if (!conversationId || conversationId === 'new') return; // Skip for new conversations
 
-    // Fetch previous messages for existing conversations
-    fetchMessages();
-}, [conversationId, fetchMessages]);
+        // Fetch previous messages for existing conversations
+        fetchMessages();
+    }, [conversationId, fetchMessages]);
 
 
 
@@ -204,7 +206,7 @@ export default function ChatbotPage() {
 
             // Create EventSource for streaming
             const convId = conversationId || 'new';
-            const url = new URL(`http://localhost:4004/api/conversations/${convId}/stream`);
+            const url = new URL(`${CONVERSATION_API}/api/conversations/${convId}/stream`);
             url.searchParams.append('query', messageText);
             url.searchParams.append('history', JSON.stringify(history));
 
@@ -250,7 +252,7 @@ export default function ChatbotPage() {
                     }
                 } catch (e) {
                     // Fallback for non-JSON data
-                    console.warn('Non-JSON SSE data:', event.data);
+                    console.warn('Non-JSON SSE data:', event.data, e);
                 }
             };
 
@@ -281,11 +283,11 @@ export default function ChatbotPage() {
 
     return (
         <div className={`flex h-screen ${isDarkMode ? 'bg-[#212121]' : 'bg-white'}`}>
-            <Sidebar 
+            <Sidebar
                 conversationTitles={conversationTitles}
                 setConversationTitles={setConversationTitles}
                 setConversationId={setConversationId}
-                conversationId={conversationId}  
+                conversationId={conversationId}
                 userId={userId}
                 onNewChat={handleNewChat}
                 isDarkMode={isDarkMode}

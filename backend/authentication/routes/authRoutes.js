@@ -21,6 +21,7 @@ router.post('/logout', authMiddleware, authController.logout.bind(authController
 
 // User management routes (require authentication and user must match userId or be admin)
 router.get('/user/:userId', authMiddleware, authController.getUserById.bind(authController));
+router.get('/user/email/:email', authMiddleware, authController.getUserByEmail.bind(authController));
 router.patch('/user/:userId/role', authMiddleware, authController.updateUserRole.bind(authController));
 router.patch('/user/:userId/department', authMiddleware, authController.updateUserDepartment.bind(authController));
 router.patch('/user/:userId/password', authMiddleware, authController.updateUserPassword.bind(authController));
