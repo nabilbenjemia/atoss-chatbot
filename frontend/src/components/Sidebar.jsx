@@ -339,6 +339,15 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
                   {t.profile}
                 </button>
                 <button
+                  onClick={() => {
+                    setShowLogoutDropdown(false);
+                    navigate('/analytics');
+                  }}
+                  className={`w-full text-left px-4 py-2 text-sm rounded-lg transition-colors border-b ${isDarkMode ? 'text-gray-200 bg-[#2f2f2f] hover:bg-[#3f3f3f] border-gray-700' : 'text-tum-black bg-tum-white hover:bg-tum-blue-light-2 border-tum-grey-7'}`}
+                >
+                  📊 Analytics
+                </button>
+                <button
                   onClick={handleLogout}
                   className={`w-full text-left px-4 py-2 text-sm rounded-lg transition-colors ${isDarkMode ? 'text-gray-200 bg-[#2f2f2f] hover:bg-[#3f3f3f]' : 'text-tum-black bg-tum-white hover:bg-tum-blue-light-2'}`}
                 >
