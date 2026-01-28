@@ -196,8 +196,12 @@ const AnalyticsDashboard = () => {
                 {/* Overall Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                        <div className="text-gray-400 text-sm mb-2">Total Queries</div>
+                        <div className="text-gray-400 text-sm mb-2">Processed Queries <span className="text-xs">(1 word queries skipped)</span></div>
                         <div className="text-4xl font-bold">{overall?.totalQueries || 0}</div>
+                    </div>
+                    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                        <div className="text-gray-400 text-sm mb-2">Total Queries <span className="text-xs">(including 1 word queries)</span></div>
+                        <div className="text-4xl font-bold">{overall?.totalQueriesIncludingOneWord || 0}</div>
                     </div>
                     <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
                         <div className="text-gray-400 text-sm mb-2">Total Users</div>
@@ -206,10 +210,6 @@ const AnalyticsDashboard = () => {
                     <div className="bg-green-900/30 rounded-lg p-6 border border-green-700">
                         <div className="text-green-400 text-sm mb-2">🟢 Active Now (15min)</div>
                         <div className="text-4xl font-bold text-green-500">{overall?.activeUsersNow || 0}</div>
-                    </div>
-                    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                        <div className="text-gray-400 text-sm mb-2">Avg Keywords</div>
-                        <div className="text-4xl font-bold">{overall?.avgKeywordsPerQuery || 0}</div>
                     </div>
                 </div>
 
@@ -290,7 +290,7 @@ const AnalyticsDashboard = () => {
                 <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
                     <h2 className="text-xl font-semibold mb-4">
                         Queries Over Time
-                        {!startDate && !endDate && <span className="text-gray-400 text-sm ml-2">(Last 30 Days)</span>}
+                        {!startDate && !endDate && <span className="text-gray-400 text-sm ml-2">(Last 7 Days)</span>}
                         {(startDate || endDate) && (
                             <span className="text-blue-400 text-sm ml-2">
                                 ({startDate || '...'} to {endDate || 'now'})

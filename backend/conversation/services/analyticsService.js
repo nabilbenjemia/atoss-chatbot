@@ -169,6 +169,20 @@ class AnalyticsService {
         
         const totalQueries = await QueryAnalytics.countDocuments(match);
         
+        // Get total queries including 1-word queries from Message collection
+        const messageFilter = { sender: 'user' };
+        if (startDate || endDate) {
+            const dateFilter = {};
+            if (startDate) dateFilter.$gte = new Date(startDate);
+            if (endDate) dateFilter.$lte = new Date(endDate);
+            messageFilter.createdAt = dateFilter;
+        }
+        if (userId && userId !== 'null') {
+            const userConversations = await Conversation.find({ userId }).distinct('_id');
+            messageFilter.conversationId = { $in: userConversations };
+        }
+        const totalQueriesIncludingOneWord = await Message.countDocuments(messageFilter);
+        
         // Get unique users who have sent messages (sender: 'user')
         const userMessages = await Message.find({ sender: 'user' }).distinct('conversationId');
         const conversationsWithUserMessages = await Conversation.find({
@@ -211,6 +225,7 @@ class AnalyticsService {
         
         return {
             totalQueries,
+            totalQueriesIncludingOneWord,
             uniqueUsers,
             activeUsersNow,
             avgKeywordsPerQuery: Math.round((avgKeywordsPerQuery[0]?.avg || 0) * 10) / 10
