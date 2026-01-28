@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Plot from 'react-plotly.js';
+import { toast } from 'react-toastify';
 
 const CONVERSATION_API = import.meta.env.VITE_CONVERSATION_API || 'http://localhost:4004';
 
@@ -47,10 +48,18 @@ const AnalyticsDashboard = () => {
             if (!response.ok) throw new Error('Failed to process queries');
             const result = await response.json();
             console.log('Process result:', result); // Debug log
+            
+            // Show appropriate notification based on result
+            if (result.processed === 0) {
+                toast.info('No new queries to process');
+            } else {
+                toast.success(`Successfully processed ${result.processed} ${result.processed === 1 ? 'query' : 'queries'}`);
+            }
+            
             await fetchDashboardData(); // Wait for refresh to complete
         } catch (err) {
             console.error('Error processing queries:', err);
-            alert('Error processing queries: ' + err.message);
+            toast.error('Error processing queries: ' + err.message);
         } finally {
             setProcessing(false);
         }
@@ -120,7 +129,7 @@ const AnalyticsDashboard = () => {
         type: 'pie',
         hole: 0.4,
         marker: {
-            colors: ['#3070B3', '#9FBA36', '#E37222', '#EA7237', '#8F81EA', '#B55CA5', '#FED702', '#5E94D4']
+            colors: ['#79d8f0', '#9FBA36', '#E37222', '#C4071B', '#8F81EA', '#B55CA5', '#FED702', '#037291']
         }
     }] : [];
 
@@ -231,7 +240,7 @@ const AnalyticsDashboard = () => {
                                         gridcolor: '#374151',
                                         title: 'Frequency'
                                     },
-                                    margin: { t: 20, b: 60, l: 50, r: 20 },
+                                    margin: { t: 20, b: 80, l: 60, r: 20 },
                                     height: 350
                                 }}
                                 config={{ displayModeBar: false }}
@@ -256,10 +265,10 @@ const AnalyticsDashboard = () => {
                                     showlegend: true,
                                     legend: {
                                         orientation: 'v',
-                                        x: 1,
+                                        x: 1.05,
                                         y: 0.5
                                     },
-                                    margin: { t: 20, b: 20, l: 20, r: 100 },
+                                    margin: { t: 30, b: 30, l: 30, r: 150 },
                                     height: 350
                                 }}
                                 config={{ displayModeBar: false }}
