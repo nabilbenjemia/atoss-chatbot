@@ -8,37 +8,37 @@ services:
     ports:
       - "5173:80"
     depends_on:
-      - llm
+      # - llm
       - authentication
       - conversation
     networks:
       - atoss-network
 
-  llm:
-    build:
-      context: ./backend/llm
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    env_file:
-      - ./backend/llm/.env
-    environment:
-      - OLLAMA_BASE_URL=http://ollama:11434
-    volumes:
-      - hf_cache:/root/.cache
-      - ./backend/llm/chroma_db_snowflake_600chunks_300overlapping:/app/chroma_db_snowflake_600chunks_300overlapping
-    depends_on:
-      ollama:
-        condition: service_healthy
-    networks:
-      - atoss-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/health\")' || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 180s
+  # llm:
+  #   build:
+  #     context: ./backend/llm
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "8000:8000"
+  #   env_file:
+  #     - ./backend/llm/.env
+  #   environment:
+  #     - OLLAMA_BASE_URL=http://ollama:11434
+  #   volumes:
+  #     - hf_cache:/root/.cache
+  #     - ./backend/llm/chroma_db_snowflake_600chunks_300overlapping:/app/chroma_db_snowflake_600chunks_300overlapping
+  #   depends_on:
+  #     ollama:
+  #       condition: service_healthy
+  #   networks:
+  #     - atoss-network
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/health\")' || exit 1"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 30
+  #     start_period: 180s
 
   authentication:
     build:
@@ -61,8 +61,8 @@ services:
     env_file:
       - ./backend/conversation/.env
     depends_on:
-      llm:
-        condition: service_healthy
+      # llm:
+      #   condition: service_healthy
       authentication:
         condition: service_started
     networks:
@@ -81,13 +81,13 @@ services:
     networks:
       - atoss-network
     entrypoint: ["/bin/sh", "/usr/local/bin/init-ollama.sh"]
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    #deploy:
+    #  resources:
+    #    reservations:
+    #      devices:
+    #        - driver: nvidia
+    #          count: all
+    #          capabilities: [gpu]
     healthcheck:
       test: ["CMD-SHELL", "ollama list || exit 1"]
       interval: 10s
