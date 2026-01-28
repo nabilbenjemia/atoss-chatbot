@@ -42,7 +42,7 @@ else
 fi
 
 # Pull the smaller analytics model
-ANALYTICS_MODEL="qwen2.5:3b-instruct-q4_0"
+ANALYTICS_MODEL="qwen3:4b-instruct"
 echo "Checking if analytics model $ANALYTICS_MODEL exists..."
 
 if ollama list | grep -q "$ANALYTICS_MODEL"; then
