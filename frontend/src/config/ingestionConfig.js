@@ -64,6 +64,44 @@ export const INGESTION_CONFIG = {
         ],
     },
 
+    // Ingestion strategies registry (same pattern as helpers: local vs backend)
+    strategies: {
+        local: [
+            {
+                id: 'embed_per_page',
+                label: 'One Embedding per Page',
+                description: 'Merge all text on each page into a single chunk',
+                type: 'local',
+                icon: '📄',
+            },
+            {
+                id: 'chunked_fixed',
+                label: 'Fixed-Size Chunks',
+                description: 'Split into ~500 token chunks with overlap',
+                type: 'local',
+                icon: '📏',
+            },
+        ],
+        backend: [
+            {
+                id: 'semantic_sections',
+                label: 'Semantic Sections (AI)',
+                description: 'Use AI to detect topic boundaries and split accordingly',
+                type: 'backend',
+                icon: '🤖',
+                status: 'development', // 'enabled', 'development', 'coming_soon'
+            },
+            {
+                id: 'hierarchical',
+                label: 'Hierarchical (AI)',
+                description: 'Multi-level embeddings with AI-generated summaries',
+                type: 'backend',
+                icon: '🏗️',
+                status: 'coming_soon',
+            },
+        ],
+    },
+
     // Polling intervals for async operations
     polling: {
         processingStatusMs: 2000, // Poll processing status every 2s
@@ -118,6 +156,34 @@ export const getFileSizeLimitText = () => {
 // Helper function to get allowed file types as string
 export const getAllowedTypesText = () => {
     return INGESTION_CONFIG.upload.allowedTypes.join(', ').toUpperCase();
+};
+
+// Helper function to check if a strategy is local (frontend processing)
+export const isLocalStrategy = (strategyId) => {
+    return INGESTION_CONFIG.strategies.local.some(s => s.id === strategyId);
+};
+
+// Helper function to check if a strategy is backend (requires LLM service)
+export const isBackendStrategy = (strategyId) => {
+    return INGESTION_CONFIG.strategies.backend.some(s => s.id === strategyId);
+};
+
+// Helper function to get all enabled strategies
+export const getEnabledStrategies = () => {
+    const local = INGESTION_CONFIG.strategies.local;
+    const backend = INGESTION_CONFIG.strategies.backend.filter(
+        s => s.status === 'enabled' || s.status === 'development'
+    );
+    return [...local, ...backend];
+};
+
+// Helper function to get strategy by ID
+export const getStrategyById = (strategyId) => {
+    const allStrategies = [
+        ...INGESTION_CONFIG.strategies.local,
+        ...INGESTION_CONFIG.strategies.backend,
+    ];
+    return allStrategies.find(s => s.id === strategyId);
 };
 
 export default INGESTION_CONFIG;
