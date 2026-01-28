@@ -13,6 +13,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import {
     loadFromCache,
+    saveToCache,
     clearCache,
     getKeysWithPrefix,
     clearKeysWithPrefix,
@@ -37,8 +38,7 @@ function CacheItem({ item, isSelected, onSelect }) {
     const getTypeIcon = (type) => {
         switch (type) {
             case 'editor': return '📝';
-            case 'uploaded': return '📁';
-            case 'content': return '📄';
+            case 'file': return '📄';
             case 'embedding': return '🧠';
             default: return '📦';
         }
@@ -47,9 +47,8 @@ function CacheItem({ item, isSelected, onSelect }) {
     const getTypeLabel = (type) => {
         switch (type) {
             case 'editor': return 'Editor';
-            case 'uploaded': return 'Uploaded';
-            case 'content': return 'Content';
-            case 'embedding': return 'Embeddings';
+            case 'file': return 'File';
+            case 'embedding': return 'Ingested';
             default: return 'Data';
         }
     };
@@ -82,7 +81,7 @@ function CacheItem({ item, isSelected, onSelect }) {
     );
 }
 
-export default function CacheManagement({ onClose }) {
+export default function CacheManagement({ onClose, onCacheCleared }) {
     const [selectedKeys, setSelectedKeys] = useState(new Set());
     const [isClearing, setIsClearing] = useState(false);
 
@@ -104,38 +103,30 @@ export default function CacheManagement({ onClose }) {
             });
         }
 
-        // Check for uploaded files list
-        const uploadedFiles = loadFromCache(INGESTION_CONFIG.storage.uploadedFilesKey);
-        if (uploadedFiles && uploadedFiles.length > 0) {
-            const key = INGESTION_CONFIG.storage.uploadedFilesKey;
-            const size = JSON.stringify(uploadedFiles).length * 2;
-            items.push({
-                key,
-                type: 'uploaded',
-                filename: `Uploaded Files List (${uploadedFiles.length} files)`,
-                size,
-                data: uploadedFiles,
-            });
-        }
+        // Get uploaded files and merge with their content data
+        // From user's perspective, these are just "files" - not separate uploaded/content items
+        const uploadedFiles = loadFromCache(INGESTION_CONFIG.storage.uploadedFilesKey) || [];
+        uploadedFiles.forEach(file => {
+            const contentKey = `${INGESTION_CONFIG.storage.contentFilesPrefix}${file.documentId}`;
+            const contentData = loadFromCache(contentKey);
 
-        // Check for content caches
-        const contentKeys = getKeysWithPrefix(INGESTION_CONFIG.storage.contentFilesPrefix);
-        contentKeys.forEach(key => {
-            const data = loadFromCache(key);
-            if (data) {
-                const size = JSON.stringify(data).length * 2;
-                items.push({
-                    key,
-                    type: 'content',
-                    filename: data.filename || key.replace(INGESTION_CONFIG.storage.contentFilesPrefix, ''),
-                    size,
-                    data,
-                    documentId: key.replace(INGESTION_CONFIG.storage.contentFilesPrefix, ''),
-                });
+            // Calculate combined size (file metadata + content)
+            let totalSize = JSON.stringify(file).length * 2;
+            if (contentData) {
+                totalSize += JSON.stringify(contentData).length * 2;
             }
+
+            items.push({
+                key: file.documentId, // Use documentId as key for file items
+                type: 'file',
+                filename: file.filename || file.documentId,
+                size: totalSize,
+                documentId: file.documentId,
+                hasContent: !!contentData,
+            });
         });
 
-        // Check for embedding caches
+        // Check for embedding caches (ingested files)
         const embeddingKeys = getKeysWithPrefix(INGESTION_CONFIG.storage.embeddingCachePrefix);
         embeddingKeys.forEach(key => {
             const data = loadFromCache(key);
@@ -155,10 +146,9 @@ export default function CacheManagement({ onClose }) {
         return items;
     }, []);
 
-    // Group items by type
+    // Group items by type (simplified: editor, file, embedding)
     const editorItems = cachedItems.filter(i => i.type === 'editor');
-    const uploadedItems = cachedItems.filter(i => i.type === 'uploaded');
-    const contentItems = cachedItems.filter(i => i.type === 'content');
+    const fileItems = cachedItems.filter(i => i.type === 'file');
     const embeddingItems = cachedItems.filter(i => i.type === 'embedding');
 
     // Calculate totals
@@ -179,19 +169,19 @@ export default function CacheManagement({ onClose }) {
         });
     }, []);
 
-    const handleSelectAllEditor = useCallback(() => {
-        const editorKeys = editorItems.map(i => i.key);
-        const allSelected = editorKeys.every(k => selectedKeys.has(k));
+    const handleSelectAllFiles = useCallback(() => {
+        const fileKeys = fileItems.map(i => i.key);
+        const allSelected = fileKeys.every(k => selectedKeys.has(k));
         setSelectedKeys(prev => {
             const next = new Set(prev);
             if (allSelected) {
-                editorKeys.forEach(k => next.delete(k));
+                fileKeys.forEach(k => next.delete(k));
             } else {
-                editorKeys.forEach(k => next.add(k));
+                fileKeys.forEach(k => next.add(k));
             }
             return next;
         });
-    }, [editorItems, selectedKeys]);
+    }, [fileItems, selectedKeys]);
 
     const handleSelectAllEmbeddings = useCallback(() => {
         const embeddingKeysArr = embeddingItems.map(i => i.key);
@@ -212,13 +202,54 @@ export default function CacheManagement({ onClose }) {
 
         setIsClearing(true);
         try {
-            // Clear selected keys
-            selectedKeys.forEach(key => {
-                clearCache(key);
+            // Determine what types are being cleared
+            const clearedTypes = new Set();
+            const clearedItems = cachedItems.filter(item => selectedKeys.has(item.key));
+            clearedItems.forEach(item => clearedTypes.add(item.type));
+
+            // Clear selected items - handle file and embedding items specially
+            clearedItems.forEach(item => {
+                if (item.type === 'file') {
+                    // For file items, remove from uploaded files list AND clear content cache
+                    const uploadedFiles = loadFromCache(INGESTION_CONFIG.storage.uploadedFilesKey) || [];
+                    const filteredFiles = uploadedFiles.filter(f => f.documentId !== item.documentId);
+                    if (filteredFiles.length > 0) {
+                        saveToCache(INGESTION_CONFIG.storage.uploadedFilesKey, filteredFiles);
+                    } else {
+                        clearCache(INGESTION_CONFIG.storage.uploadedFilesKey);
+                    }
+                    // Clear content cache
+                    clearCache(`${INGESTION_CONFIG.storage.contentFilesPrefix}${item.documentId}`);
+                } else if (item.type === 'embedding') {
+                    // For embedding items, remove from ingested files list AND clear embedding cache
+                    const ingestedFiles = loadFromCache(INGESTION_CONFIG.storage.ingestedFilesKey) || [];
+                    const filteredFiles = ingestedFiles.filter(f => f.documentId !== item.documentId);
+                    if (filteredFiles.length > 0) {
+                        saveToCache(INGESTION_CONFIG.storage.ingestedFilesKey, filteredFiles);
+                    } else {
+                        clearCache(INGESTION_CONFIG.storage.ingestedFilesKey);
+                    }
+                    // Clear embedding cache
+                    clearCache(item.key);
+                } else {
+                    // For other items (editor), just clear the key
+                    clearCache(item.key);
+                }
             });
+
+            // Map 'file' type to 'uploaded' and 'content' for parent notification
+            const notifyTypes = Array.from(clearedTypes).flatMap(type =>
+                type === 'file' ? ['uploaded', 'content'] : [type]
+            );
 
             toast.success(`Cleared ${selectedKeys.size} cached item(s)`);
             setSelectedKeys(new Set());
+
+            // Notify parent about what was cleared
+            onCacheCleared?.({
+                all: false,
+                types: notifyTypes,
+            });
 
             // Close after a short delay to show success
             setTimeout(() => onClose?.(), 500);
@@ -228,7 +259,7 @@ export default function CacheManagement({ onClose }) {
         } finally {
             setIsClearing(false);
         }
-    }, [selectedKeys, onClose]);
+    }, [selectedKeys, onClose, onCacheCleared, cachedItems]);
 
     const handleClearAll = useCallback(async () => {
         setIsClearing(true);
@@ -250,6 +281,13 @@ export default function CacheManagement({ onClose }) {
 
             toast.success('All cache cleared');
             setSelectedKeys(new Set());
+
+            // Notify parent that all cache was cleared
+            onCacheCleared?.({
+                all: true,
+                types: ['editor', 'uploaded', 'content', 'embedding'],
+            });
+
             setTimeout(() => onClose?.(), 500);
         } catch (error) {
             console.error('Failed to clear cache:', error);
@@ -257,7 +295,7 @@ export default function CacheManagement({ onClose }) {
         } finally {
             setIsClearing(false);
         }
-    }, [onClose]);
+    }, [onClose, onCacheCleared]);
 
     if (cachedItems.length === 0) {
         return (
@@ -301,14 +339,8 @@ export default function CacheManagement({ onClose }) {
                     <div className="mb-4">
                         <div className="flex items-center justify-between mb-2">
                             <h5 className="text-xs font-semibold text-tum-grey-3 uppercase tracking-wide">
-                                📝 Editor Data ({editorItems.length})
+                                📝 Editor Session ({editorItems.length})
                             </h5>
-                            <button
-                                onClick={handleSelectAllEditor}
-                                className="px-3 py-1 text-xs font-medium rounded-full bg-tum-blue-light-5 text-tum-blue hover:bg-tum-blue-light-3 transition-colors"
-                            >
-                                {editorItems.every(i => selectedKeys.has(i.key)) ? 'Deselect All' : 'Select All'}
-                            </button>
                         </div>
                         <div className="space-y-1">
                             {editorItems.map(item => (
@@ -323,16 +355,22 @@ export default function CacheManagement({ onClose }) {
                     </div>
                 )}
 
-                {/* Uploaded Files Section */}
-                {uploadedItems.length > 0 && (
+                {/* Uploaded Files Section (merged uploaded + content) */}
+                {fileItems.length > 0 && (
                     <div className="mb-4">
                         <div className="flex items-center justify-between mb-2">
                             <h5 className="text-xs font-semibold text-tum-grey-3 uppercase tracking-wide">
-                                📁 Uploaded Files ({uploadedItems.length})
+                                📄 Uploaded Files ({fileItems.length})
                             </h5>
+                            <button
+                                onClick={handleSelectAllFiles}
+                                className="px-3 py-1 text-xs font-medium rounded-full bg-tum-blue-light-5 text-tum-blue hover:bg-tum-blue-light-3 transition-colors"
+                            >
+                                {fileItems.every(i => selectedKeys.has(i.key)) ? 'Deselect All' : 'Select All'}
+                            </button>
                         </div>
                         <div className="space-y-1">
-                            {uploadedItems.map(item => (
+                            {fileItems.map(item => (
                                 <CacheItem
                                     key={item.key}
                                     item={item}
@@ -344,33 +382,12 @@ export default function CacheManagement({ onClose }) {
                     </div>
                 )}
 
-                {/* Content Cache Section */}
-                {contentItems.length > 0 && (
-                    <div className="mb-4">
-                        <div className="flex items-center justify-between mb-2">
-                            <h5 className="text-xs font-semibold text-tum-grey-3 uppercase tracking-wide">
-                                📄 Content Data ({contentItems.length})
-                            </h5>
-                        </div>
-                        <div className="space-y-1">
-                            {contentItems.map(item => (
-                                <CacheItem
-                                    key={item.key}
-                                    item={item}
-                                    isSelected={selectedKeys.has(item.key)}
-                                    onSelect={handleSelectItem}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Embeddings Cache Section */}
+                {/* Ingested/Embeddings Cache Section */}
                 {embeddingItems.length > 0 && (
                     <div className="mb-4">
                         <div className="flex items-center justify-between mb-2">
                             <h5 className="text-xs font-semibold text-tum-grey-3 uppercase tracking-wide">
-                                🧠 Embedding Data ({embeddingItems.length})
+                                🧠 Ingested Files ({embeddingItems.length})
                             </h5>
                             <button
                                 onClick={handleSelectAllEmbeddings}

@@ -117,6 +117,7 @@ export const INGESTION_CONFIG = {
         // New: Separate cache for uploaded files list and ingested files list
         uploadedFilesKey: 'ingestion_uploaded_files', // Array of uploaded file metadata
         contentFilesPrefix: 'ingestion_content_', // Per-file content: ingestion_content_{documentId}
+        historyPrefix: 'ingestion_history_', // Per-file command history: ingestion_history_{documentId}
     },
 
     // UI settings

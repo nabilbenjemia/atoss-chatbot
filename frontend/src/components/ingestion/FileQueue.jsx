@@ -25,6 +25,7 @@ import FileQueueItem from './FileQueueItem';
  * @param {Set} props.previewDocumentIds - Set of document IDs being previewed
  * @param {Function} props.onRemoveFromPreview - Handler for removing file from preview
  * @param {Function} props.onRemoveFromContent - Handler for removing file from content view
+ * @param {Function} props.onRemoveIngestedFile - Handler for removing ingested file
  * @param {boolean} props.showIngestedSection - Whether to show the ingested files section
  */
 export default function FileQueue({
@@ -40,6 +41,7 @@ export default function FileQueue({
     previewDocumentIds = new Set(),
     onRemoveFromPreview,
     onRemoveFromContent,
+    onRemoveIngestedFile,
     showIngestedSection = true,
 }) {
     // In preview mode, filter to only show files being previewed
@@ -102,14 +104,19 @@ export default function FileQueue({
                     <ul className="space-y-2">
                         {ingestedFiles.map((doc) => (
                             <FileQueueItem
-                                key={doc.id || doc.documentId}
-                                doc={{ ...doc, id: doc.id || doc.documentId, status: 'ingested' }}
-                                isSelected={doc.documentId === selectedDocumentId}
+                                key={doc.ingestedId || doc.id || doc.documentId}
+                                doc={{
+                                    ...doc,
+                                    id: doc.ingestedId || doc.id || doc.documentId,
+                                    documentId: doc.ingestedId || doc.documentId, // Use ingestedId for removal
+                                    status: 'ingested'
+                                }}
+                                isSelected={(doc.ingestedId || doc.documentId) === selectedDocumentId}
                                 isChecked={false}
                                 onSelect={onSelect}
                                 showCheckbox={false}
                                 removableMode={true}
-                                onRemoveFromSelection={onRemoveFromContent}
+                                onRemoveFromSelection={onRemoveIngestedFile}
                             />
                         ))}
                     </ul>
