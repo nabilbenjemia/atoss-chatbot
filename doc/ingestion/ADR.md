@@ -8,7 +8,13 @@ This document records key architectural decisions made during the development of
 
 **Date**: 2026-01-28
 
-**Status**: Decided
+**Status**: Implemented ✅
+
+**Implementation Notes**: 
+- Backend config endpoint implemented in `backend/ingestion/services/ingestionService.js`
+- Returns `strategies` and `helpers` arrays with `type: 'local'|'backend'` and `enabled` flags
+- Currently returns mock data; LLM service integration not yet implemented
+- Backend-type strategies/helpers are disabled (`enabled: false`) until LLM service is ready
 
 ### Context
 
@@ -261,7 +267,7 @@ const useBackendConfig = () => {
 
 **Date**: 2026-01-28
 
-**Status**: Decided
+**Status**: Planned (Not Yet Implemented)
 
 ### Context
 

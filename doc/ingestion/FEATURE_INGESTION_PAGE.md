@@ -12,6 +12,57 @@ The **IngestionPage** is an admin-only page for document ingestion workflow in t
 
 ## Architecture
 
+### Service Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              Frontend                                    │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────────┐ │
+│  │ IngestionPage   │───▶│ ingestionApi.js │───▶│ HTTP Requests       │ │
+│  │ (React)         │    │ (Service Layer) │    │                     │ │
+│  └─────────────────┘    └─────────────────┘    └──────────┬──────────┘ │
+└──────────────────────────────────────────────────────────┼──────────────┘
+                                                           │
+                           ┌───────────────────────────────▼──────────────┐
+                           │           Ingestion Service (Node.js)        │
+                           │           Port 4005 - Proxy/Mock             │
+                           │  ┌─────────────────────────────────────────┐ │
+                           │  │ ingestionService.js                     │ │
+                           │  │ - getConfig()        [MOCK]             │ │
+                           │  │ - uploadForProcessing() [MOCK]          │ │
+                           │  │ - ingestToVectorDb() [MOCK]             │ │
+                           │  │ - generateEmbeddingPreview() [LOCAL]    │ │
+                           │  └─────────────────────────────────────────┘ │
+                           │  ┌─────────────────────────────────────────┐ │
+                           │  │ contentViewerService.js                 │ │
+                           │  │ - runAiHelper()      [MOCK]             │ │
+                           │  └─────────────────────────────────────────┘ │
+                           └───────────────────────────────┬──────────────┘
+                                                           │
+                                                           │ [NOT IMPLEMENTED]
+                                                           ▼
+                           ┌──────────────────────────────────────────────┐
+                           │           LLM Service (FastAPI)              │
+                           │           Port 8000                          │
+                           │  ┌─────────────────────────────────────────┐ │
+                           │  │ TODO: Endpoints to implement            │ │
+                           │  │ - GET  /api/config                      │ │
+                           │  │ - POST /api/docling/process             │ │
+                           │  │ - POST /api/ingest                      │ │
+                           │  │ - POST /api/helper/{helperId}           │ │
+                           │  └─────────────────────────────────────────┘ │
+                           └──────────────────────────────────────────────┘
+```
+
+### Current Implementation Status
+
+| Layer | Status | Notes |
+|-------|--------|-------|
+| Frontend (IngestionPage) | ✅ Implemented | Full UI with editing, preview, ingestion |
+| Frontend (ingestionApi.js) | ✅ Implemented | Calls Ingestion Service |
+| Ingestion Service (Node.js) | ✅ Proxy/Mock | Returns mock data, ready for LLM integration |
+| LLM Service (FastAPI) | ❌ Not Implemented | Endpoints need to be created |
+
 ### Component Hierarchy
 
 ```
@@ -54,10 +105,18 @@ IngestionPage.jsx
 
 ### Backend Services
 
-| Service | Directory | Purpose |
-|---------|-----------|---------|
-| `ingestion` | `backend/ingestion/` | Document upload, processing status, content management |
-| `llm` | `backend/llm/` | Document processing, embedding generation |
+| Service | Directory | Port | Purpose | Status |
+|---------|-----------|------|---------|--------|
+| `ingestion` | `backend/ingestion/` | 4005 | Document upload, processing status, content management | ✅ Mock data |
+| `llm` | `backend/llm/` | 8000 | Document processing, embedding generation | ❌ Not implemented |
+
+### ADR Decisions Applied
+
+This feature follows architectural decisions documented in `doc/ingestion/ADR.md`:
+
+- **ADR-001: Strategy and Helper Code Location** - Hybrid approach where backend provides metadata/control and frontend provides local execution code. Config endpoint returns `strategies` and `helpers` arrays with `type: 'local'|'backend'` flags.
+
+- **ADR-002: Component State Management** (Planned) - Context + Reducer with Split Contexts for scalable state management.
 
 ---
 
@@ -339,26 +398,59 @@ sequenceDiagram
 
 ---
 
-## Backend Integration TODOs
+## Backend Integration
 
-All backend integration points are marked with `// TODO: Connect to backend` comments in `src/services/ingestionApi.js`.
+The Ingestion Service (`backend/ingestion/`) acts as a **proxy** between the frontend and the LLM Service. Currently, it returns **mock data** because the LLM Service endpoints are not yet implemented.
 
-### API Endpoints Required
+### API Endpoints (Ingestion Service)
 
-| # | Endpoint | Method | Purpose | Location in Code |
-|---|----------|--------|---------|------------------|
-| 1 | `/api/ingestion/upload` | POST | Upload PDF file for processing | `uploadDocument()` |
-| 2 | `/api/ingestion/{documentId}/status` | GET | Get document processing status | `getProcessingStatus()` |
-| 3 | `/api/ingestion/{documentId}/content` | GET | Get extracted content (pages, items) | `getExtractedContent()` |
-| 4 | `/api/ingestion/config` | GET | Get backend configuration | `getBackendConfig()` |
-| 5 | `/api/ingestion/{documentId}/helper` | POST | Run AI helper function | `runBackendHelper()` |
-| 6 | `/api/ingestion/{documentId}/ingest` | POST | Start ingestion to vector DB | `startIngestion()` |
-| 7 | `/api/ingestion/job/{jobId}/status` | GET | Get ingestion job status | `getIngestionStatus()` |
-| 8 | `/api/ingestion/{id}` | DELETE | Cancel processing/ingestion job | `cancelJob()` |
+| # | Endpoint | Method | Purpose | Implementation |
+|---|----------|--------|---------|----------------|
+| 1 | `/api/ingestion/config` | GET | Get backend configuration (ADR-001 hybrid config) | ✅ Mock data |
+| 2 | `/api/ingestion/upload` | POST | Upload PDF file for content extraction | ✅ Mock data |
+| 3 | `/api/ingestion/preview` | POST | Generate embedding preview from document state | ✅ Local (no LLM needed) |
+| 4 | `/api/ingestion/ingest` | POST | Ingest document into vector database | ✅ Mock success |
+| 5 | `/api/ingestion/helper` | POST | Run AI helper function | ✅ Mock data |
 
-### Detailed API Specifications
+### API Specifications
 
-#### 1. Upload Document
+#### 1. Get Configuration (ADR-001 Hybrid Config)
+```javascript
+// GET /api/ingestion/config
+// Returns metadata that controls frontend behavior
+
+// Response
+{
+    // Embedding strategies - controls frontend dropdown
+    strategies: [
+        { id: 'embed_per_page', label: 'One Embedding per Page', type: 'local', enabled: true },
+        { id: 'chunked_fixed', label: 'Fixed-Size Chunks', type: 'local', enabled: true },
+        { id: 'semantic_sections', label: 'Semantic Sections (AI)', type: 'backend', enabled: false },
+        { id: 'hierarchical', label: 'Hierarchical (AI)', type: 'backend', enabled: false },
+    ],
+    // Helper functions - controls helper panel buttons
+    helpers: [
+        { id: 'remove_logos', label: 'Remove All Logos', type: 'local', enabled: true },
+        { id: 'remove_empty', label: 'Remove Empty Text', type: 'local', enabled: true },
+        { id: 'delete_regex', label: 'Delete by Regex', type: 'local', enabled: true, hasInput: true },
+        { id: 'ai_image_descriptions', label: 'AI Image Descriptions', type: 'backend', enabled: false },
+    ],
+    // Target databases
+    collections: [
+        { id: 'chroma_default', label: 'ChromaDB (Default)' },
+        { id: 'chroma_snowflake', label: 'ChromaDB (Snowflake Collection)' },
+    ],
+    // Image classification options
+    imageClasses: ['logo', 'figure', 'chart', 'diagram', 'photo', 'screenshot', 'table_image', 'other'],
+    // Embedding models
+    embeddingModels: [
+        { id: 'default', label: 'Snowflake Arctic Embed', disabled: false },
+        { id: 'openai', label: 'OpenAI Ada-002', disabled: true },
+    ],
+}
+```
+
+#### 2. Upload Document
 ```javascript
 // POST /api/ingestion/upload
 // Content-Type: multipart/form-data
@@ -366,146 +458,117 @@ All backend integration points are marked with `// TODO: Connect to backend` com
 // Request
 const formData = new FormData();
 formData.append('file', file);
-formData.append('config', JSON.stringify({ /* optional processing config */ }));
 
-// Response
+// Response (currently MOCK data)
 {
-    documentId: "doc_abc123",
-    status: "processing",
-    estimatedTime: 5000  // ms
-}
-```
-
-#### 2. Get Processing Status
-```javascript
-// GET /api/ingestion/{documentId}/status
-
-// Response
-{
-    status: "processing" | "ready" | "error",
-    progress: 0-100,
-    error?: "Error message if failed"
-}
-```
-
-#### 3. Get Extracted Content
-```javascript
-// GET /api/ingestion/{documentId}/content
-
-// Response
-{
-    documentId: "doc_abc123",
+    success: true,
     filename: "document.pdf",
-    totalPages: 5,
-    pages: [
-        {
-            pageNumber: 1,
-            items: [
-                {
-                    id: "t1",
-                    type: "text",
-                    content: "# Heading\n\nParagraph text...",
-                    deleted: false
-                },
-                {
-                    id: "i1",
-                    type: "image",
-                    imageUrl: "data:image/png;base64,...",  // or URL
-                    imageWidth: 400,
-                    imageHeight: 300,
-                    classification: "diagram",
-                    description?: "Optional AI-generated description",
-                    deleted: false
-                },
-                {
-                    id: "tb1",
-                    type: "table",
-                    tableData: {
-                        headers: ["Col1", "Col2"],
-                        rows: [["A", "B"], ["C", "D"]]
-                    },
-                    deleted: false
-                }
-            ]
-        }
-        // ... more pages
-    ]
+    content: {
+        documentId: "doc_1706428800000",
+        filename: "document.pdf",
+        totalPages: 3,
+        pages: [
+            {
+                pageNumber: 1,
+                items: [
+                    { id: "t1", type: "text", content: "# Chapter 1...", deleted: false },
+                    { id: "i1", type: "image", imageUrl: "data:...", classification: "logo", deleted: false },
+                    // ...
+                ]
+            },
+            // ...more pages
+        ]
+    }
 }
 ```
 
-#### 4. Get Backend Config
+#### 3. Preview Embeddings
 ```javascript
-// GET /api/ingestion/config
+// POST /api/ingestion/preview
+// This endpoint runs LOCAL logic (no LLM service call needed)
+
+// Request
+{
+    strategy: "embed_per_page",
+    documentState: { /* full document state */ }
+}
 
 // Response
 {
-    availableTargetDbs: [
-        { id: "chroma_default", label: "ChromaDB (Default)" },
-        { id: "chroma_snowflake", label: "ChromaDB (Snowflake)" }
-    ],
-    availableImageClasses: [
-        "logo", "figure", "chart", "diagram", "photo", "screenshot", "table_image", "other"
-    ],
-    embeddingModels: [
-        { id: "default", label: "Snowflake Arctic Embed", disabled: false },
-        { id: "openai", label: "OpenAI Ada-002", disabled: true }
+    source: "document.pdf",
+    document_type: "pdf",
+    page_count: 3,
+    total_embeddings: 3,
+    strategy: "embed_per_page",
+    documents: [
+        {
+            id: "page_1",
+            content: "Text content from page 1...",
+            metadata: {
+                page_num: 1,
+                source: "document.pdf",
+                char_count: 500,
+                word_count: 100,
+            }
+        },
+        // ...
     ]
 }
 ```
 
-#### 5. Run Backend Helper
+#### 4. Ingest to Vector DB
 ```javascript
-// POST /api/ingestion/{documentId}/helper
-// Content-Type: application/json
+// POST /api/ingestion/ingest
+
+// Request
+{
+    targetDb: "chroma_default",
+    documentState: { /* full document state */ },
+    strategy: "embed_per_page"
+}
+
+// Response (currently MOCK success)
+{
+    success: true,
+    targetDb: "chroma_default",
+    strategy: "embed_per_page",
+    documentCount: 3,
+    message: "[MOCK] Successfully ingested 3 embeddings to chroma_default"
+}
+```
+
+#### 5. Run AI Helper
+```javascript
+// POST /api/ingestion/helper
 
 // Request
 {
     helperId: "ai_image_descriptions",
-    params: { /* helper-specific params */ }
+    content: { pages: [...] },
+    params: {}
 }
 
-// Response
+// Response (currently MOCK data)
 {
     success: true,
     modifiedItems: [
-        { id: "i1", description: "AI-generated description" },
-        { id: "i2", description: "Another description" }
+        { id: "i1", description: "AI-generated description for logo on page 1" },
+        { id: "i2", description: "AI-generated description for diagram on page 2" }
     ],
     message: "Generated descriptions for 2 images"
 }
 ```
 
-#### 6. Start Ingestion
-```javascript
-// POST /api/ingestion/{documentId}/ingest
-// Content-Type: application/json
+### LLM Service Integration (TODO)
 
-// Request
-{
-    targetDb: "chroma_default",
-    content: {
-        pages: [ /* modified pages with items */ ]
-    }
-}
+When implementing the LLM Service endpoints, the Ingestion Service will proxy requests:
 
-// Response
-{
-    jobId: "job_xyz789",
-    status: "started"
-}
-```
-
-#### 7. Get Ingestion Status
-```javascript
-// GET /api/ingestion/job/{jobId}/status
-
-// Response
-{
-    status: "running" | "completed" | "failed",
-    progress: 0-100,
-    error?: "Error message if failed"
-}
-```
+| Ingestion Service | LLM Service (TODO) |
+|-------------------|-------------------|
+| `GET /api/ingestion/config` | `GET /api/config` |
+| `POST /api/ingestion/upload` | `POST /api/docling/process` |
+| `POST /api/ingestion/ingest` | `POST /api/ingest` |
+| `POST /api/ingestion/helper` | `POST /api/helper/{helperId}` |
 
 ---
 
@@ -683,9 +746,26 @@ useEffect(() => {
 
 ---
 
-## Quick Reference: Where to Wire Backend
+## Quick Reference: Next Steps
 
-1. **`src/services/ingestionApi.js`** - All 8 API functions need real HTTP calls
-2. **`src/pages/IngestionPage.jsx:77-91`** - Auth check needs real user service
-3. **`src/hooks/useBackendConfig.js`** - Uses `getBackendConfig()` from ingestionApi
-4. **`src/mocks/ingestionMocks.js`** - Remove/disable when backend is ready
+### To Enable Real LLM Service Integration
+
+1. **Implement LLM Service endpoints** in `backend/llm/`:
+   - `GET /api/config` - Return configuration
+   - `POST /api/docling/process` - PDF content extraction
+   - `POST /api/ingest` - Vector DB ingestion
+   - `POST /api/helper/{helperId}` - AI helpers
+
+2. **Uncomment proxy code** in Ingestion Service:
+   - `backend/ingestion/services/ingestionService.js` - Uncomment axios calls
+   - `backend/ingestion/services/contentViewerService.js` - Uncomment axios calls
+
+3. **Update config** to enable backend features:
+   - Set `enabled: true` for backend strategies/helpers in `getDefaultConfig()`
+
+### Authentication TODOs
+
+Located in `IngestionPage.jsx`:
+- Ensure `getCurrentUser()` returns user object with `role` property
+- Remove `shouldUseMockAuth()` bypass for production
+- Verify admin role checking logic
