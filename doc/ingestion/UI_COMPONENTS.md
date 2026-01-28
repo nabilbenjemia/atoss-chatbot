@@ -376,18 +376,66 @@ User Action: Click "✓ Confirm" in preview
      ▼
 handleConfirmIngestion()
      │
-     ├─► Simulated delay (1 second)
-     ├─► convertPreviewToIngestedFormat(embeddingPreview)
+     ├─► setIsIngesting(true)
      │
      ▼
-markFileAsIngested(documentId, ingestedData)  ◄─ localStorage
-clearCache(editStateKey)                       ◄─ localStorage
+ingestToVectorDb(targetDb, embeddingPreview, strategy) ◄───── BACKEND CALL
+     │
+     ├─► POST /api/ingestion/ingest
+     │   {
+     │     targetDb: "chroma_default",
+     │     chunks: embeddingPreview.chunks,
+     │     strategy: "embed_per_page",
+     │     filename: documentState.filename
+     │   }
+     │
+     ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    LLM Service Processing                           │
+├─────────────────────────────────────────────────────────────────────┤
+│  1. For each chunk with images:                                     │
+│     ├─► Decode base64 PNG                                           │
+│     ├─► Generate UUID for image                                     │
+│     ├─► Save as {uuid}.png in static folder                         │
+│     └─► Replace imageUrl: "data:image/png;base64,..." →            │
+│                imageUrl: "mongodb:{uuid}" or "/static/{uuid}.png"   │
+│                                                                     │
+│  2. Generate embeddings for text:                                   │
+│     ├─► Send text to embedding model (Snowflake)                    │
+│     └─► Get vector representation                                   │
+│                                                                     │
+│  3. Store in ChromaDB:                                              │
+│     ├─► collection.add(                                             │
+│     │     ids=[chunk_ids],                                          │
+│     │     documents=[chunk_texts],                                  │
+│     │     embeddings=[vectors],                                     │
+│     │     metadatas=[{page, source, images: [uuid1, uuid2]}]        │
+│     │   )                                                           │
+│     └─► Return success status                                       │
+└─────────────────────────────────────────────────────────────────────┘
+     │
+     ├─► Response: {
+     │     success: true,
+     │     chunksIngested: 5,
+     │     imagesStored: 3,
+     │     collectionId: "chroma_default"
+     │   }
+     │
+     ▼
+markFileAsIngested(documentId, response)  ◄─ localStorage (for UI state)
+clearCache(editStateKey)                   ◄─ localStorage
      │
      ▼
 Update uploadQueue → Remove document
 Update ingestedFilesList → Add document
 setIsPreviewMode(false)
+setIsIngesting(false)
+toast.success('Document ingested successfully!')
 ```
+
+**Current Implementation Note**: 
+> ⚠️ The current code has a **simulated delay** instead of a real backend call.
+> This needs to be implemented with the actual `POST /api/ingestion/ingest` endpoint.
 
 ---
 
