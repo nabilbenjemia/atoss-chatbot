@@ -8,7 +8,7 @@ const VideoCard = ({ video, onVideoClick, apiBaseUrl }) => {
     };
 
     return (
-        <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
+        <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer h-72 flex flex-col">
             {/* Thumbnail - smaller height */}
             <div className="relative">
                 <img
@@ -25,19 +25,26 @@ const VideoCard = ({ video, onVideoClick, apiBaseUrl }) => {
             </div>
 
             {/* Video Info - more compact */}
-            <div className="p-3">
-                <h3 className="font-semibold text-sm mb-1 line-clamp-2 overflow-hidden text-ellipsis">
-                    {video.title}
-                </h3>
-                <p className="text-gray-600 text-xs mb-2 line-clamp-1 overflow-hidden text-ellipsis">
-                    {video.description}
-                </p>
+            <div className="p-3 flex flex-col h-full">
+                {/* Top: title + description */}
+                <div className="flex-1">
+                    <h3 className="font-semibold text-sm mb-1 line-clamp-1 overflow-hidden text-ellipsis">
+                        {video.title}
+                    </h3>
+                    <p className="text-gray-600 text-xs mb-1 line-clamp-1 overflow-hidden text-ellipsis min-h-[1.5rem]">
+                        {video.description || '\u00A0'}
+                    </p>
+                </div>
+
+                {/* Category row */}
                 <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-                    <span className="bg-gray-100 px-2 py-1 rounded">
+                    <span className="bg-gray-100 px-2 py-0.5 rounded">
                         {video.category}
                     </span>
                     <span>{video.views} views</span>
                 </div>
+
+                {/* Button at bottom */}
                 <button
                     onClick={() => onVideoClick(video)}
                     className="w-full bg-tum-blue text-white py-1.5 text-sm rounded-lg hover:bg-tum-blue-dark transition-colors"

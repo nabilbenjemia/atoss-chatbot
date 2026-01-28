@@ -27,7 +27,7 @@ const AdminVideoCard = ({ video, onVideoClick, onEdit, onDelete, apiBaseUrl }) =
     }, [showOptions]);
 
     return (
-        <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer relative">
+        <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer h-72 flex flex-col relative">
             {/* Three dots menu */}
             <div className="absolute top-2 right-2 z-20" ref={dropdownRef}>
                 <button
@@ -89,23 +89,27 @@ const AdminVideoCard = ({ video, onVideoClick, onEdit, onDelete, apiBaseUrl }) =
                 </div>
             </div>
 
-            {/* Video Info */}
-            <div className="p-3 flex flex-col">
-                <h3 className="font-semibold text-sm mb-1 line-clamp-2 overflow-hidden text-ellipsis min-h-[2.5rem]">
-                    {video.title}
-                </h3>
-                <p className="text-gray-600 text-xs mb-2 line-clamp-1 overflow-hidden text-ellipsis">
-                    {video.description}
-                </p>
+            {/* Video Info - same layout as VideoCard */}
+            <div className="p-3 flex flex-col h-full">
+                <div className="flex-1">
+                    <h3 className="font-semibold text-sm mb-1 line-clamp-1 overflow-hidden text-ellipsis">
+                        {video.title}
+                    </h3>
+                    <p className="text-gray-600 text-xs mb-1 line-clamp-1 overflow-hidden text-ellipsis min-h-[1.5rem]">
+                        {video.description || '\u00A0'}
+                    </p>
+                </div>
+                
                 <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-                    <span className="bg-gray-100 px-2 py-1 rounded">
+                    <span className="bg-gray-100 px-2 py-0.5 rounded">
                         {video.category}
                     </span>
                     <span>{video.views} views</span>
                 </div>
+                
                 <button
                     onClick={() => onVideoClick(video)}
-                    className="w-full bg-tum-blue text-white py-1.5 text-sm rounded-lg hover:bg-tum-blue-dark transition-colors mt-auto"
+                    className="w-full bg-tum-blue text-white py-1.5 text-sm rounded-lg hover:bg-tum-blue-dark transition-colors"
                 >
                     Watch Video
                 </button>
