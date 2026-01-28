@@ -7,6 +7,7 @@ import VerifyEmailPage from "./pages/VerifyEmailPage.jsx";
 import ForgetPass from "./pages/ForgetPass.jsx";
 import ChatbotPage from "./pages/ChatbotPage.jsx";
 import UserProfilePage from "./pages/UserProfilePage.jsx";
+import AnalyticsDashboard from "./pages/AnalyticsDashboard.jsx";
 
 
 export default function App() {
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="/forget-password" element={<ForgetPass />} />
         <Route path="/chatbot" element={<ChatbotPage />} />
         <Route path="/profile" element={<UserProfilePage />} />
+        <Route path="/analytics" element={<AnalyticsDashboard />} />
       </Routes>
       <ToastContainer
         position="top-right"
