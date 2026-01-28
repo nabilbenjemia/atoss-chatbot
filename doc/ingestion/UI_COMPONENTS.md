@@ -1,6 +1,6 @@
 # Ingestion Page UI Components Documentation
 
-> **Last Updated**: Based on latest refactoring (stateless backend, localStorage-based state management)
+> **Last Updated**: 2026-01-28 (ADR-002 Context + Reducer implementation)
 
 ## Table of Contents
 1. [Architecture Overview](#architecture-overview)
@@ -49,26 +49,36 @@ The Ingestion Page is a document processing and vector database ingestion UI tha
 
 ## Component Hierarchy
 
+### New Architecture (Connected Components)
+
 ```
-IngestionPage.jsx (1163 lines - main container)
-├── UploadZone.jsx          - Drag-drop file upload
-├── FileQueue.jsx           - File list with sections
-│   └── FileQueueItem.jsx   - Individual file item
-├── ContentViewer.jsx       - Main content display
-│   ├── PageContent.jsx     - Page items container
-│   │   ├── TextItem.jsx    - Editable text (markdown)
-│   │   ├── ImageItem.jsx   - Image with classification
-│   │   └── TableItem.jsx   - Read-only table
-│   └── PageNavigation.jsx  - Page nav buttons
-├── HelperPanel.jsx         - AI helper functions
-├── SaveBar.jsx             - Undo/redo/save/ingest
-├── EmbeddingPreviewViewer.jsx - Preview before ingestion
-│   └── EmbeddingPreview.jsx   - Single embedding card
-├── IngestionModal.jsx      - Strategy/DB selection
-├── RegexInputModal.jsx     - Regex pattern input
-├── CacheManagement.jsx     - Cache clearing UI
-└── HelperFileSelectModal.jsx - Multi-file helper selection
+IngestionPage.jsx (entry point)
+└── IngestionProvider (context provider)
+    └── IngestionPageLayout.jsx (~400 lines - layout-only)
+        ├── ConnectedUploadZone.jsx      - Drag-drop upload (owns upload logic)
+        ├── ConnectedFileQueue.jsx       - File list (owns selection logic)
+        │   └── FileQueueItem.jsx        - Individual file item (pure UI)
+        ├── ConnectedContentViewer.jsx   - Main content display (owns edit logic)
+        │   ├── PageContent.jsx          - Page items container (pure UI)
+        │   │   ├── TextItem.jsx         - Editable text (pure UI)
+        │   │   ├── ImageItem.jsx        - Image with classification (pure UI)
+        │   │   └── TableItem.jsx        - Read-only table (pure UI)
+        │   └── PageNavigation.jsx       - Page nav buttons (pure UI)
+        ├── ConnectedHelperPanel.jsx     - AI helper functions (owns execution logic)
+        ├── EmbeddingPreviewViewer.jsx   - Preview before ingestion (pure UI)
+        │   └── EmbeddingPreview.jsx     - Single embedding card (pure UI)
+        ├── IngestionModal.jsx           - Strategy/DB selection (pure UI)
+        ├── RegexInputModal.jsx          - Regex pattern input (pure UI)
+        ├── CacheManagement.jsx          - Cache clearing UI (pure UI)
+        └── HelperFileSelectModal.jsx    - Multi-file helper selection (pure UI)
 ```
+
+### Component Classification
+
+| Type | Components | Characteristics |
+|------|------------|-----------------|
+| **Connected** | `ConnectedUploadZone`, `ConnectedFileQueue`, `ConnectedContentViewer`, `ConnectedHelperPanel` | Use context hooks, own business logic, dispatch actions |
+| **Pure UI** | `FileQueueItem`, `PageContent`, `TextItem`, `ImageItem`, `TableItem`, `PageNavigation`, Modals | Receive props, emit events, no context dependency |
 
 ### Constants (`constants.js`)
 ```javascript
@@ -165,112 +175,112 @@ export const CONTENT_TYPE = {
 | `useCommandHistory` | Custom | Undo/redo with command pattern |
 | `useLocalCache` | Custom | localStorage persistence |
 | `useBackendConfig` | Custom | Fetch backend config on mount |
-| `useIngestionEvent` | Custom | Subscribe to component events (Pub/Sub) |
-| `useIngestionEmit` | Custom | Publish events to other components |
+| `useFileQueue` | Context | Access file queue state |
+| `useDocument` | Context | Access document state |
+| `usePreview` | Context | Access preview state |
+| `useUI` | Context | Access UI state |
+| `useIngestionActions` | Context | Dispatch actions to reducer |
 
 ---
 
-## Event-Driven Architecture (Pub/Sub)
+## State Management Architecture (ADR-002)
 
-> **ADR-002**: Components communicate via events for loose coupling and separation of concerns.
+> **ADR-002**: Components communicate via Context + Reducer with Split Contexts.
 > See `doc/ingestion/ADR.md` for the full decision record.
 
 ### Core Principle
 
-Each component:
-1. **Owns its own state** - No God Class orchestrating everything
-2. **Publishes events** when something meaningful happens
-3. **Subscribes to events** from other components that affect it
-4. **Reacts autonomously** - Knows "when X happens, I do Y"
+State is managed by a **single reducer** (`ingestionReducer.js`) for traceability, split into **four domains** with separate React contexts for fine-grained re-renders.
 
-### Event Flow Example: "Confirm & Ingest"
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       IngestionProvider                         │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                       useReducer                           │  │
+│  │  ┌────────────┬────────────┬────────────┬────────────┐    │  │
+│  │  │ fileQueue  │  document  │  preview   │     ui     │    │  │
+│  │  └────────────┴────────────┴────────────┴────────────┘    │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                              │                                  │
+│        ┌─────────────────────┼─────────────────────┐           │
+│        │                     │                     │           │
+│        ▼                     ▼                     ▼           │
+│  FileQueueContext      DocumentContext       PreviewContext    │
+│        │                     │                     │           │
+│        ▼                     ▼                     ▼           │
+│   useFileQueue()       useDocument()         usePreview()      │
+│                                                                │
+│                     UIContext ──► useUI()                      │
+│                     DispatchContext ──► useDispatch()          │
+└────────────────────────────────────────────────────────────────┘
+```
+
+### Connected Components Pattern
+
+Each **Connected Component** owns its business logic:
+1. **Subscribes to context** via domain hooks (`useFileQueue`, `useDocument`, etc.)
+2. **Dispatches actions** to the reducer for state changes
+3. **Handles side effects** (API calls, toast notifications, caching)
+
+### Data Flow Example: "Confirm & Ingest"
 
 ```
 User clicks "Confirm & Ingest"
            │
            ▼
-┌──────────────────────────────┐
-│    EmbeddingPreview          │
-│    emit('ingestion:complete')│
-└──────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│              IngestionPageLayout (Modal Handler)                │
+│        dispatch({ type: 'INGESTION_COMPLETE', payload })       │
+└────────────────────────────────────────────────────────────────┘
            │
-   ┌───────┼───────┬───────┬───────┐
-   ▼       ▼       ▼       ▼       ▼
-┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
-│Pending│ │Ingest│ │Doc   │ │Content│ │Toast │
-│File  │ │File  │ │Editor│ │Viewer │ │      │
-│List  │ │List  │ │      │ │       │ │      │
-│──────│ │──────│ │──────│ │───────│ │──────│
-│Remove│ │Add   │ │Set   │ │Set    │ │Show  │
-│file  │ │file  │ │mode: │ │read-  │ │success
-│      │ │      │ │read- │ │only   │ │      │
-│      │ │      │ │only  │ │       │ │      │
-└──────┘ └──────┘ └──────┘ └───────┘ └──────┘
+           ▼
+┌────────────────────────────────────────────────────────────────┐
+│                    ingestionReducer                             │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ case 'INGESTION_COMPLETE':                                │  │
+│  │   return {                                                │  │
+│  │     fileQueue: { /* remove from uploadQueue, add to */    │  │
+│  │                  /* ingestedFiles */ },                   │  │
+│  │     document:  { /* store embeddings */ },                │  │
+│  │     preview:   { isPreviewMode: false },                  │  │
+│  │     ui:        { isIngesting: false },                    │  │
+│  │   };                                                      │  │
+│  └──────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────┘
+           │
+           ▼ (Split contexts propagate only to their subscribers)
+┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
+│File  │ │Doc   │ │Preview│ │Toast │
+│Queue │ │Editor│ │Viewer │ │      │
+│──────│ │──────│ │───────│ │──────│
+│Re-   │ │Shows │ │Exits  │ │Shows │
+│renders│ │stored│ │preview│ │success│
+│with  │ │embed │ │mode   │ │      │
+│new   │ │dings │ │       │ │      │
+│lists │ │      │ │       │ │      │
+└──────┘ └──────┘ └───────┘ └──────┘
 ```
 
-### Event Types
+### Action Types
 
-Located in `frontend/src/utils/eventBus.js`:
+Actions are defined in `context/ingestion/actionTypes.js`:
 
-| Event | Payload | Published By | Subscribers |
-|-------|---------|--------------|-------------|
-| `file:uploaded` | `{ id, filename }` | UploadZone | FileQueue |
-| `file:selected` | `{ fileId }` | FileQueue | ContentViewer, HelperPanel |
-| `file:deleted` | `{ fileId }` | FileQueue | ContentViewer |
-| `processing:complete` | `{ fileId, documentState }` | UploadZone | FileQueue, ContentViewer |
-| `content:modified` | `{ fileId, changeType }` | ContentViewer | SaveBar (dirty flag) |
-| `preview:started` | `{ fileId, strategy }` | SaveBar | ContentViewer |
-| `preview:generated` | `{ fileId, chunks }` | ContentViewer | EmbeddingPreview |
-| `preview:cancelled` | `{ fileId }` | EmbeddingPreview | ContentViewer (back to editing) |
-| `ingestion:complete` | `{ fileId, filename, chunkCount }` | EmbeddingPreview | FileQueue, IngestedList, ContentViewer |
-| `mode:changed` | `{ fileId, mode }` | ContentViewer | HelperPanel |
+| Domain | Actions |
+|--------|---------|
+| **FileQueue** | `ADD_TO_QUEUE`, `UPDATE_FILE_STATUS`, `SET_SELECTED_DOCUMENT`, `RESTORE_FILES_FROM_CACHE`, `LOAD_INGESTED_FILES` |
+| **Document** | `SET_DOCUMENT_STATE`, `MODIFY_DOCUMENT`, `SET_CURRENT_PAGE`, `STORE_EMBEDDINGS` |
+| **Preview** | `START_PREVIEW`, `SET_PREVIEW_GENERATED`, `EXIT_PREVIEW_MODE`, `SWITCH_PREVIEW_FILE` |
+| **UI** | `TOGGLE_SIDEBAR`, `OPEN_MODAL`, `CLOSE_MODAL`, `START_HELPER`, `COMPLETE_HELPER` |
 
-### Usage Pattern
+### Key Files
 
-**Publisher** (e.g., EmbeddingPreview):
-```jsx
-import { useIngestionEmit, IngestionEvents } from '../hooks/useIngestionEvent';
-
-const EmbeddingPreview = () => {
-    const emitComplete = useIngestionEmit(IngestionEvents.INGESTION_COMPLETE);
-    
-    const handleConfirm = async () => {
-        await ingestToVectorDB(chunks);
-        emitComplete({ fileId, filename, chunkCount });
-    };
-};
-```
-
-**Subscriber** (e.g., PendingFileList):
-```jsx
-import { useIngestionEvent, IngestionEvents } from '../hooks/useIngestionEvent';
-
-const PendingFileList = () => {
-    const [files, setFiles] = useState([]);
-    
-    // "When ingestion completes, I remove the file"
-    useIngestionEvent(
-        IngestionEvents.INGESTION_COMPLETE,
-        ({ fileId }) => {
-            setFiles(prev => prev.filter(f => f.id !== fileId));
-        },
-        []
-    );
-};
-```
-
-### Debugging Events
-
-In development mode, all events are logged to console:
-```
-[EventBus] ingestion:complete { fileId: "abc123", filename: "doc.pdf", chunkCount: 42 }
-```
-
-Also available in browser console:
-```javascript
-window.__ingestionEventBus.listSubscribers()
-// { "ingestion:complete": 4, "file:selected": 2, ... }
-```
+| File | Purpose |
+|------|---------|
+| `context/ingestion/ingestionReducer.js` | Central reducer (~520 lines) |
+| `context/ingestion/IngestionProvider.jsx` | Provider with split contexts |
+| `context/ingestion/hooks.js` | Domain hooks and action creators |
+| `context/ingestion/actionTypes.js` | Action type constants |
+| `context/ingestion/constants.js` | DOC_STATUS, CONTENT_TYPE, etc. |
 
 ---
 

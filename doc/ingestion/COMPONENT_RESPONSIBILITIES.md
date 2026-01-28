@@ -353,27 +353,28 @@ IngestionPage (entry point)
 
 ### Upload Flow
 ```
-User drops file → UploadZone.onFilesSelected
-    → IngestionPageContent.handleFilesSelected
+User drops file → ConnectedUploadZone
+    → handleFilesSelected (owns logic)
     → actions.startFileUpload() → reducer → state.fileQueue.uploadQueue
-    → API call → actions.completeFileUpload() → reducer
-    → FileQueue re-renders with new file
+    → uploadDocument API call
+    → actions.completeFileUpload() → reducer
+    → ConnectedFileQueue re-renders via useFileQueue hook
 ```
 
 ### Edit Flow
 ```
-User edits text → TextItem.onEdit
-    → IngestionPageContent.handleEditItem
+User edits text → TextItem.onEdit (pure UI callback)
+    → ConnectedContentViewer.handleEditItem (owns logic)
     → executeCommand(Commands.editItem)
     → useCommandHistory → new documentState
     → actions.modifyDocument() → reducer → state.document
-    → ContentViewer re-renders
+    → ConnectedContentViewer re-renders via useDocument hook
 ```
 
 ### Ingestion Flow
 ```
-User clicks Ingest → IngestionModal.onShowPreview
-    → IngestionPageContent.handleStartIngestion
+User clicks Ingest → IngestionModal.onShowPreview (pure UI)
+    → IngestionPageLayout.handleShowPreview (modal handler)
     → actions.startPreview() → reducer → state.preview, state.ui
     → API call → actions.setPreviewGenerated()
     → EmbeddingPreviewViewer renders
@@ -381,23 +382,32 @@ User clicks Ingest → IngestionModal.onShowPreview
     → actions.completeIngestion() → reducer → ALL domains updated
 ```
 
-## Context Subscriptions
+## Context Subscriptions (New Architecture)
 
-| Component | useFileQueue | useDocument | usePreview | useUI | useDispatch |
-|-----------|:------------:|:-----------:|:----------:|:-----:|:-----------:|
-| IngestionPageContent | ✓ | ✓ | ✓ | ✓ | ✓ |
-| LeftSidebar | - | - | - | - | - |
-| FileQueue | (props) | - | - | - | - |
-| ContentHeader | - | (props) | - | - | - |
-| ContentViewer | - | (props) | - | - | - |
-| RightSidebar | - | - | - | - | - |
-| HelperPanel | - | - | - | (props) | - |
+| Component | useFileQueue | useDocument | usePreview | useUI | useIngestionActions |
+|-----------|:------------:|:-----------:|:----------:|:-----:|:-------------------:|
+| **IngestionPageLayout** | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **ConnectedFileQueue** | ✓ | - | ✓ | ✓ | ✓ |
+| **ConnectedUploadZone** | ✓ | - | ✓ | ✓ | ✓ |
+| **ConnectedContentViewer** | - | ✓ | - | - | ✓ |
+| **ConnectedHelperPanel** | - | ✓ | - | ✓ | ✓ |
+| FileQueueItem | (props) | - | - | - | - |
+| PageContent | - | (props) | - | - | - |
+| TextItem/ImageItem | - | (props) | - | - | - |
+| Modals | (props) | - | - | - | - |
 
-**Note**: Most child components receive data via props from `IngestionPageContent`, which subscribes to all contexts. This is intentional as it allows `IngestionPageContent` to coordinate cross-domain operations.
+**Note**: Connected components subscribe directly to context, while pure UI components receive data via props. This distributes business logic while keeping UI components reusable.
+
+## Benefits of New Architecture
+
+1. **Distributed Logic**: Business logic is in Connected components, not a "God Class"
+2. **Fine-Grained Re-renders**: Components only re-render when their subscribed domain changes
+3. **Testable**: Connected components can be tested with mocked context
+4. **Traceable**: All state changes visible in reducer (see `REDUCER.md`)
+5. **Standard React**: Familiar patterns, works with React DevTools
 
 ## Future Optimizations
 
-1. **Deeper Context Usage**: Move context subscriptions closer to leaf components that need specific state
-2. **Memoization**: Add `React.memo` to expensive render components
-3. **Virtualization**: For large file lists, use virtualized scrolling
-4. **Code Splitting**: Lazy load modal components
+1. **Memoization**: Add `React.memo` to expensive pure UI components
+2. **Virtualization**: For large file lists, use virtualized scrolling
+3. **Code Splitting**: Lazy load modal components
