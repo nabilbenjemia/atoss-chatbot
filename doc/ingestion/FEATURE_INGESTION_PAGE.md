@@ -10,7 +10,72 @@ The **IngestionPage** is an admin-only page for document ingestion workflow in t
 
 ---
 
+## Related Documentation
+
+| Document | Description |
+|----------|-------------|
+| [ADR.md](./ADR.md) | Architecture Decision Records for ingestion feature |
+| [REDUCER.md](./REDUCER.md) | Reducer documentation for state management |
+| [COMPONENT_RESPONSIBILITIES.md](./COMPONENT_RESPONSIBILITIES.md) | Component responsibilities breakdown |
+
+---
+
 ## Architecture
+
+### State Management Architecture (ADR-002)
+
+The IngestionPage uses Context + Reducer with Split Contexts pattern:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        IngestionProvider                                 │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │                         useReducer                                 │  │
+│  │  ┌────────────┬────────────┬────────────┬────────────┐           │  │
+│  │  │ fileQueue  │  document  │  preview   │     ui     │           │  │
+│  │  └────────────┴────────────┴────────────┴────────────┘           │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+│                                │                                        │
+│         ┌──────────────────────┼──────────────────────┐                │
+│         ▼                      ▼                      ▼                │
+│  FileQueueContext      DocumentContext         PreviewContext          │
+│         │                      │                      │                │
+│         ▼                      ▼                      ▼                │
+│  useFileQueue()         useDocument()          usePreview()            │
+│                                                                        │
+│                    DispatchContext ────► useDispatch()                 │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### Component Architecture
+
+The page uses **Connected Components** that own their business logic:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       IngestionPageLayout                                │
+│                    (Layout-only: ~250 lines)                            │
+│  ┌─────────────────┐  ┌──────────────────────┐  ┌─────────────────┐    │
+│  │  LeftSidebar    │  │    Main Content      │  │  RightSidebar   │    │
+│  │  ┌───────────┐  │  │  ┌────────────────┐  │  │  ┌───────────┐  │    │
+│  │  │Connected  │  │  │  │  Connected     │  │  │  │Connected  │  │    │
+│  │  │UploadZone │  │  │  │  ContentViewer │  │  │  │HelperPanel│  │    │
+│  │  └───────────┘  │  │  │  (owns edit)   │  │  │  │(owns run) │  │    │
+│  │  ┌───────────┐  │  │  └────────────────┘  │  │  └───────────┘  │    │
+│  │  │Connected  │  │  │                      │  │                 │    │
+│  │  │FileQueue  │  │  │                      │  │                 │    │
+│  │  │(owns sel) │  │  │                      │  │                 │    │
+│  │  └───────────┘  │  │                      │  │                 │    │
+│  └─────────────────┘  └──────────────────────┘  └─────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Files**:
+- `frontend/src/context/ingestion/` - Context, reducer, hooks
+- `frontend/src/pages/IngestionPageLayout.jsx` - Layout-only page (~250 lines)
+- `frontend/src/components/ingestion/Connected*.jsx` - Connected components
+
+### Service Architecture
 
 ### Service Architecture
 
@@ -59,6 +124,7 @@ The **IngestionPage** is an admin-only page for document ingestion workflow in t
 | Layer | Status | Notes |
 |-------|--------|-------|
 | Frontend (IngestionPage) | ✅ Implemented | Full UI with editing, preview, ingestion |
+| Frontend (Context/Reducer) | ✅ Implemented | State management with split contexts |
 | Frontend (ingestionApi.js) | ✅ Implemented | Calls Ingestion Service |
 | Ingestion Service (Node.js) | ✅ Proxy/Mock | Returns mock data, ready for LLM integration |
 | LLM Service (FastAPI) | ❌ Not Implemented | Endpoints need to be created |
@@ -66,29 +132,49 @@ The **IngestionPage** is an admin-only page for document ingestion workflow in t
 ### Component Hierarchy
 
 ```
-IngestionPage.jsx
-├── UploadZone.jsx          # Drag-and-drop file upload
-├── FileQueue.jsx           # List of uploaded documents
-│   └── FileQueueItem.jsx   # Individual file item with status
-├── ContentViewer.jsx       # Main content viewing area
-│   ├── PageNavigation.jsx  # Page navigation controls
-│   └── PageContent.jsx     # Page content renderer
-│       ├── TextItem.jsx    # Editable text block
-│       ├── ImageItem.jsx   # Image with classification dropdown
-│       └── TableItem.jsx   # Table display component
-├── HelperPanel.jsx         # Sidebar with helper function buttons
-├── SaveBar.jsx             # Undo/redo and save controls
-├── IngestionModal.jsx      # Modal for target DB selection
-└── RegexInputModal.jsx     # Modal for regex pattern input
+IngestionPage.jsx (or IngestionPageRefactored.jsx)
+├── IngestionProvider (Context provider)
+│   └── IngestionPageContent
+│       ├── LeftSidebar
+│       │   ├── UploadZone.jsx          # Drag-and-drop file upload
+│       │   ├── FileQueue.jsx           # List of uploaded documents
+│       │   │   └── FileQueueItem.jsx   # Individual file item with status
+│       │   └── CacheManagement.jsx     # Cache management (modal)
+│       ├── Main Content
+│       │   ├── ContentHeader (inline)  # Title and SaveBar
+│       │   │   └── SaveBar.jsx         # Undo/redo and save controls
+│       │   ├── ContentViewer.jsx       # Main content viewing area
+│       │   │   ├── PageNavigation.jsx  # Page navigation controls
+│       │   │   └── PageContent.jsx     # Page content renderer
+│       │   │       ├── TextItem.jsx    # Editable text block
+│       │   │       ├── ImageItem.jsx   # Image with classification dropdown
+│       │   │       └── TableItem.jsx   # Table display component
+│       │   └── EmbeddingPreviewViewer.jsx  # Preview/readonly mode
+│       │       └── EmbeddingPreview.jsx    # Single embedding chunk
+│       ├── RightSidebar
+│       │   └── HelperPanel.jsx         # Sidebar with helper function buttons
+│       └── Modals
+│           ├── IngestionModal.jsx      # Modal for target DB selection
+│           ├── RegexInputModal.jsx     # Modal for regex pattern input
+│           ├── CacheManagement.jsx     # Cache management modal
+│           └── HelperFileSelectModal.jsx  # File selection for helpers
 ```
+
+See [COMPONENT_RESPONSIBILITIES.md](./COMPONENT_RESPONSIBILITIES.md) for detailed component documentation.
 
 ### Custom Hooks Used
 
-| Hook | Purpose |
-|------|---------|
-| `useBackendConfig` | Fetches dynamic configuration from backend (available DBs, image classes, embedding models) |
-| `useCommandHistory` | Command Pattern undo/redo - stores lightweight commands instead of full state copies (memory efficient for large documents) |
-| `useLocalCache` | Persists edit state to localStorage for session recovery |
+| Hook | File | Purpose |
+|------|------|---------|
+| `useBackendConfig` | `hooks/useBackendConfig.js` | Fetches dynamic configuration from backend |
+| `useCommandHistory` | `hooks/useCommandHistory.js` | Command Pattern undo/redo (memory efficient) |
+| `useLocalCache` | `hooks/useLocalCache.js` | Persists edit state to localStorage |
+| `useFileQueue` | `context/ingestion/hooks.js` | Access file queue state from context |
+| `useDocument` | `context/ingestion/hooks.js` | Access document state from context |
+| `usePreview` | `context/ingestion/hooks.js` | Access preview state from context |
+| `useUI` | `context/ingestion/hooks.js` | Access UI state from context |
+| `useDispatch` | `context/ingestion/hooks.js` | Access dispatch function |
+| `useIngestionActions` | `context/ingestion/hooks.js` | Pre-bound action creators |
 
 ### Services
 

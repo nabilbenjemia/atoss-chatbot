@@ -1,0 +1,75 @@
+/**
+ * Action Types for Ingestion State Management
+ * 
+ * Organized by domain to make it clear which parts of state each action affects.
+ * Some actions are cross-domain and affect multiple state slices atomically.
+ */
+
+// File Queue Actions
+export const FILE_UPLOAD_STARTED = 'FILE_UPLOAD_STARTED';
+export const FILE_UPLOAD_PROGRESS = 'FILE_UPLOAD_PROGRESS';
+export const FILE_UPLOAD_COMPLETE = 'FILE_UPLOAD_COMPLETE';
+export const FILE_UPLOAD_FAILED = 'FILE_UPLOAD_FAILED';
+export const FILE_SELECTED = 'FILE_SELECTED';
+export const FILE_REMOVED = 'FILE_REMOVED';
+export const FILE_RENAMED = 'FILE_RENAMED';
+export const FILES_RESTORED_FROM_CACHE = 'FILES_RESTORED_FROM_CACHE';
+export const INGESTED_FILES_LOADED = 'INGESTED_FILES_LOADED';
+export const INGESTED_FILE_REMOVED = 'INGESTED_FILE_REMOVED';
+
+// Document Actions
+export const DOCUMENT_LOADED = 'DOCUMENT_LOADED';
+export const DOCUMENT_MODIFIED = 'DOCUMENT_MODIFIED';
+export const DOCUMENT_RESET = 'DOCUMENT_RESET';
+export const DOCUMENT_HISTORY_RESTORED = 'DOCUMENT_HISTORY_RESTORED';
+export const PAGE_CHANGED = 'PAGE_CHANGED';
+export const ITEM_EDITED = 'ITEM_EDITED';
+export const ITEM_DELETED = 'ITEM_DELETED';
+export const ITEM_RESTORED = 'ITEM_RESTORED';
+export const ITEM_CLASS_CHANGED = 'ITEM_CLASS_CHANGED';
+export const BATCH_ITEMS_MODIFIED = 'BATCH_ITEMS_MODIFIED';
+export const DOCUMENT_RENAMED = 'DOCUMENT_RENAMED';
+
+// Preview Actions
+export const PREVIEW_STARTED = 'PREVIEW_STARTED';
+export const PREVIEW_LOADING = 'PREVIEW_LOADING';
+export const PREVIEW_GENERATED = 'PREVIEW_GENERATED';
+export const PREVIEW_FAILED = 'PREVIEW_FAILED';
+export const PREVIEW_CANCELLED = 'PREVIEW_CANCELLED';
+export const PREVIEW_FILE_SWITCHED = 'PREVIEW_FILE_SWITCHED';
+export const PREVIEW_FILE_REMOVED = 'PREVIEW_FILE_REMOVED';
+
+// Ingestion Actions (Cross-Domain)
+export const INGESTION_STARTED = 'INGESTION_STARTED';
+export const INGESTION_PROGRESS = 'INGESTION_PROGRESS';
+export const INGESTION_COMPLETE = 'INGESTION_COMPLETE';
+export const INGESTION_FAILED = 'INGESTION_FAILED';
+
+// UI Actions
+export const UI_MODE_CHANGED = 'UI_MODE_CHANGED';
+export const LEFT_SIDEBAR_TOGGLED = 'LEFT_SIDEBAR_TOGGLED';
+export const RIGHT_SIDEBAR_TOGGLED = 'RIGHT_SIDEBAR_TOGGLED';
+export const MULTI_SELECT_TOGGLED = 'MULTI_SELECT_TOGGLED';
+export const DOCUMENT_CHECKED = 'DOCUMENT_CHECKED';
+export const CHECKED_DOCUMENTS_CLEARED = 'CHECKED_DOCUMENTS_CLEARED';
+export const DRAGGING_CHANGED = 'DRAGGING_CHANGED';
+export const TITLE_EDITING_STARTED = 'TITLE_EDITING_STARTED';
+export const TITLE_EDITING_ENDED = 'TITLE_EDITING_ENDED';
+
+// Modal Actions
+export const MODAL_OPENED = 'MODAL_OPENED';
+export const MODAL_CLOSED = 'MODAL_CLOSED';
+
+// Cache Actions
+export const CACHE_CLEARED = 'CACHE_CLEARED';
+
+// Content Type Actions
+export const CONTENT_TYPE_CHANGED = 'CONTENT_TYPE_CHANGED';
+export const STORED_EMBEDDINGS_SET = 'STORED_EMBEDDINGS_SET';
+
+// Helper Actions
+export const HELPER_STARTED = 'HELPER_STARTED';
+export const HELPER_COMPLETED = 'HELPER_COMPLETED';
+export const HELPER_FAILED = 'HELPER_FAILED';
+export const PENDING_HELPER_SET = 'PENDING_HELPER_SET';
+export const PENDING_HELPER_CLEARED = 'PENDING_HELPER_CLEARED';
