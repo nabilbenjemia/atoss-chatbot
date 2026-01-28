@@ -1,13 +1,12 @@
 /**
  * SaveBar Component
  * 
- * Floating save bar with unsaved indicator and undo/redo buttons.
+ * Floating bar with undo/redo buttons and ingest action.
+ * Content is auto-saved, so no manual save button needed.
  */
 
 /**
  * @param {Object} props
- * @param {boolean} props.hasUnsavedChanges - Whether there are unsaved changes
- * @param {Function} props.onSave - Save handler
  * @param {boolean} props.canUndo - Whether undo is available
  * @param {boolean} props.canRedo - Whether redo is available
  * @param {Function} props.onUndo - Undo handler
@@ -16,8 +15,6 @@
  * @param {boolean} props.canIngest - Whether ingestion is available
  */
 export default function SaveBar({
-    hasUnsavedChanges = false,
-    onSave,
     canUndo = false,
     canRedo = false,
     onUndo,
@@ -50,23 +47,11 @@ export default function SaveBar({
             </div>
 
             <div className="flex items-center gap-2">
-                {/* Unsaved indicator */}
-                {hasUnsavedChanges && (
-                    <span className="text-xs text-tum-orange flex items-center">
-                        <span className="w-2 h-2 bg-tum-orange rounded-full mr-1" />
-                        <span className="hidden sm:inline">Unsaved</span>
-                    </span>
-                )}
-
-                {/* Save button */}
-                <button
-                    onClick={onSave}
-                    disabled={!hasUnsavedChanges}
-                    className="px-3 sm:px-4 py-1.5 text-sm font-bold transition-all disabled:opacity-40
-                        bg-tum-blue hover:bg-tum-dark-blue text-white"
-                >
-                    Save
-                </button>
+                {/* Auto-save indicator */}
+                <span className="text-xs text-tum-grey-4 flex items-center">
+                    <span className="w-2 h-2 bg-tum-green rounded-full mr-1" />
+                    <span className="hidden sm:inline">Auto-saved</span>
+                </span>
 
                 {/* Ingest button */}
                 <button

@@ -31,8 +31,11 @@ import {
     getFileContent,
     updateUploadedFile,
     getIngestedFiles,
-    markFileAsIngested,
+    createIngestedFile,
+    getExistingIngestedFile,
     removeIngestedFile,
+    saveFileHistory,
+    getFileHistory,
 } from '../utils/fileCacheManager';
 
 // Import components
@@ -67,13 +70,14 @@ export default function IngestionPage() {
         undo,
         redo,
         reset: resetDocument,
+        restore: restoreDocument,
+        getFullState: getDocumentFullState,
         canUndo,
         canRedo,
     } = useCommandHistory(null);
 
     // UI state
     const [currentPage, setCurrentPage] = useState(1);
-    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [showIngestionModal, setShowIngestionModal] = useState(false);
     const [ingestionProgress, setIngestionProgress] = useState(0);
     const [isIngesting, setIsIngesting] = useState(false);
@@ -137,12 +141,29 @@ export default function IngestionPage() {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Local cache
+    // Local cache for editor state (session recovery)
     useLocalCache(
-        documentState ? { documentState, hasUnsavedChanges } : null,
+        documentState ? { documentState } : null,
         INGESTION_CONFIG.storage.editStateKey,
-        { enabled: hasUnsavedChanges }
+        { enabled: !!documentState }
     );
+
+    // Auto-save document content and command history to cache whenever documentState changes
+    useEffect(() => {
+        if (documentState && selectedDocumentId) {
+            // Save content to file-specific cache
+            saveFileContent(selectedDocumentId, documentState);
+
+            // Sync filename to uploaded files metadata
+            updateUploadedFile(selectedDocumentId, { filename: documentState.filename });
+
+            // Save command history for this file
+            const fullState = getDocumentFullState();
+            saveFileHistory(selectedDocumentId, fullState);
+
+            console.log('[IngestionPage] 📦 Auto-saved content and history to cache for', selectedDocumentId);
+        }
+    }, [documentState, selectedDocumentId, getDocumentFullState]);
 
     // Auth check (bypassed in dev mode)
     useEffect(() => {
@@ -179,7 +200,6 @@ export default function IngestionPage() {
                 );
                 if (resume) {
                     resetDocument(cached.documentState);
-                    setHasUnsavedChanges(cached.hasUnsavedChanges || false);
                     toast.info('Restored previous session');
                 } else {
                     clearCache(INGESTION_CONFIG.storage.editStateKey);
@@ -210,9 +230,35 @@ export default function IngestionPage() {
     const selectDocument = useCallback(async (documentId) => {
         console.log('[IngestionPage] selectDocument called', { documentId, isPreviewMode });
 
-        // In preview mode, don't allow switching to content viewer
+        // In preview mode, allow switching between preview files only
         if (isPreviewMode) {
-            console.log('[IngestionPage] In preview mode, selection ignored');
+            // Check if the clicked document is in the preview set
+            if (previewDocumentIds.has(documentId)) {
+                console.log('[IngestionPage] Switching to another preview file', documentId);
+
+                // Load the content for this document
+                const docContent = getFileContent(documentId);
+                if (!docContent) {
+                    toast.error('Could not load document content');
+                    return;
+                }
+
+                // Generate preview for this file
+                setIsLoadingPreview(true);
+                setSelectedDocumentId(documentId);
+
+                try {
+                    const preview = await previewEmbeddings(previewConfig.strategy, docContent);
+                    setEmbeddingPreview(preview);
+                } catch (error) {
+                    console.error('Failed to generate preview:', error);
+                    toast.error('Failed to generate embedding preview');
+                } finally {
+                    setIsLoadingPreview(false);
+                }
+            } else {
+                console.log('[IngestionPage] In preview mode, selection outside preview set ignored');
+            }
             return;
         }
 
@@ -227,7 +273,6 @@ export default function IngestionPage() {
             setContentType(CONTENT_TYPE.EMBEDDING);
             setSelectedDocumentId(documentId);
             setCurrentPage(1);
-            setHasUnsavedChanges(false);
             resetDocument(null); // Clear editor state
             return;
         }
@@ -236,10 +281,27 @@ export default function IngestionPage() {
         const cachedContent = getFileContent(documentId);
         if (cachedContent) {
             console.log('[IngestionPage] Loading cached content for', documentId);
-            resetDocument(cachedContent);
+
+            // Check if we have cached command history for this file
+            const cachedHistory = getFileHistory(documentId);
+            if (cachedHistory) {
+                // Restore with history
+                console.log('[IngestionPage] Restoring command history for', documentId, {
+                    undoSteps: cachedHistory.past?.length || 0,
+                    redoSteps: cachedHistory.future?.length || 0
+                });
+                restoreDocument({
+                    past: cachedHistory.past || [],
+                    present: cachedContent,
+                    future: cachedHistory.future || [],
+                });
+            } else {
+                // No history, just reset with content
+                resetDocument(cachedContent);
+            }
+
             setSelectedDocumentId(documentId);
             setCurrentPage(1);
-            setHasUnsavedChanges(false);
             setContentType(CONTENT_TYPE.EDITOR);
             setStoredEmbeddings(null);
             return;
@@ -249,7 +311,7 @@ export default function IngestionPage() {
         // Content should be cached when file is uploaded
         console.warn('[IngestionPage] No cached content found for', documentId);
         toast.error('Document content not found. Please re-upload the file.');
-    }, [resetDocument, isPreviewMode]);
+    }, [resetDocument, restoreDocument, isPreviewMode, previewDocumentIds, previewConfig.strategy]);
 
     // Handle files selected from upload zone
     const handleFilesSelected = useCallback(async (files) => {
@@ -354,7 +416,6 @@ export default function IngestionPage() {
         }
 
         executeCommand(Commands.editItem(itemId, newContent, oldContent));
-        setHasUnsavedChanges(true);
     }, [documentState, executeCommand]);
 
     const handleDeleteItem = useCallback((itemId) => {
@@ -362,7 +423,6 @@ export default function IngestionPage() {
         if (!documentState) return;
 
         executeCommand(Commands.deleteItem(itemId));
-        setHasUnsavedChanges(true);
         toast.info('Item deleted (can be undone)');
     }, [documentState, executeCommand]);
 
@@ -371,7 +431,6 @@ export default function IngestionPage() {
         if (!documentState) return;
 
         executeCommand(Commands.restoreItem(itemId));
-        setHasUnsavedChanges(true);
         toast.info('Item restored');
     }, [documentState, executeCommand]);
 
@@ -390,7 +449,6 @@ export default function IngestionPage() {
         }
 
         executeCommand(Commands.changeClass(itemId, newClass, oldClass));
-        setHasUnsavedChanges(true);
     }, [documentState, executeCommand]);
 
     // Helper functions - using Command Pattern for batch operations
@@ -453,7 +511,6 @@ export default function IngestionPage() {
 
                     if (logoItemIds.length > 0) {
                         executeCommand(Commands.batchDelete(logoItemIds));
-                        setHasUnsavedChanges(true);
                     }
                     message = logoItemIds.length > 0 ? `${logoItemIds.length} logo(s) removed` : 'No logos found';
                     break;
@@ -475,7 +532,6 @@ export default function IngestionPage() {
 
                     if (emptyItemIds.length > 0) {
                         executeCommand(Commands.batchDelete(emptyItemIds));
-                        setHasUnsavedChanges(true);
                     }
                     message = emptyItemIds.length > 0 ? `${emptyItemIds.length} empty item(s) removed` : 'No empty items found';
                     break;
@@ -507,7 +563,6 @@ export default function IngestionPage() {
 
                         if (changes.length > 0) {
                             executeCommand(Commands.batchUpdate(changes));
-                            setHasUnsavedChanges(true);
                         }
                         message = result.message || 'AI descriptions generated';
                     }
@@ -547,7 +602,6 @@ export default function IngestionPage() {
 
             if (matchingItemIds.length > 0) {
                 executeCommand(Commands.batchDelete(matchingItemIds));
-                setHasUnsavedChanges(true);
             }
             toast.success(matchingItemIds.length > 0 ? `${matchingItemIds.length} item(s) matched and deleted` : 'No matches found');
         } catch {
@@ -556,9 +610,25 @@ export default function IngestionPage() {
     }, [documentState, executeCommand]);
 
     // Start ingestion - now shows preview first
+    // Supports both single file (selectedDocumentId) and multi-file (checkedDocumentIds)
     const handleStartIngestion = useCallback(async (targetDb, strategy) => {
-        console.log('[IngestionPage] 🎯 handleStartIngestion (USER ACTION) - showing preview', { targetDb, strategy, documentId: selectedDocumentId });
-        if (!targetDb || !strategy || !documentState) return;
+        // Determine which documents to preview
+        // If multi-select mode with checked files, use those; otherwise use current selection
+        const documentsToPreview = checkedDocumentIds.size > 0
+            ? [...checkedDocumentIds]
+            : selectedDocumentId ? [selectedDocumentId] : [];
+
+        console.log('[IngestionPage] 🎯 handleStartIngestion (USER ACTION) - showing preview', {
+            targetDb,
+            strategy,
+            documentsToPreview,
+            isMultiFile: documentsToPreview.length > 1
+        });
+
+        if (!targetDb || !strategy || documentsToPreview.length === 0) {
+            toast.warning('No files selected for ingestion');
+            return;
+        }
 
         // Store config for later use
         setPreviewConfig({ targetDb, strategy });
@@ -568,16 +638,32 @@ export default function IngestionPage() {
         setRightSidebarStateBeforePreview(rightSidebarCollapsed);
         setRightSidebarCollapsed(true);
 
-        // Set preview document IDs (currently only single file, but supports multi)
-        const previewIds = new Set([selectedDocumentId]);
+        // Set preview document IDs (supports multi-file)
+        const previewIds = new Set(documentsToPreview);
         setPreviewDocumentIds(previewIds);
 
-        // Generate preview
+        // For the first file (or selected file), generate and show the preview
+        // The user can click on other files in the sidebar to see their previews
+        const firstDocId = documentsToPreview[0];
+
+        // Get the document content for the first file
+        const firstDocContent = firstDocId === selectedDocumentId
+            ? documentState
+            : getFileContent(firstDocId);
+
+        if (!firstDocContent) {
+            toast.error('Could not load document content');
+            setPreviewDocumentIds(new Set());
+            return;
+        }
+
+        // Generate preview for the first file
         setIsLoadingPreview(true);
         setIsPreviewMode(true);
+        setSelectedDocumentId(firstDocId); // Select the first file
 
         try {
-            const preview = await previewEmbeddings(strategy, documentState);
+            const preview = await previewEmbeddings(strategy, firstDocContent);
             setEmbeddingPreview(preview);
         } catch (error) {
             console.error('Failed to generate preview:', error);
@@ -588,7 +674,7 @@ export default function IngestionPage() {
         } finally {
             setIsLoadingPreview(false);
         }
-    }, [documentState, selectedDocumentId, rightSidebarCollapsed, rightSidebarStateBeforePreview]);
+    }, [documentState, selectedDocumentId, checkedDocumentIds, rightSidebarCollapsed, rightSidebarStateBeforePreview]);
 
     // Cancel preview mode
     const handleCancelPreview = useCallback(() => {
@@ -607,6 +693,13 @@ export default function IngestionPage() {
         const { targetDb, strategy } = previewConfig;
         if (!targetDb || !strategy || !embeddingPreview) return;
 
+        // Check if same file + strategy already exists
+        const existingIngested = getExistingIngestedFile(selectedDocumentId, strategy);
+        if (existingIngested) {
+            // Optionally warn user that this will overwrite
+            console.log('[IngestionPage] Updating existing ingested file:', existingIngested.ingestedId);
+        }
+
         setIsIngesting(true);
         setIngestionProgress(0);
 
@@ -618,16 +711,21 @@ export default function IngestionPage() {
             // Convert preview to ingested format (base64 → server URLs)
             const ingestedData = convertPreviewToIngestedFormat(embeddingPreview);
 
-            // Use file cache manager to mark as ingested
-            markFileAsIngested(selectedDocumentId, ingestedData);
+            // Get current file info from uploadQueue
+            const currentFile = uploadQueue.find(f => f.documentId === selectedDocumentId);
+
+            // Create ingested file entry (does NOT remove the uploaded file)
+            const ingestedEntry = createIngestedFile(
+                selectedDocumentId,
+                strategy,
+                ingestedData,
+                currentFile || { documentId: selectedDocumentId, filename: 'Unknown' }
+            );
 
             // Clear editor state cache
             clearCache(INGESTION_CONFIG.storage.editStateKey);
 
-            // Update queue status to INGESTED
-            setUploadQueue((prev) =>
-                prev.filter((d) => d.documentId !== selectedDocumentId)
-            );
+            // NOTE: No longer removing from uploadQueue - user may want to re-ingest with different strategy
 
             // Update ingested files list
             setIngestedFilesList(getIngestedFiles());
@@ -638,23 +736,24 @@ export default function IngestionPage() {
             setEmbeddingPreview(null);
             setPreviewConfig({ targetDb: '', strategy: '' });
             setPreviewDocumentIds(new Set());
-            setHasUnsavedChanges(false);
 
-            // Reset to empty state (document is now ingested)
-            resetDocument(null);
-            setContentType(CONTENT_TYPE.EMBEDDING);
-            setStoredEmbeddings(ingestedData);
+            // Show the newly ingested file's embeddings
+            // Select the ingested file automatically
+            if (ingestedEntry) {
+                setContentType(CONTENT_TYPE.EMBEDDING);
+                setStoredEmbeddings(ingestedData);
+            }
 
             // Restore right sidebar state
             setRightSidebarCollapsed(rightSidebarStateBeforePreview);
 
-            toast.success('Document ingested successfully! Embeddings saved.');
+            toast.success(`Document ingested with "${strategy}" strategy!`);
         } catch (error) {
             console.error('Ingestion failed:', error);
             setIsIngesting(false);
             toast.error('Failed to ingest document');
         }
-    }, [embeddingPreview, selectedDocumentId, previewConfig, rightSidebarStateBeforePreview, resetDocument]);
+    }, [embeddingPreview, selectedDocumentId, previewConfig, rightSidebarStateBeforePreview, uploadQueue]);
 
     // Confirm ingestion for ALL files in multi-file preview
     const handleConfirmIngestionAll = useCallback(async () => {
@@ -666,33 +765,6 @@ export default function IngestionPage() {
 
         toast.success(`All ${previewDocumentIds.size} file(s) ingested successfully!`);
     }, [handleConfirmIngestion, previewDocumentIds]);
-
-    // Save changes (mark as saved locally and update cache)
-    const handleSave = useCallback(() => {
-        console.log('[IngestionPage] 🎯 handleSave (USER ACTION)');
-
-        // Update the content cache with current document state
-        if (documentState && selectedDocumentId) {
-            saveFileContent(selectedDocumentId, documentState);
-
-            // Also sync the filename to uploaded files metadata
-            updateUploadedFile(selectedDocumentId, { filename: documentState.filename });
-
-            // Update local uploadQueue state to reflect the filename
-            setUploadQueue((prev) =>
-                prev.map((d) =>
-                    d.documentId === selectedDocumentId
-                        ? { ...d, filename: documentState.filename }
-                        : d
-                )
-            );
-
-            console.log('[IngestionPage] Content saved to cache for', selectedDocumentId);
-        }
-
-        setHasUnsavedChanges(false);
-        toast.success('Changes saved');
-    }, [documentState, selectedDocumentId]);
 
     // Multi-select handlers
     const handleCheckDocument = useCallback((documentId) => {
@@ -773,17 +845,17 @@ export default function IngestionPage() {
     }, [selectedDocumentId, resetDocument]);
 
     // Handle removing an ingested file
-    const handleRemoveIngestedFile = useCallback((documentId) => {
-        console.log('[IngestionPage] 🎯 handleRemoveIngestedFile (USER ACTION)', { documentId });
+    const handleRemoveIngestedFile = useCallback((ingestedId) => {
+        console.log('[IngestionPage] 🎯 handleRemoveIngestedFile (USER ACTION)', { ingestedId });
 
-        // Remove from cache
-        removeIngestedFile(documentId);
+        // Remove from cache (supports both ingestedId and legacy documentId format)
+        removeIngestedFile(ingestedId);
 
         // Update local state
         setIngestedFilesList(getIngestedFiles());
 
         // If this was the selected document, clear selection
-        if (documentId === selectedDocumentId) {
+        if (ingestedId === selectedDocumentId) {
             setSelectedDocumentId(null);
             setStoredEmbeddings(null);
             setContentType(CONTENT_TYPE.EDITOR);
@@ -791,6 +863,36 @@ export default function IngestionPage() {
 
         toast.info('Ingested file removed from cache');
     }, [selectedDocumentId]);
+
+    // Handle cache cleared from CacheManagement component
+    const handleCacheCleared = useCallback(({ all, types }) => {
+        console.log('[IngestionPage] 📦 handleCacheCleared', { all, types });
+
+        // If all cache was cleared or uploaded/content types were cleared
+        if (all || types.includes('uploaded') || types.includes('content')) {
+            // Clear upload queue state
+            setUploadQueue([]);
+        }
+
+        // If all cache was cleared or embedding types were cleared
+        if (all || types.includes('embedding')) {
+            // Refresh ingested files list from cache (will be empty after clear all)
+            setIngestedFilesList(getIngestedFiles());
+        }
+
+        // If all cache was cleared or editor state was cleared
+        if (all || types.includes('editor')) {
+            // Reset document state
+            resetDocument(null);
+        }
+
+        // Reset selection state
+        setSelectedDocumentId(null);
+        setStoredEmbeddings(null);
+        setContentType(CONTENT_TYPE.EDITOR);
+        setCheckedDocumentIds(new Set());
+        setMultiSelectMode(false);
+    }, [resetDocument]);
 
     // Keyboard shortcuts
     useEffect(() => {
@@ -800,7 +902,6 @@ export default function IngestionPage() {
                 e.preventDefault();
                 if (canUndo) {
                     undo();
-                    setHasUnsavedChanges(true);
                 }
             }
             // Ctrl/Cmd + Shift + Z = Redo
@@ -808,7 +909,6 @@ export default function IngestionPage() {
                 e.preventDefault();
                 if (canRedo) {
                     redo();
-                    setHasUnsavedChanges(true);
                 }
             }
         };
@@ -816,21 +916,6 @@ export default function IngestionPage() {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [canUndo, canRedo, undo, redo]);
-
-    // Warn on navigation with unsaved changes (browser refresh/close)
-    useEffect(() => {
-        const handleBeforeUnload = (e) => {
-            if (hasUnsavedChanges) {
-                e.preventDefault();
-                // Chrome requires returnValue to be set
-                e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-                return e.returnValue;
-            }
-        };
-
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [hasUnsavedChanges]);
 
     // Get available image classes from backend config
     const availableClasses = backendConfig?.availableImageClasses || [];
@@ -912,6 +997,7 @@ export default function IngestionPage() {
                                         ? handleRemoveIngestedFile
                                         : handleRemoveFromContent
                                 )}
+                                onRemoveIngestedFile={handleRemoveIngestedFile}
                                 showIngestedSection={!isPreviewMode}
                             />
                         </div>
@@ -965,7 +1051,6 @@ export default function IngestionPage() {
                                                 if (trimmed && trimmed !== documentState.filename) {
                                                     // Update document state using command
                                                     executeCommand(Commands.renameDocument(trimmed, documentState.filename));
-                                                    setHasUnsavedChanges(true);
                                                     // Update upload queue
                                                     const doc = uploadQueue.find(d => d.documentId === selectedDocumentId);
                                                     if (doc) {
@@ -1021,12 +1106,10 @@ export default function IngestionPage() {
                             {!documentState && <div />}
 
                             <SaveBar
-                                hasUnsavedChanges={hasUnsavedChanges}
-                                onSave={handleSave}
                                 canUndo={canUndo}
                                 canRedo={canRedo}
-                                onUndo={() => { undo(); setHasUnsavedChanges(true); }}
-                                onRedo={() => { redo(); setHasUnsavedChanges(true); }}
+                                onUndo={undo}
+                                onRedo={redo}
                                 onIngest={() => setShowIngestionModal(true)}
                                 canIngest={!!documentState && !isIngesting && !isPreviewMode}
                             />
@@ -1139,7 +1222,10 @@ export default function IngestionPage() {
                         onClick={() => setShowCacheManagement(false)}
                     />
                     <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden">
-                        <CacheManagement onClose={() => setShowCacheManagement(false)} />
+                        <CacheManagement
+                            onClose={() => setShowCacheManagement(false)}
+                            onCacheCleared={handleCacheCleared}
+                        />
                     </div>
                 </div>
             )}

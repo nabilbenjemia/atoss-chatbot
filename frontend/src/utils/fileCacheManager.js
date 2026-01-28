@@ -81,6 +81,9 @@ export const removeUploadedFile = (documentId) => {
 
     // Also clear the content cache for this file
     clearCache(`${INGESTION_CONFIG.storage.contentFilesPrefix}${documentId}`);
+
+    // Also clear the command history for this file
+    clearCache(`${INGESTION_CONFIG.storage.historyPrefix}${documentId}`);
 };
 
 /**
@@ -122,7 +125,89 @@ export const saveIngestedFiles = (files) => {
 };
 
 /**
- * Move a file from uploaded to ingested
+ * Create or update an ingested file entry
+ * - Does NOT remove the uploaded file (user may want to re-ingest with different strategy)
+ * - Creates ingested entry keyed by documentId + strategy
+ * - If same documentId + strategy exists, updates it (same embedding preview)
+ * - If different strategy, creates new entry (different embedding preview)
+ * 
+ * @param {string} documentId - Original document ID
+ * @param {string} strategy - Ingestion strategy used
+ * @param {Object} embeddingData - Embedding preview data to cache
+ * @param {Object} fileInfo - Optional file info (filename, etc.) - if not provided, will look up from uploaded files
+ */
+export const createIngestedFile = (documentId, strategy, embeddingData, fileInfo = null) => {
+    // Get file info from uploaded files if not provided
+    let file = fileInfo;
+    if (!file) {
+        const uploadedFiles = getUploadedFiles();
+        file = uploadedFiles.find(f => f.documentId === documentId);
+    }
+
+    if (!file) {
+        console.warn('[fileCacheManager] No file info found for', documentId);
+        return null;
+    }
+
+    // Create unique ingested ID based on documentId + strategy
+    const ingestedId = `${documentId}_${strategy}`;
+
+    // Get existing ingested files
+    const ingestedFiles = getIngestedFiles();
+    const existingIndex = ingestedFiles.findIndex(f => f.ingestedId === ingestedId);
+
+    const ingestedEntry = {
+        id: ingestedId,
+        ingestedId,
+        documentId,  // Keep reference to original document
+        strategy,
+        filename: `${file.filename} (${strategy})`,
+        originalFilename: file.filename,
+        ingestedAt: new Date().toISOString(),
+        status: 'ingested',
+    };
+
+    if (existingIndex >= 0) {
+        // Update existing entry
+        ingestedFiles[existingIndex] = {
+            ...ingestedFiles[existingIndex],
+            ...ingestedEntry,
+            ingestedAt: new Date().toISOString(), // Update timestamp
+        };
+    } else {
+        // Add new entry
+        ingestedFiles.push(ingestedEntry);
+    }
+
+    saveIngestedFiles(ingestedFiles);
+
+    // Save embedding data with the ingested ID as key
+    const embeddingKey = `${INGESTION_CONFIG.storage.embeddingCachePrefix}${ingestedId}`;
+    saveToCache(embeddingKey, {
+        ...embeddingData,
+        strategy,
+        documentId,
+        ingestedId,
+    });
+
+    return ingestedEntry;
+};
+
+/**
+ * Check if an ingested file with same documentId + strategy already exists
+ * @param {string} documentId - Document ID
+ * @param {string} strategy - Ingestion strategy
+ * @returns {Object|null} - Existing ingested file or null
+ */
+export const getExistingIngestedFile = (documentId, strategy) => {
+    const ingestedId = `${documentId}_${strategy}`;
+    const ingestedFiles = getIngestedFiles();
+    return ingestedFiles.find(f => f.ingestedId === ingestedId) || null;
+};
+
+/**
+ * @deprecated Use createIngestedFile instead
+ * Move a file from uploaded to ingested (legacy function)
  * @param {string} documentId - Document ID
  * @param {Object} embeddingData - Embedding preview data to cache
  */
@@ -145,12 +230,8 @@ export const markFileAsIngested = (documentId, embeddingData) => {
             saveIngestedFiles(ingestedFiles);
         }
 
-        // Remove from uploaded files
-        const filtered = uploadedFiles.filter(f => f.documentId !== documentId);
-        saveUploadedFiles(filtered);
-
-        // Clear content cache (no longer needed)
-        clearCache(`${INGESTION_CONFIG.storage.contentFilesPrefix}${documentId}`);
+        // NOTE: No longer removing from uploaded files or clearing caches
+        // User may want to re-ingest with different strategy
 
         // Save embedding data
         const embeddingKey = `${INGESTION_CONFIG.storage.embeddingCachePrefix}${documentId}`;
@@ -160,15 +241,18 @@ export const markFileAsIngested = (documentId, embeddingData) => {
 
 /**
  * Remove an ingested file from cache
- * @param {string} documentId - Document ID to remove
+ * @param {string} ingestedId - Ingested file ID (documentId_strategy format) or legacy documentId
  */
-export const removeIngestedFile = (documentId) => {
+export const removeIngestedFile = (ingestedId) => {
     const files = getIngestedFiles();
-    const filtered = files.filter(f => f.documentId !== documentId);
+    // Support both new ingestedId format and legacy documentId format
+    const filtered = files.filter(f =>
+        f.ingestedId !== ingestedId && f.documentId !== ingestedId
+    );
     saveIngestedFiles(filtered);
 
-    // Also clear the embedding cache
-    clearCache(`${INGESTION_CONFIG.storage.embeddingCachePrefix}${documentId}`);
+    // Clear the embedding cache
+    clearCache(`${INGESTION_CONFIG.storage.embeddingCachePrefix}${ingestedId}`);
 };
 
 /**
@@ -219,4 +303,43 @@ export const clearAllFileCaches = () => {
     // Clear all embedding caches
     const embeddingKeys = getKeysWithPrefix(INGESTION_CONFIG.storage.embeddingCachePrefix);
     embeddingKeys.forEach(key => clearCache(key));
+
+    // Clear all history caches
+    const historyKeys = getKeysWithPrefix(INGESTION_CONFIG.storage.historyPrefix);
+    historyKeys.forEach(key => clearCache(key));
+};
+
+// ==================== COMMAND HISTORY ====================
+
+/**
+ * Save command history for a file
+ * @param {string} documentId - Document ID
+ * @param {Object} history - Command history { past, present, future }
+ */
+export const saveFileHistory = (documentId, history) => {
+    const key = `${INGESTION_CONFIG.storage.historyPrefix}${documentId}`;
+    // Only save past and future arrays (present is saved in content cache)
+    saveToCache(key, {
+        past: history.past,
+        future: history.future,
+    });
+};
+
+/**
+ * Get command history for a file
+ * @param {string} documentId - Document ID
+ * @returns {Object|null} - History { past, future } or null
+ */
+export const getFileHistory = (documentId) => {
+    const key = `${INGESTION_CONFIG.storage.historyPrefix}${documentId}`;
+    return loadFromCache(key);
+};
+
+/**
+ * Clear command history for a file
+ * @param {string} documentId - Document ID
+ */
+export const clearFileHistory = (documentId) => {
+    const key = `${INGESTION_CONFIG.storage.historyPrefix}${documentId}`;
+    clearCache(key);
 };

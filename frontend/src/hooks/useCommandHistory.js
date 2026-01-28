@@ -185,6 +185,7 @@ const EXECUTE = 'EXECUTE';
 const UNDO = 'UNDO';
 const REDO = 'REDO';
 const RESET = 'RESET';
+const RESTORE = 'RESTORE';
 
 const commandReducer = (state, action) => {
     const { past, present, future } = state;
@@ -242,6 +243,15 @@ const commandReducer = (state, action) => {
             };
         }
 
+        case RESTORE: {
+            // Restore full state including history
+            return {
+                past: action.payload.past || [],
+                present: action.payload.present,
+                future: action.payload.future || [],
+            };
+        }
+
         default:
             return state;
     }
@@ -292,6 +302,22 @@ const useCommandHistory = (initialState) => {
         dispatch({ type: RESET, payload: newInitialState });
     }, []);
 
+    /**
+     * Restore full state including history (for switching between files)
+     */
+    const restore = useCallback((fullState) => {
+        dispatch({ type: RESTORE, payload: fullState });
+    }, []);
+
+    /**
+     * Get the full internal state (for saving to cache)
+     */
+    const getFullState = useCallback(() => ({
+        past: state.past,
+        present: state.present,
+        future: state.future,
+    }), [state.past, state.present, state.future]);
+
     const canUndo = state.past.length > 0;
     const canRedo = state.future.length > 0;
     const undoCount = state.past.length;
@@ -304,11 +330,13 @@ const useCommandHistory = (initialState) => {
         undo,
         redo,
         reset,
+        restore,
+        getFullState,
         canUndo,
         canRedo,
         undoCount,
         redoCount,
-    }), [state.present, execute, undo, redo, reset, canUndo, canRedo, undoCount, redoCount]);
+    }), [state.present, execute, undo, redo, reset, restore, getFullState, canUndo, canRedo, undoCount, redoCount]);
 };
 
 export default useCommandHistory;
