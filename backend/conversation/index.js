@@ -3,6 +3,7 @@ const cors = require("cors");
 const connectDB = require('./config/database');
 const conversationRoutes = require('./routes/conversationRoutes');
 const messageRoutes = require('./routes/messageRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
 require('dotenv').config();
 
 const app = express();
@@ -25,6 +26,7 @@ app.use((req, res, next) => {
 // Routes
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/conversations', messageRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
