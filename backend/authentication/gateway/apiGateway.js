@@ -2,6 +2,7 @@ const express = require('express');
 const proxy = require('express-http-proxy');
 const authRoutes = require('../routes/authRoutes');
 const gatewayAuthMiddleware = require('../middleware/gatewayMiddleware');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 
 /**
  * API Gateway

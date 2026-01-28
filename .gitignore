@@ -1,5 +1,26 @@
+# Root level gitignore
+
+# Frontend
+frontend/.env
+frontend/.env.local
+frontend/node_modules
+frontend/dist
+
+# Backend
+backend/**/.env
+backend/**/node_modules
+
+# Learning Material Service
+backend/learning-material/.env
+backend/learning-material/uploads/videos/*
+backend/learning-material/uploads/thumbnails/*
+!backend/learning-material/uploads/videos/.gitkeep
+!backend/learning-material/uploads/thumbnails/.gitkeep
+
+# Authentication Service
+backend/authentication/.env
+
 # Logs
-logs
 *.log
 npm-debug.log*
 yarn-debug.log*

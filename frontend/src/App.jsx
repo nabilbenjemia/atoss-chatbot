@@ -6,6 +6,8 @@ import RegisterPage from "./pages/RegisterPage.jsx";
 import VerifyEmailPage from "./pages/VerifyEmailPage.jsx";
 import ForgetPass from "./pages/ForgetPass.jsx";
 import ChatbotPage from "./pages/ChatbotPage.jsx";
+import LearningPage from "./pages/LearningMaterialPage.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import UserProfilePage from "./pages/UserProfilePage.jsx";
 
 
@@ -17,7 +19,22 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/forget-password" element={<ForgetPass />} />
-        <Route path="/chatbot" element={<ChatbotPage />} />
+        <Route 
+          path="/chatbot" 
+          element={
+            <ProtectedRoute>
+              <ChatbotPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/learning" 
+          element={
+            <ProtectedRoute>
+              <LearningPage />
+            </ProtectedRoute>
+          } 
+        />
         <Route path="/profile" element={<UserProfilePage />} />
       </Routes>
       <ToastContainer
