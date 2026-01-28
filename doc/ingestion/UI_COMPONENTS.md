@@ -262,9 +262,10 @@ export const CONTENT_TYPE = {
 |----------|--------|---------|---------|
 | `/api/ingestion/config` | GET | Page mount | - |
 | `/api/ingestion/upload` | POST | File drop/select | `FormData(file)` |
-| `/api/ingestion/preview` | POST | "Ingest" → modal confirm | `{strategy, documentState}` |
-| `/api/ingestion/ingest` | POST | Preview confirm (future) | `{targetDb, documentState, strategy}` |
+| `/api/ingestion/ingest` | POST | Preview confirm | `{targetDb, embeddingPreview, strategy}` |
 | `/api/ingestion/helper` | POST | Backend helper run | `{helperId, content, params}` |
+
+> **Note**: `previewEmbeddings` is now a **frontend-only** operation (pure data transformation, no backend call).
 
 ### Trigger Flow 1: Upload Document
 ```
@@ -320,7 +321,7 @@ executeCommand(Commands.batchUpdate(changes))
 setHasUnsavedChanges(true)
 ```
 
-### Trigger Flow 3: Preview Embeddings
+### Trigger Flow 3: Preview Embeddings (Frontend-Only)
 ```
 User Action: Click "Ingest" → Select strategy → Confirm
      │
@@ -328,17 +329,25 @@ User Action: Click "Ingest" → Select strategy → Confirm
 handleStartIngestion(targetDb, strategy)
      │
      ├─► setIsPreviewMode(true)
-     ├─► setIsLoadingPreview(true)
      │
      ▼
-previewEmbeddings(strategy, documentState) ◄───────── BACKEND CALL
+generateEmbeddingPreview(documentState, strategy) ◄── LOCAL (no backend)
      │
-     ├─► Response: {chunks: [{id, text, metadata, images}]}
+     ├─► Pure data transformation:
+     │   - Filter deleted items
+     │   - Merge text items per page/strategy
+     │   - Collect images
+     │   - Format as chunks
+     │
+     ├─► Returns: {chunks: [{id, text, metadata, images}]}
      │
      ▼
 setEmbeddingPreview(preview)
-setIsLoadingPreview(false)
 ```
+
+> **Why frontend?** This is pure data restructuring with no AI or external services needed.
+> The frontend already has the documentState in memory, so sending it to backend
+> just to restructure and send back adds unnecessary latency.
 
 ### Trigger Flow 4: Confirm Ingestion
 ```
