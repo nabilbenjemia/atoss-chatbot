@@ -6,7 +6,7 @@ const axios = require('axios');
 class LLMClassificationService {
     constructor() {
         this.ollamaUrl = process.env.OLLAMA_BASE_URL || 'http://ollama:11434';
-        this.model = 'qwen2.5:3b-instruct-q4_0'; // Smaller model for classification
+        this.model = 'qwen3:4b-instruct'; // Smaller model for classification
     }
 
     /**
@@ -33,7 +33,8 @@ Respond ONLY with valid JSON in this exact format:
 
 Instructions:
 1. Extract 2-4 relevant keywords from the query.
-2. CLASSIFY the query into exactly ONE of the following categories based on the definitions below. Do not invent new categories.
+2. One keyword can be only one word.
+3. CLASSIFY the query into exactly ONE of the following categories based on the definitions below. Do not invent new categories.
 
 ALLOWED CATEGORIES:
 - "Technisch": For technical issues, bugs, login errors/password resets, interface errors, or app/browser functionality issues (Incidents).
@@ -45,7 +46,7 @@ ALLOWED CATEGORIES:
 - "Schulung/Doku": For requests regarding missing manuals, tutorials, or training needs (e.g., "Where can I find instructions for...?", "Can someone show me how... works?").
 - "Sonstiges": For queries that do not fit into any of the above categories.
 
-3. Respond only with the JSON object.`;
+4. Respond only with the JSON object.`;
 
             const response = await axios.post(`${this.ollamaUrl}/api/generate`, {
                 model: this.model,
