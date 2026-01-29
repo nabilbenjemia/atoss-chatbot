@@ -19,7 +19,6 @@ export default {
           green: "#a2ad00",
           "light-gray": "#dad7cb",
 
-          // Inofficial (popular web palette, 2022)
           "blue-brand": "#3070B3",
           "blue-dark": "#072140",
           "blue-dark-1": "#0A2D57",

@@ -91,15 +91,15 @@ const AnalyticsDashboard = () => {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-screen bg-tum-blue-dark">
-                <div className="text-tum-white text-xl">Loading analytics...</div>
+            <div className="flex items-center justify-center h-screen bg-tum-white">
+                <div className="text-tum-grey-1 text-xl">Loading analytics...</div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="flex items-center justify-center h-screen bg-tum-blue-dark">
+            <div className="flex items-center justify-center h-screen bg-tum-white">
                 <div className="text-tum-red text-xl">Error: {error}</div>
             </div>
         );
@@ -144,26 +144,26 @@ const AnalyticsDashboard = () => {
     }] : [];
 
     return (
-        <div className="min-h-screen bg-tum-blue-dark text-tum-white p-6">
+        <div className="min-h-screen bg-tum-white text-tum-grey-1 p-6">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
                     <div className="flex justify-between items-center mb-4">
                         <div>
-                            <h1 className="text-3xl font-bold mb-2 text-tum-white">Analytics Dashboard</h1>
-                            <p className="text-tum-grey-7">Query analysis and insights</p>
+                            <h1 className="text-3xl font-bold mb-2 text-tum-grey-1">Analytics Dashboard</h1>
+                            <p className="text-tum-grey-4">Query analysis and insights</p>
                         </div>
                         <div className="flex gap-3">
                             <button
                                 onClick={downloadCSV}
-                                className="bg-tum-green-1 hover:bg-tum-green-dark text-white px-6 py-2 rounded-lg transition-colors"
+                                className="bg-tum-green hover:bg-tum-green-dark text-tum-white px-6 py-2 rounded-lg transition-colors"
                             >
                                 Download CSV
                             </button>
                             <button
                                 onClick={processQueries}
                                 disabled={processing}
-                                className="bg-tum-blue-brand hover:bg-tum-blue disabled:bg-tum-grey-4 text-white px-6 py-2 rounded-lg transition-colors"
+                                className="bg-tum-blue-brand hover:bg-tum-dark-blue disabled:bg-tum-grey-4 text-tum-white px-6 py-2 rounded-lg transition-colors"
                             >
                                 {processing ? 'Processing...' : 'Process New Queries'}
                             </button>
@@ -171,29 +171,29 @@ const AnalyticsDashboard = () => {
                     </div>
                     
                     {/* Date Range Filters */}
-                    <div className="flex gap-4 items-center bg-tum-blue-dark-1 p-4 rounded-xl border border-tum-blue-dark-3 shadow-lg">
+                    <div className="flex gap-4 items-center bg-tum-blue-light-5 p-4 rounded-xl border border-tum-blue-light-2 shadow-lg">
                         <div className="flex items-center gap-2">
-                            <label className="text-tum-grey-7 text-sm font-medium">From:</label>
+                            <label className="text-tum-grey-3 text-sm font-medium">From:</label>
                             <input
                                 type="date"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
-                                className="bg-tum-blue-dark-2 text-tum-white px-3 py-2 rounded-xl border border-tum-blue-dark-4 focus:border-tum-blue-brand focus:ring-2 focus:ring-tum-blue-brand focus:outline-none"
+                                className="bg-tum-white text-tum-grey-1 px-3 py-2 rounded-xl border border-tum-blue-light-2 focus:border-tum-blue-brand focus:ring-2 focus:ring-tum-blue-brand focus:outline-none"
                             />
                         </div>
                         <div className="flex items-center gap-2">
-                            <label className="text-tum-grey-7 text-sm font-medium">To:</label>
+                            <label className="text-tum-grey-3 text-sm font-medium">To:</label>
                             <input
                                 type="date"
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
-                                className="bg-tum-blue-dark-2 text-tum-white px-3 py-2 rounded-xl border border-tum-blue-dark-4 focus:border-tum-blue-brand focus:ring-2 focus:ring-tum-blue-brand focus:outline-none"
+                                className="bg-tum-white text-tum-grey-1 px-3 py-2 rounded-xl border border-tum-blue-light-2 focus:border-tum-blue-brand focus:ring-2 focus:ring-tum-blue-brand focus:outline-none"
                             />
                         </div>
                         {(startDate || endDate) && (
                             <button
                                 onClick={() => { setStartDate(''); setEndDate(''); }}
-                                className="text-tum-blue-light hover:text-tum-white text-sm font-medium transition-colors"
+                                className="text-tum-blue-brand hover:text-tum-dark-blue text-sm font-medium transition-colors"
                             >
                                 Clear filters
                             </button>
@@ -203,41 +203,41 @@ const AnalyticsDashboard = () => {
 
                 {/* Overall Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-tum-blue-dark-1 rounded-xl p-6 border border-tum-blue-dark-3 shadow-lg">
-                        <div className="text-tum-grey-7 text-sm mb-2 font-medium">Processed Queries <span className="text-xs font-normal">(1 word queries skipped)</span></div>
-                        <div className="text-4xl font-bold text-tum-white">{overall?.totalQueries || 0}</div>
+                    <div className="bg-tum-blue-light-4 rounded-xl p-6 border border-tum-blue-light-2 shadow-lg">
+                        <div className="text-tum-grey-3 text-sm mb-2 font-medium">Processed Queries <span className="text-xs font-normal">(1 word queries skipped)</span></div>
+                        <div className="text-4xl font-bold text-tum-dark-blue">{overall?.totalQueries || 0}</div>
                     </div>
-                    <div className="bg-tum-blue-dark-1 rounded-xl p-6 border border-tum-blue-dark-3 shadow-lg">
-                        <div className="text-tum-grey-7 text-sm mb-2 font-medium">Total Queries <span className="text-xs font-normal">(including 1 word queries)</span></div>
-                        <div className="text-4xl font-bold text-tum-white">{overall?.totalQueriesIncludingOneWord || 0}</div>
+                    <div className="bg-tum-blue-light-4 rounded-xl p-6 border border-tum-blue-light-2 shadow-lg">
+                        <div className="text-tum-grey-3 text-sm mb-2 font-medium">Total Queries <span className="text-xs font-normal">(including 1 word queries)</span></div>
+                        <div className="text-4xl font-bold text-tum-dark-blue">{overall?.totalQueriesIncludingOneWord || 0}</div>
                     </div>
-                    <div className="bg-tum-blue-dark-1 rounded-xl p-6 border border-tum-blue-dark-3 shadow-lg">
-                        <div className="text-tum-grey-7 text-sm mb-2 font-medium">Total Users</div>
-                        <div className="text-4xl font-bold text-tum-white">{overall?.uniqueUsers || 0}</div>
+                    <div className="bg-tum-blue-light-4 rounded-xl p-6 border border-tum-blue-light-2 shadow-lg">
+                        <div className="text-tum-grey-3 text-sm mb-2 font-medium">Total Users</div>
+                        <div className="text-4xl font-bold text-tum-dark-blue">{overall?.uniqueUsers || 0}</div>
                     </div>
-                    <div className="bg-tum-blue-dark-1 rounded-xl p-6 border border-tum-green-dark shadow-lg">
-                        <div className="text-tum-grey-7 text-sm mb-2 font-medium">🟢 Active Now (15min)</div>
-                        <div className="text-4xl font-bold text-tum-green-2">{overall?.activeUsersNow || 0}</div>
+                    <div className="bg-tum-green-5 rounded-xl p-6 border border-tum-green-2 shadow-lg">
+                        <div className="text-tum-grey-3 text-sm mb-2 font-medium">🟢 Active Now (15min)</div>
+                        <div className="text-4xl font-bold text-tum-green">{overall?.activeUsersNow || 0}</div>
                     </div>
                 </div>
                 {/* Charts Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                     {/* Top Keywords Chart */}
-                    <div className="bg-tum-blue-dark-1 rounded-xl p-6 border border-tum-blue-dark-3 shadow-lg">
-                        <h2 className="text-xl font-semibold mb-4 text-tum-white">Top Keywords</h2>
+                    <div className="bg-tum-blue-light-4 rounded-xl p-6 border border-tum-blue-light-2 shadow-lg">
+                        <h2 className="text-xl font-semibold mb-4 text-tum-dark-blue">Top Keywords</h2>
                         {keywords && keywords.length > 0 ? (
                             <Plot
                                 data={keywordData}
                                 layout={{
                                     paper_bgcolor: 'rgba(0,0,0,0)',
                                     plot_bgcolor: 'rgba(0,0,0,0)',
-                                    font: { color: '#e5e7eb' },
+                                    font: { color: '#20252A' },
                                     xaxis: {
-                                        gridcolor: '#374151',
+                                        gridcolor: '#C2D7EF',
                                         title: 'Keywords'
                                     },
                                     yaxis: {
-                                        gridcolor: '#374151',
+                                        gridcolor: '#C2D7EF',
                                         title: 'Frequency'
                                     },
                                     margin: { t: 20, b: 80, l: 60, r: 20 },
@@ -248,20 +248,20 @@ const AnalyticsDashboard = () => {
                                 useResizeHandler={true}
                             />
                         ) : (
-                            <div className="text-tum-grey-7 text-center py-10">No keyword data available</div>
+                            <div className="text-tum-grey-4 text-center py-10">No keyword data available</div>
                         )}
                     </div>
 
                     {/* Category Distribution Chart */}
-                    <div className="bg-tum-blue-dark-1 rounded-xl p-6 border border-tum-blue-dark-3 shadow-lg">
-                        <h2 className="text-xl font-semibold mb-4 text-tum-white">Query Categories</h2>
+                    <div className="bg-tum-blue-light-4 rounded-xl p-6 border border-tum-blue-light-2 shadow-lg">
+                        <h2 className="text-xl font-semibold mb-4 text-tum-dark-blue">Query Categories</h2>
                         {categories && categories.length > 0 ? (
                             <Plot
                                 data={categoryData}
                                 layout={{
                                     paper_bgcolor: 'rgba(0,0,0,0)',
                                     plot_bgcolor: 'rgba(0,0,0,0)',
-                                    font: { color: '#e5e7eb' },
+                                    font: { color: '#20252A' },
                                     showlegend: true,
                                     legend: {
                                         orientation: 'v',
@@ -276,18 +276,18 @@ const AnalyticsDashboard = () => {
                                 useResizeHandler={true}
                             />
                         ) : (
-                            <div className="text-tum-grey-7 text-center py-10">No category data available</div>
+                            <div className="text-tum-grey-4 text-center py-10">No category data available</div>
                         )}
                     </div>
                 </div>
 
                 {/* Timeline Chart - Full Width */}
-                <div className="bg-tum-blue-dark-1 rounded-xl p-6 border border-tum-blue-dark-3 shadow-lg">
-                    <h2 className="text-xl font-semibold mb-4 text-tum-white">
+                <div className="bg-tum-blue-light-4 rounded-xl p-6 border border-tum-blue-light-2 shadow-lg">
+                    <h2 className="text-xl font-semibold mb-4 text-tum-dark-blue">
                         Queries Over Time
-                        {!startDate && !endDate && <span className="text-tum-grey-7 text-sm ml-2">(Last 7 Days)</span>}
+                        {!startDate && !endDate && <span className="text-tum-grey-4 text-sm ml-2">(Last 7 Days)</span>}
                         {(startDate || endDate) && (
-                            <span className="text-tum-grey-7 text-sm ml-2">
+                            <span className="text-tum-grey-4 text-sm ml-2">
                                 ({startDate || '...'} to {endDate || 'now'})
                             </span>
                         )}
@@ -298,13 +298,13 @@ const AnalyticsDashboard = () => {
                             layout={{
                                 paper_bgcolor: 'rgba(0,0,0,0)',
                                 plot_bgcolor: 'rgba(0,0,0,0)',
-                                font: { color: '#e5e7eb' },
+                                font: { color: '#20252A' },
                                 xaxis: {
-                                    gridcolor: '#374151',
+                                    gridcolor: '#C2D7EF',
                                     title: 'Date'
                                 },
                                 yaxis: {
-                                    gridcolor: '#374151',
+                                    gridcolor: '#C2D7EF',
                                     title: 'Number of Queries'
                                 },
                                 margin: { t: 20, b: 60, l: 50, r: 20 },
@@ -315,13 +315,13 @@ const AnalyticsDashboard = () => {
                             useResizeHandler={true}
                         />
                     ) : (
-                        <div className="text-tum-grey-7 text-center py-10">No timeline data available</div>
+                        <div className="text-tum-grey-4 text-center py-10">No timeline data available</div>
                     )}
                 </div>
 
                 {/* Info Box */}
-                <div className="mt-6 bg-tum-blue-dark-1 border border-tum-blue-dark-3 rounded-xl p-4 shadow-lg">
-                    <p className="text-sm text-tum-grey-7">
+                <div className="mt-6 bg-tum-blue-light-5 border border-tum-blue-light-2 rounded-xl p-4 shadow-lg">
+                    <p className="text-sm text-tum-grey-3">
                         <strong>Note:</strong> Analytics are powered by a small LLM that classifies queries into keywords and categories. 
                         Click "Process New Queries" to analyze recent chat messages.
                     </p>
