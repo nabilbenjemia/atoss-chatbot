@@ -38,6 +38,7 @@ const getStatusIcon = (status) => {
  * @param {Object} props.doc - Document object
  * @param {boolean} props.isSelected - Whether this document is selected
  * @param {boolean} props.isChecked - Whether this document is checked (multi-select)
+ * @param {boolean} props.isLoading - Whether this document is being loaded (preview switching)
  * @param {Function} props.onSelect - Selection handler
  * @param {Function} props.onCheck - Check handler for multi-select
  * @param {Function} props.onRemove - Remove handler (optional)
@@ -49,6 +50,7 @@ export default function FileQueueItem({
     doc,
     isSelected = false,
     isChecked = false,
+    isLoading = false,
     onSelect,
     onCheck,
     onRemove,
@@ -71,13 +73,14 @@ export default function FileQueueItem({
         <li
             className={`
                 relative p-3 cursor-pointer transition-all border-b border-white group
+                ${isLoading ? 'opacity-70 cursor-wait' : ''}
                 ${isSelected
                     ? 'bg-tum-blue/20 text-tum-black shadow-inner border-l-4 border-tum-blue'
                     : isChecked
                         ? 'bg-tum-blue-light-3 text-tum-black border-l-4 border-transparent'
                         : 'bg-tum-blue-light-5 hover:bg-tum-blue-light-3 text-tum-black border-l-4 border-transparent'}
             `}
-            onClick={() => doc.documentId && onSelect && onSelect(doc.documentId)}
+            onClick={() => !isLoading && doc.documentId && onSelect && onSelect(doc.documentId)}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
@@ -98,6 +101,15 @@ export default function FileQueueItem({
                         `}
                     />
                 )}
+
+                {/* Loading spinner */}
+                {isLoading && (
+                    <svg className="animate-spin w-4 h-4 mr-2 text-tum-blue" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                )}
+
                 <span
                     className={`text-sm truncate flex-1 ${isSelected ? 'font-semibold' : ''}`}
                     title={doc.filename}
@@ -106,7 +118,7 @@ export default function FileQueueItem({
                 </span>
 
                 {/* Hover X button for removable mode */}
-                {removableMode && isHovered && onRemoveFromSelection && (
+                {removableMode && isHovered && onRemoveFromSelection && !isLoading && (
                     <button
                         onClick={handleRemoveClick}
                         className={`

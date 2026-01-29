@@ -143,7 +143,7 @@ ui: {
 | `FILE_SELECTED` | `{ documentId }` | Select a file |
 | `FILE_REMOVED` | `{ documentId }` | Remove an uploaded file |
 | `FILE_RENAMED` | `{ documentId, newFilename }` | Rename a file |
-| `FILES_RESTORED_FROM_CACHE` | `{ uploadQueue }` | Restore files from cache |
+| `FILES_RESTORED_FROM_CACHE` | `{ uploadQueue, ingestedFiles? }` | Restore files from cache or clear all (when both empty) |
 | `INGESTED_FILES_LOADED` | `{ ingestedFiles }` | Load ingested files |
 | `INGESTED_FILE_REMOVED` | `{ ingestedId }` | Remove an ingested file |
 
@@ -175,7 +175,8 @@ ui: {
 |--------|---------|-------------|
 | `INGESTION_STARTED` | - | Start ingestion process |
 | `INGESTION_PROGRESS` | `{ progress }` | Update ingestion progress |
-| `INGESTION_COMPLETE` | `{ documentId, ingestedEntry, ingestedData, rightSidebarState }` | Complete ingestion |
+| `INGESTION_COMPLETE` | `{ documentId, ingestedEntry, ingestedData, rightSidebarState }` | Complete single-file ingestion |
+| `INGESTION_BATCH_COMPLETE` | `{ ingestedEntries, rightSidebarState }` | Complete multi-file ingestion (Ingest All) |
 | `INGESTION_FAILED` | - | Handle ingestion failure |
 
 ### UI Actions
@@ -257,6 +258,84 @@ case ActionTypes.INGESTION_COMPLETE: {
 }
 ```
 
+### `INGESTION_BATCH_COMPLETE`
+
+Handles multi-file "Ingest All" - adds all ingested entries at once:
+
+```javascript
+case ActionTypes.INGESTION_BATCH_COMPLETE: {
+    const { ingestedEntries, rightSidebarState } = action.payload;
+    
+    // Add all ingested entries (avoid duplicates)
+    let updatedIngestedFiles = [...state.fileQueue.ingestedFiles];
+    for (const entry of ingestedEntries) {
+        const existingIndex = updatedIngestedFiles.findIndex(
+            f => f.ingestedId === entry.ingestedId
+        );
+        if (existingIndex >= 0) {
+            updatedIngestedFiles[existingIndex] = entry;
+        } else {
+            updatedIngestedFiles.push(entry);
+        }
+    }
+
+    return {
+        ...state,
+        fileQueue: {
+            ...state.fileQueue,
+            ingestedFiles: updatedIngestedFiles,
+            selectedDocumentId: ingestedEntries[0]?.ingestedId,
+        },
+        document: {
+            ...state.document,
+            contentType: CONTENT_TYPE.EMBEDDING,
+            storedEmbeddings: ingestedEntries[0]?.embeddingPreview || null,
+        },
+        preview: {
+            ...state.preview,
+            isPreviewMode: false,
+            previewDocumentIds: new Set(),
+        },
+        ui: {
+            ...state.ui,
+            mode: UI_MODE.READONLY,
+            isIngesting: false,
+            multiSelectMode: false,
+            checkedDocumentIds: new Set(),
+        },
+    };
+}
+```
+
+### `FILES_RESTORED_FROM_CACHE`
+
+Also handles cache clearing when both arrays are empty:
+
+```javascript
+case ActionTypes.FILES_RESTORED_FROM_CACHE: {
+    const { uploadQueue, ingestedFiles } = action.payload;
+    return {
+        ...state,
+        fileQueue: {
+            ...state.fileQueue,
+            uploadQueue,
+            // Also clear ingestedFiles if provided (for cache clear)
+            ...(ingestedFiles !== undefined && { ingestedFiles }),
+        },
+        // Reset document state when clearing all files
+        ...(uploadQueue.length === 0 && {
+            document: {
+                ...state.document,
+                documentState: null,
+                currentPage: 0,
+                contentType: null,
+                storedEmbeddings: null,
+            },
+        }),
+    };
+}
+```
+
 ## Hooks
 
 ### Domain Hooks
@@ -282,10 +361,13 @@ const dispatch = useDispatch();
 // Pre-bound action creators
 const actions = useIngestionActions();
 
-// Usage
+// Usage examples
 actions.selectFile(documentId);
 actions.changePage(2);
-actions.completeIngestion(result);
+actions.completeIngestion(documentId, ingestedEntry, embeddingPreview, rightSidebarState);
+actions.completeBatchIngestion(ingestedEntries, rightSidebarState);  // Multi-file "Ingest All"
+actions.clearAllFiles();  // Clears both uploadQueue and ingestedFiles
+actions.switchPreviewFile(documentId, embeddingPreview);  // Switch preview in multi-file mode
 ```
 
 ### Selector Hooks

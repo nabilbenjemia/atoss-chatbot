@@ -28,17 +28,8 @@ export default function ConnectedHelperPanel({ executeCommand }) {
     const localHelpers = useMemo(() => INGESTION_CONFIG.helpers.local || [], []);
     const backendHelpers = useMemo(() => INGESTION_CONFIG.helpers.backend || [], []);
 
-    // Run a helper
-    const handleRunHelper = useCallback(async (helperId) => {
-        // Show file selection modal first (helpers need to know which files to run on)
-        const allHelpers = [...localHelpers, ...backendHelpers];
-        const helper = allHelpers.find(h => h.id === helperId);
-        actions.setPendingHelper(helper || { id: helperId, label: helperId });
-        actions.openModal(MODAL_TYPES.HELPER_FILE_SELECT);
-    }, [localHelpers, backendHelpers, actions]);
-
-    // Execute helper after file selection (exported for use by file selection modal)
-    const _executeHelper = useCallback(async (helperId) => {
+    // Execute helper directly on current document
+    const executeHelper = useCallback(async (helperId) => {
         if (!documentState) {
             toast.warning('No document loaded to apply helper');
             return;
@@ -142,7 +133,7 @@ export default function ConnectedHelperPanel({ executeCommand }) {
                 {localHelpers.map((helper) => (
                     <button
                         key={helper.id}
-                        onClick={() => handleRunHelper(helper.id)}
+                        onClick={() => executeHelper(helper.id)}
                         disabled={disabled || runningHelper === helper.id}
                         className={`
                             w-full px-3 py-2 text-left text-sm transition-all border
@@ -173,7 +164,7 @@ export default function ConnectedHelperPanel({ executeCommand }) {
                 {backendHelpers.map((helper) => (
                     <button
                         key={helper.id}
-                        onClick={() => handleRunHelper(helper.id)}
+                        onClick={() => executeHelper(helper.id)}
                         disabled={disabled || runningHelper === helper.id}
                         className={`
                             w-full px-3 py-2 text-left text-sm transition-all border

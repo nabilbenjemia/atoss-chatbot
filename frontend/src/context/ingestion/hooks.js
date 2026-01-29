@@ -236,6 +236,11 @@ export function useIngestionActions() {
             payload: { documentId, ingestedEntry, ingestedData, rightSidebarState },
         }),
 
+        completeBatchIngestion: (ingestedEntries, rightSidebarState) => dispatch({
+            type: ActionTypes.INGESTION_BATCH_COMPLETE,
+            payload: { ingestedEntries, rightSidebarState },
+        }),
+
         failIngestion: () => dispatch({
             type: ActionTypes.INGESTION_FAILED,
         }),
@@ -338,6 +343,41 @@ export function useIngestionActions() {
         clearCache: (all, types) => dispatch({
             type: ActionTypes.CACHE_CLEARED,
             payload: { all, types },
+        }),
+
+        // Convenience Actions (composite/aliased)
+
+        // Update filename is an alias for renameFile
+        updateFilename: (documentId, newFilename) => dispatch({
+            type: ActionTypes.FILE_RENAMED,
+            payload: { documentId, newFilename },
+        }),
+
+        // Clear all files (for cache management)
+        clearAllFiles: () => dispatch({
+            type: ActionTypes.FILES_RESTORED_FROM_CACHE,
+            payload: { uploadQueue: [], ingestedFiles: [] },
+        }),
+
+        // Exit preview mode (alias for cancelPreview)
+        exitPreviewMode: (rightSidebarState = false) => dispatch({
+            type: ActionTypes.PREVIEW_CANCELLED,
+            payload: { rightSidebarState },
+        }),
+
+        // Confirm ingestion (single file)
+        confirmIngestion: () => dispatch({
+            type: ActionTypes.INGESTION_STARTED,
+        }),
+
+        // Confirm ingestion for all files in preview
+        confirmIngestionAll: () => dispatch({
+            type: ActionTypes.INGESTION_STARTED,
+        }),
+
+        // Cancel ingestion
+        cancelIngestion: () => dispatch({
+            type: ActionTypes.INGESTION_FAILED,
         }),
     }), [dispatch]);
 }

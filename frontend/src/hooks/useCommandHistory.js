@@ -126,6 +126,64 @@ export const Commands = {
 };
 
 // ============================================================================
+// COMMAND SERIALIZATION (for localStorage persistence)
+// ============================================================================
+
+/**
+ * Serialize a command to a plain object (removes functions)
+ * @param {Object} command - Command object with execute/undo functions
+ * @returns {Object} - Serializable command data
+ */
+export function serializeCommand(command) {
+    // Destructure to remove execute/undo functions, keep rest
+    const { execute: _execute, undo: _undo, ...data } = command;
+    return data;
+}
+
+/**
+ * Deserialize command data back to a full command with functions
+ * @param {Object} data - Serialized command data
+ * @returns {Object|null} - Full command object or null if type unknown
+ */
+export function deserializeCommand(data) {
+    if (!data || !data.type) return null;
+
+    switch (data.type) {
+        case 'EDIT_ITEM':
+            return Commands.editItem(data.itemId, data.newContent, data.oldContent);
+        case 'DELETE_ITEM':
+            return Commands.deleteItem(data.itemId);
+        case 'RESTORE_ITEM':
+            return Commands.restoreItem(data.itemId);
+        case 'CHANGE_CLASS':
+            return Commands.changeClass(data.itemId, data.newClass, data.oldClass);
+        case 'BATCH_DELETE':
+            return Commands.batchDelete(data.itemIds);
+        case 'RENAME_DOCUMENT':
+            return Commands.renameDocument(data.newFilename, data.oldFilename);
+        case 'BATCH_UPDATE':
+            return Commands.batchUpdate(data.changes);
+        default:
+            console.warn(`[deserializeCommand] Unknown command type: ${data.type}`);
+            return null;
+    }
+}
+
+/**
+ * Serialize an array of commands
+ */
+export function serializeHistory(commands) {
+    return commands.map(serializeCommand);
+}
+
+/**
+ * Deserialize an array of command data
+ */
+export function deserializeHistory(dataArray) {
+    return dataArray.map(deserializeCommand).filter(Boolean);
+}
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 
@@ -304,18 +362,32 @@ const useCommandHistory = (initialState) => {
 
     /**
      * Restore full state including history (for switching between files)
+     * Accepts either serialized (from localStorage) or deserialized commands
      */
     const restore = useCallback((fullState) => {
-        dispatch({ type: RESTORE, payload: fullState });
+        // If past/future contain serialized commands, deserialize them
+        let past = fullState.past || [];
+        let future = fullState.future || [];
+
+        // Check if commands need deserialization (no execute function = serialized)
+        if (past.length > 0 && typeof past[0].execute !== 'function') {
+            past = deserializeHistory(past);
+        }
+        if (future.length > 0 && typeof future[0].execute !== 'function') {
+            future = deserializeHistory(future);
+        }
+
+        dispatch({ type: RESTORE, payload: { past, present: fullState.present, future } });
     }, []);
 
     /**
      * Get the full internal state (for saving to cache)
+     * Returns serialized commands that can be stored in localStorage
      */
     const getFullState = useCallback(() => ({
-        past: state.past,
+        past: serializeHistory(state.past),
         present: state.present,
-        future: state.future,
+        future: serializeHistory(state.future),
     }), [state.past, state.present, state.future]);
 
     const canUndo = state.past.length > 0;

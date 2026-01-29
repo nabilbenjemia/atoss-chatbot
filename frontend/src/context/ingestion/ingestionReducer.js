@@ -193,13 +193,25 @@ export function ingestionReducer(state, action) {
         }
 
         case ActionTypes.FILES_RESTORED_FROM_CACHE: {
-            const { uploadQueue } = action.payload;
+            const { uploadQueue, ingestedFiles } = action.payload;
             return {
                 ...state,
                 fileQueue: {
                     ...state.fileQueue,
                     uploadQueue,
+                    // Also clear ingestedFiles if provided (for cache clear)
+                    ...(ingestedFiles !== undefined && { ingestedFiles }),
                 },
+                // Reset document state when clearing all files
+                ...(uploadQueue.length === 0 && {
+                    document: {
+                        ...state.document,
+                        documentState: null,
+                        currentPage: 0,
+                        contentType: null,
+                        storedEmbeddings: null,
+                    },
+                }),
             };
         }
 
@@ -339,7 +351,8 @@ export function ingestionReducer(state, action) {
                     ...state.ui,
                     mode: UI_MODE.PREVIEW,
                     rightSidebarStateBeforePreview: rightSidebarState,
-                    rightSidebarCollapsed: true,
+                    // Expand sidebar in preview mode to show file list (especially for multi-file)
+                    rightSidebarCollapsed: false,
                 },
             };
         }
@@ -474,14 +487,33 @@ export function ingestionReducer(state, action) {
 
         case ActionTypes.INGESTION_COMPLETE: {
             const { ingestedEntry, ingestedData, rightSidebarState } = action.payload;
+
+            // Update or add ingested entry (avoid duplicates)
+            let updatedIngestedFiles = state.fileQueue.ingestedFiles;
+            if (ingestedEntry) {
+                const existingIndex = updatedIngestedFiles.findIndex(
+                    f => f.ingestedId === ingestedEntry.ingestedId
+                );
+                if (existingIndex >= 0) {
+                    // Update existing
+                    updatedIngestedFiles = [
+                        ...updatedIngestedFiles.slice(0, existingIndex),
+                        ingestedEntry,
+                        ...updatedIngestedFiles.slice(existingIndex + 1),
+                    ];
+                } else {
+                    // Add new
+                    updatedIngestedFiles = [...updatedIngestedFiles, ingestedEntry];
+                }
+            }
+
             return {
                 ...state,
                 fileQueue: {
                     ...state.fileQueue,
-                    ingestedFiles: ingestedEntry
-                        ? [...state.fileQueue.ingestedFiles, ingestedEntry]
-                        : state.fileQueue.ingestedFiles,
-                    // Keep selected document
+                    ingestedFiles: updatedIngestedFiles,
+                    // Update selected to the ingested file ID
+                    selectedDocumentId: ingestedEntry?.ingestedId || state.fileQueue.selectedDocumentId,
                 },
                 document: {
                     ...state.document,
@@ -502,6 +534,59 @@ export function ingestionReducer(state, action) {
                     isIngesting: false,
                     ingestionProgress: 0,
                     rightSidebarCollapsed: rightSidebarState,
+                },
+            };
+        }
+
+        case ActionTypes.INGESTION_BATCH_COMPLETE: {
+            const { ingestedEntries, rightSidebarState } = action.payload;
+
+            // Add all ingested entries (avoid duplicates)
+            let updatedIngestedFiles = [...state.fileQueue.ingestedFiles];
+            for (const entry of ingestedEntries) {
+                const existingIndex = updatedIngestedFiles.findIndex(
+                    f => f.ingestedId === entry.ingestedId
+                );
+                if (existingIndex >= 0) {
+                    // Update existing
+                    updatedIngestedFiles[existingIndex] = entry;
+                } else {
+                    // Add new
+                    updatedIngestedFiles.push(entry);
+                }
+            }
+
+            // Select the first ingested file
+            const firstEntry = ingestedEntries[0];
+
+            return {
+                ...state,
+                fileQueue: {
+                    ...state.fileQueue,
+                    ingestedFiles: updatedIngestedFiles,
+                    selectedDocumentId: firstEntry?.ingestedId || state.fileQueue.selectedDocumentId,
+                },
+                document: {
+                    ...state.document,
+                    contentType: CONTENT_TYPE.EMBEDDING,
+                    storedEmbeddings: firstEntry?.embeddingPreview || null,
+                },
+                preview: {
+                    ...state.preview,
+                    isPreviewMode: false,
+                    isLoadingPreview: false,
+                    embeddingPreview: null,
+                    previewConfig: { targetDb: '', strategy: '' },
+                    previewDocumentIds: new Set(),
+                },
+                ui: {
+                    ...state.ui,
+                    mode: UI_MODE.READONLY,
+                    isIngesting: false,
+                    ingestionProgress: 0,
+                    rightSidebarCollapsed: rightSidebarState,
+                    multiSelectMode: false,
+                    checkedDocumentIds: new Set(),
                 },
             };
         }

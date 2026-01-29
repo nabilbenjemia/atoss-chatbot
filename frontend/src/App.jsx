@@ -38,6 +38,8 @@ export default function App() {
           }
         />
         <Route path="/profile" element={<UserProfilePage />} />
+        {/* Admin routes */}
+        <Route path="/admin/ingestion" element={<IngestionPage />} />
       </Routes>
       <ToastContainer
         position="top-right"
