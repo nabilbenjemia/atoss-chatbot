@@ -10,11 +10,11 @@
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
 import {
-    useUI,
-    usePreview,
-    useFileQueue,
-    useIngestionActions,
-    DOC_STATUS,
+    useUI, //hooks
+    usePreview, //hooks
+    useFileQueue, //hooks
+    useIngestionActions, // hooks
+    DOC_STATUS, //constants
 } from '../../context/ingestion';
 import { uploadDocument } from '../../services/ingestionApi';
 import { saveFileContent, addUploadedFile } from '../../utils/fileCacheManager';

@@ -192,6 +192,141 @@ export const CONTENT_TYPE = {
 
 State is managed by a **single reducer** (`ingestionReducer.js`) for traceability, split into **four domains** with separate React contexts for fine-grained re-renders.
 
+### How State Changes Propagate (The Notification Mechanism)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Component as Any Component
+    participant Hooks as useIngestionActions()
+    participant Dispatch as DispatchContext
+    participant Reducer as ingestionReducer
+    participant Provider as IngestionProvider
+    participant Contexts as Split Contexts
+    participant Subscribers as Components using useUI(), useFileQueue(), etc.
+
+    Note over Component,Subscribers: 1. SETUP PHASE (on mount)
+    Provider->>Provider: const [state, dispatch] = useReducer(ingestionReducer, initialState)
+    Provider->>Contexts: Create contexts with state slices
+    Note over Contexts: FileQueueContext.Provider value={state.fileQueue}<br/>DocumentContext.Provider value={state.document}<br/>PreviewContext.Provider value={state.preview}<br/>UIContext.Provider value={state.ui}<br/>DispatchContext.Provider value={dispatch}
+    
+    Subscribers->>Contexts: useContext(UIContext) // subscribes to ui changes
+    Note over Subscribers: Component re-renders when<br/>UIContext value changes
+
+    Note over Component,Subscribers: 2. STATE CHANGE PHASE (on user action)
+    Component->>Hooks: actions.startIngestion()
+    Hooks->>Dispatch: dispatch({ type: INGESTION_STARTED })
+    Dispatch->>Reducer: ingestionReducer(currentState, action)
+    Reducer->>Reducer: return newState with ui.isIngesting=true
+    Reducer-->>Provider: newState
+    
+    Note over Provider: React detects state changed
+    Provider->>Contexts: Update context values with new state slices
+    Note over Contexts: UIContext now has new value<br/>(isIngesting: true)
+    
+    Contexts-->>Subscribers: React triggers re-render for subscribers
+    Note over Subscribers: Only components using useUI()<br/>re-render, not useFileQueue()
+```
+
+### The Key Files Explained
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  contexts.js - Creates empty contexts                                   │
+│  ─────────────────────────────────────────────────────────────────────  │
+│  export const UIContext = createContext(null);                          │
+│  export const FileQueueContext = createContext(null);                   │
+│  // ... contexts are just "buckets" to hold values                      │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  IngestionProvider.jsx - Connects reducer to contexts                   │
+│  ─────────────────────────────────────────────────────────────────────  │
+│  function IngestionProvider({ children }) {                             │
+│    const [state, dispatch] = useReducer(ingestionReducer, initialState);│
+│                                                                         │
+│    return (                                                             │
+│      <DispatchContext.Provider value={dispatch}>      ← stable ref      │
+│        <FileQueueContext.Provider value={state.fileQueue}>              │
+│          <DocumentContext.Provider value={state.document}>              │
+│            <PreviewContext.Provider value={state.preview}>              │
+│              <UIContext.Provider value={state.ui}>    ← changes here    │
+│                {children}                               trigger re-render│
+│              </UIContext.Provider>                      for useUI() only │
+│            </PreviewContext.Provider>                                   │
+│          </DocumentContext.Provider>                                    │
+│        </FileQueueContext.Provider>                                     │
+│      </DispatchContext.Provider>                                        │
+│    );                                                                   │
+│  }                                                                      │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  hooks.js - Convenient access to contexts                               │
+│  ─────────────────────────────────────────────────────────────────────  │
+│  export function useUI() {                                              │
+│    const context = useContext(UIContext);  // ← subscribes to UIContext │
+│    return context;  // { isIngesting, activeModal, ... }                │
+│  }                                                                      │
+│                                                                         │
+│  export function useIngestionActions() {                                │
+│    const dispatch = useContext(DispatchContext);  // ← stable, no rerenders│
+│    return useMemo(() => ({                                              │
+│      startIngestion: () => dispatch({ type: INGESTION_STARTED }),       │
+│      // ... all action creators                                         │
+│    }), [dispatch]);                                                     │
+│  }                                                                      │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Why Split Contexts?
+
+Without split contexts, ANY state change would re-render ALL components:
+
+```javascript
+// ❌ BAD: Single context - everything re-renders on any change
+<IngestionContext.Provider value={entireState}>
+
+// ✅ GOOD: Split contexts - only relevant components re-render
+<UIContext.Provider value={state.ui}>           // Only useUI() subscribers
+<FileQueueContext.Provider value={state.fileQueue}>  // Only useFileQueue() subscribers
+```
+
+### Summary: How useUI() Gets Notified
+
+1. **Component calls `useUI()`** → internally calls `useContext(UIContext)`
+2. **React subscribes** that component to `UIContext`
+3. **Somewhere else**, a component calls `actions.startIngestion()`
+4. **dispatch()** sends action to reducer
+5. **Reducer** returns new state with `ui.isIngesting = true`
+6. **IngestionProvider** re-renders, passes new `state.ui` to `UIContext.Provider`
+7. **React detects** `UIContext` value changed
+8. **All components using `useUI()`** re-render automatically
+
+---
+
+## Trigger Types: User Interaction vs State Change
+
+Flows can be triggered in two ways:
+
+### 🖱️ User Interaction Triggers
+Direct user action (click, drop, type) starts the flow.
+
+### ⚡ State Change Triggers (useEffect)
+A `useEffect` watches for state changes and triggers the flow automatically.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     TRIGGER TYPE LEGEND                                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│  🖱️  = User Interaction (onClick, onDrop, onSubmit)                    │
+│  ⚡  = State Change (useEffect watching state)                          │
+│  🔄  = Combination (user triggers, then useEffect continues)            │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                       IngestionProvider                         │
@@ -401,7 +536,9 @@ All API responses follow a consistent format:
 }
 ```
 
-### Trigger Flow 1: Upload Document
+### Trigger Flow 1: Upload Document 🖱️
+
+**Trigger Type**: 🖱️ User Interaction (drag-drop or file select)
 
 ```mermaid
 sequenceDiagram
@@ -473,7 +610,9 @@ sequenceDiagram
 
 **Important:** The reducer is **pure** (no side effects). LocalStorage writes happen in the component after dispatch.
 
-### Trigger Flow 2: Run Backend Helper
+### Trigger Flow 2: Run Backend Helper 🖱️
+
+**Trigger Type**: 🖱️ User Interaction (click helper button)
 
 ```mermaid
 sequenceDiagram
@@ -524,7 +663,9 @@ sequenceDiagram
 | API Call | `services/ingestionApi.js` | `runBackendHelper()` |
 | Undo/Redo | `hooks/useCommandHistory.js` | `Commands.batchUpdate()` |
 
-### Trigger Flow 3: Preview Embeddings
+### Trigger Flow 3: Preview Embeddings 🖱️
+
+**Trigger Type**: 🖱️ User Interaction (click "Preview Embeddings" in modal)
 
 ```mermaid
 sequenceDiagram
@@ -577,7 +718,9 @@ sequenceDiagram
 | API Call | `services/ingestionApi.js` | `previewEmbeddings()` |
 | Preview Display | `components/ingestion/EmbeddingPreviewViewer.jsx` | Renders embedding cards |
 
-### Trigger Flow 4: Confirm Ingestion
+### Trigger Flow 4: Confirm Ingestion 🖱️
+
+**Trigger Type**: 🖱️ User Interaction (click "Confirm & Ingest")
 
 ```mermaid
 sequenceDiagram
@@ -632,7 +775,9 @@ sequenceDiagram
 
 **Implementation Status**: ✅ Fully implemented
 
-### Trigger Flow 5: Ingest All (Multi-File)
+### Trigger Flow 5: Ingest All (Multi-File) 🖱️
+
+**Trigger Type**: 🖱️ User Interaction (click "Ingest All")
 
 ```mermaid
 sequenceDiagram
@@ -686,7 +831,9 @@ sequenceDiagram
 | Progress Updates | `context/ingestion/hooks.js` | `actions.updateIngestionProgress()` |
 | Batch Complete | `context/ingestion/ingestionReducer.js` | `INGESTION_BATCH_COMPLETE` handler |
 
-### Trigger Flow 6: Switch Preview File
+### Trigger Flow 6: Switch Preview File 🖱️
+
+**Trigger Type**: 🖱️ User Interaction (click different file in sidebar during preview)
 
 ```mermaid
 sequenceDiagram
@@ -727,7 +874,9 @@ sequenceDiagram
     end
 ```
 
-### Trigger Flow 7: Clear All Cache
+### Trigger Flow 7: Clear All Cache 🖱️
+
+**Trigger Type**: 🖱️ User Interaction (click "Clear All" in cache management)
 
 ```mermaid
 sequenceDiagram
@@ -766,6 +915,187 @@ sequenceDiagram
     
     Page-->>User: toast.success("All cache cleared")
 ```
+
+### Trigger Flow 8: Load Document on File Selection ⚡
+
+**Trigger Type**: ⚡ State Change (`useEffect` watches `selectedDocumentId`)
+
+This flow is triggered automatically when `selectedDocumentId` changes (after user clicks a file or after upload completes).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant PrevFlow as Previous Flow (Upload/Click)
+    participant Reducer as ingestionReducer.js
+    participant Page as IngestionPage.jsx
+    participant UseEffect as useEffect([selectedDocumentId])
+    participant Cache as fileCacheManager.js
+    participant CmdHistory as useCommandHistory
+    participant Hooks as hooks.js
+
+    Note over PrevFlow,Hooks: User clicked file OR upload completed
+    PrevFlow->>Hooks: actions.selectFile(documentId)
+    Hooks->>Reducer: dispatch({ type: FILE_SELECTED })
+    Reducer-->>Reducer: selectedDocumentId = newDocId
+    
+    Note over Page: React re-renders IngestionPage<br/>because useFileQueue() updated
+    
+    Reducer-->>Page: New state via useFileQueue()
+    
+    Note over UseEffect: useEffect detects<br/>selectedDocumentId changed
+    UseEffect->>UseEffect: Check if selectedDocumentId exists
+    
+    alt No file selected (null)
+        UseEffect->>CmdHistory: resetCommandDocument(null)
+        UseEffect->>Hooks: actions.resetDocument()
+        Hooks->>Reducer: dispatch({ type: DOCUMENT_RESET })
+    else Ingested file selected
+        UseEffect->>Cache: getIngestedFileEmbeddings(ingestedId)
+        Cache-->>UseEffect: embeddings data
+        UseEffect->>Hooks: actions.setStoredEmbeddings(embeddings)
+        Hooks->>Reducer: dispatch({ type: STORED_EMBEDDINGS_SET })
+        Reducer-->>Reducer: contentType='embedding'<br/>storedEmbeddings=data
+    else Uploaded file selected
+        UseEffect->>Cache: getFileContent(documentId)
+        Cache-->>UseEffect: document content
+        UseEffect->>Cache: getFileHistory(documentId)
+        Cache-->>UseEffect: command history (past/future)
+        
+        alt Has saved history
+            UseEffect->>CmdHistory: restoreCommandDocument({ past, present, future })
+        else No history
+            UseEffect->>CmdHistory: resetCommandDocument(content)
+        end
+        
+        UseEffect->>Hooks: actions.loadDocument(content, documentId)
+        Hooks->>Reducer: dispatch({ type: DOCUMENT_LOADED })
+        Reducer-->>Reducer: documentState=content<br/>contentType='editor'
+    end
+```
+
+**Key Code** (from `IngestionPage.jsx`):
+```javascript
+// Load document content when file is selected
+useEffect(() => {
+    if (!selectedDocumentId) {
+        resetCommandDocument(null);
+        actions.resetDocument();
+        return;
+    }
+    // ... load content based on file type
+}, [selectedDocumentId, ingestedFiles, actions, resetCommandDocument, restoreCommandDocument]);
+```
+
+### Trigger Flow 9: Auto-Save Document Changes ⚡
+
+**Trigger Type**: ⚡ State Change (`useEffect` watches `documentState`)
+
+This flow runs automatically whenever the document content changes (after edit, delete, helper runs, etc.).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant PrevFlow as Previous Flow (Edit/Helper)
+    participant CmdHistory as useCommandHistory
+    participant Page as IngestionPage.jsx
+    participant UseEffect as useEffect([documentState])
+    participant Cache as fileCacheManager.js
+
+    Note over PrevFlow,Cache: User edited text OR ran helper
+    PrevFlow->>CmdHistory: executeCommand(Commands.editItem(...))
+    CmdHistory-->>CmdHistory: Apply command, update state
+    CmdHistory-->>Page: commandDocumentState updated
+    
+    Note over Page: useEffect syncs command state to context
+    Page->>Page: actions.modifyDocument(commandDocumentState)
+    
+    Note over UseEffect: useEffect detects<br/>documentState changed
+    
+    UseEffect->>UseEffect: Check documentState && selectedDocumentId
+    
+    alt Valid document and matching ID
+        UseEffect->>Cache: saveFileContent(selectedDocumentId, documentState)
+        Cache-->>Cache: localStorage.setItem()
+        
+        UseEffect->>CmdHistory: getCommandFullState()
+        CmdHistory-->>UseEffect: { past, present, future }
+        
+        UseEffect->>Cache: saveFileHistory(selectedDocumentId, fullState)
+        Cache-->>Cache: localStorage.setItem()
+        
+        UseEffect->>Cache: updateUploadedFile(selectedDocumentId, { filename })
+        Cache-->>Cache: localStorage.setItem()
+    end
+```
+
+**Key Code** (from `IngestionPage.jsx`):
+```javascript
+// Auto-save document content and command history
+useEffect(() => {
+    if (documentState && selectedDocumentId && 
+        commandHistoryDocIdRef.current === selectedDocumentId) {
+        saveFileContent(selectedDocumentId, documentState);
+        const fullState = getCommandFullState();
+        saveFileHistory(selectedDocumentId, fullState);
+        updateUploadedFile(selectedDocumentId, { filename: documentState.filename });
+    }
+}, [documentState, selectedDocumentId, getCommandFullState]);
+```
+
+### Trigger Flow 10: Sync Command History to Context ⚡
+
+**Trigger Type**: ⚡ State Change (`useEffect` watches `commandDocumentState`)
+
+The `useCommandHistory` hook manages its own state. This flow syncs it to the context.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant CmdHistory as useCommandHistory
+    participant Page as IngestionPage.jsx
+    participant UseEffect as useEffect([commandDocumentState])
+    participant Hooks as hooks.js
+    participant Reducer as ingestionReducer.js
+
+    Note over CmdHistory: User executes command<br/>(edit, delete, undo, redo)
+    CmdHistory-->>CmdHistory: Internal state updated
+    CmdHistory-->>Page: commandDocumentState changed
+    
+    Note over UseEffect: useEffect detects<br/>commandDocumentState changed
+    
+    UseEffect->>Hooks: actions.modifyDocument(commandDocumentState)
+    Hooks->>Reducer: dispatch({ type: DOCUMENT_MODIFIED })
+    Reducer-->>Reducer: documentState = commandDocumentState
+    
+    Note over Page: Now context has latest state<br/>and other components can access it
+```
+
+**Key Code** (from `IngestionPage.jsx`):
+```javascript
+// Sync command history state with context
+useEffect(() => {
+    if (commandDocumentState) {
+        actions.modifyDocument(commandDocumentState);
+    }
+}, [commandDocumentState, actions]);
+```
+
+---
+
+## Trigger Flow Summary
+
+| Flow | Type | Trigger | Description |
+|------|------|---------|-------------|
+| 1. Upload Document | 🖱️ | User drops/selects file | Process and cache new document |
+| 2. Run Backend Helper | 🖱️ | User clicks helper button | AI processes document content |
+| 3. Preview Embeddings | 🖱️ | User clicks "Preview" | Generate embedding preview |
+| 4. Confirm Ingestion | 🖱️ | User clicks "Confirm" | Store in vector database |
+| 5. Ingest All | 🖱️ | User clicks "Ingest All" | Batch ingest multiple files |
+| 6. Switch Preview File | 🖱️ | User clicks different file | Load different file's preview |
+| 7. Clear All Cache | 🖱️ | User clicks "Clear All" | Reset all state and storage |
+| 8. Load Document | ⚡ | `selectedDocumentId` changes | Load content from cache |
+| 9. Auto-Save | ⚡ | `documentState` changes | Persist to localStorage |
+| 10. Sync Command History | ⚡ | `commandDocumentState` changes | Sync hook state to context |
 
 ---
 
