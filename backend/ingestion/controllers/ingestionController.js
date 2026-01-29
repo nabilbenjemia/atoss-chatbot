@@ -82,12 +82,12 @@ const previewEmbeddings = async (req, res) => {
         const { documentState, strategy = 'embed_per_page' } = req.body;
 
         if (!documentState) {
-            return res.status(400).json({ error: 'documentState is required' });
+            return res.status(400).json({ success: false, error: 'documentState is required' });
         }
 
         // Generate preview based on strategy
         const preview = ingestionService.generateEmbeddingPreview(documentState, strategy);
-        res.json(preview);
+        res.json({ success: true, preview });
     } catch (error) {
         console.error('Preview error:', error);
         res.status(500).json({ error: 'Failed to generate preview', details: error.message });

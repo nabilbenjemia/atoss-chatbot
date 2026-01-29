@@ -313,9 +313,9 @@ export default function CacheManagement({ onClose, onCacheCleared }) {
     }
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full min-h-0">
             {/* Header */}
-            <div className="px-4 py-3 border-b border-tum-grey-7 bg-tum-grey-9 relative">
+            <div className="flex-shrink-0 px-4 py-3 border-b border-tum-grey-7 bg-tum-grey-9 relative">
                 <div className="flex items-center justify-between mb-2">
                     <h4 className="font-semibold text-tum-black">Cache Management</h4>
                     <button
@@ -332,8 +332,8 @@ export default function CacheManagement({ onClose, onCacheCleared }) {
                 </p>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto px-4 py-3">
+            {/* Content - scrollable */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
                 {/* Editor Cache Section */}
                 {editorItems.length > 0 && (
                     <div className="mb-4">
@@ -410,8 +410,8 @@ export default function CacheManagement({ onClose, onCacheCleared }) {
                 )}
             </div>
 
-            {/* Footer Actions */}
-            <div className="px-4 py-3 border-t border-tum-grey-7 bg-tum-grey-9 space-y-2">
+            {/* Footer Actions - fixed at bottom */}
+            <div className="flex-shrink-0 px-4 py-3 border-t border-tum-grey-7 bg-tum-grey-9 space-y-2">
                 {selectedKeys.size > 0 && (
                     <p className="text-xs text-tum-grey-4 text-center">
                         {selectedKeys.size} selected • {formatBytes(selectedSize)}

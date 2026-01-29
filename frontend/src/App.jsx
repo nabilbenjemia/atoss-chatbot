@@ -20,7 +20,7 @@ export default function App() {
         <Route path="/forget-password" element={<ForgetPass />} />
         <Route path="/chatbot" element={<ChatbotPage />} />
         <Route path="/profile" element={<UserProfilePage />} />
-        {/* Admin routes - TODO: Enhance auth guard when backend provides user.role */}
+        {/* Admin routes */}
         <Route path="/admin/ingestion" element={<IngestionPage />} />
       </Routes>
       <ToastContainer

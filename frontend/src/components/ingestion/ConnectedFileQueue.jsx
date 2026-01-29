@@ -7,36 +7,69 @@
  * @see doc/ingestion/COMPONENT_RESPONSIBILITIES.md
  */
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
     useFileQueue,
     usePreview,
     useUI,
     useIngestionActions,
-    useDocument,
-    CONTENT_TYPE,
 } from '../../context/ingestion';
-import { removeUploadedFile, removeIngestedFile, getIngestedFiles } from '../../utils/fileCacheManager';
+import { removeUploadedFile, removeIngestedFile, getIngestedFiles, getFileContent } from '../../utils/fileCacheManager';
+import { previewEmbeddings } from '../../services/ingestionApi';
 import FileQueueItem from './FileQueueItem';
 
 export default function ConnectedFileQueue() {
     // Subscribe to relevant state
     const { uploadQueue, ingestedFiles, selectedDocumentId } = useFileQueue();
-    const { isPreviewMode, previewDocumentIds } = usePreview();
+    const { isPreviewMode, previewDocumentIds, previewConfig, isLoadingPreview } = usePreview();
     const { multiSelectMode, checkedDocumentIds } = useUI();
-    const { contentType } = useDocument();
     const actions = useIngestionActions();
+
+    // Local state for tracking which file is being loaded
+    const [switchingToDocId, setSwitchingToDocId] = useState(null);
 
     // In preview mode, filter to only show files being previewed
     const displayFiles = isPreviewMode
         ? uploadQueue.filter(f => previewDocumentIds.has(f.documentId))
         : uploadQueue;
 
-    // Handle file selection
-    const handleSelect = useCallback((documentId) => {
-        actions.selectFile(documentId);
-    }, [actions]);
+    // Handle file selection - in preview mode, also switch the preview
+    const handleSelect = useCallback(async (documentId) => {
+        // If in preview mode and selecting a different file, generate new preview
+        if (isPreviewMode && documentId !== selectedDocumentId) {
+            if (isLoadingPreview || switchingToDocId) return; // Already loading
+
+            setSwitchingToDocId(documentId);
+
+            try {
+                // Get the document content from cache
+                const content = getFileContent(documentId);
+                if (!content) {
+                    toast.error('Could not load file content');
+                    return;
+                }
+
+                // Generate preview for this file
+                const result = await previewEmbeddings(previewConfig.strategy, content);
+
+                if (result.success) {
+                    // Switch to this file's preview
+                    actions.switchPreviewFile(documentId, result.preview);
+                } else {
+                    throw new Error(result.error || 'Failed to generate preview');
+                }
+            } catch (error) {
+                console.error('Failed to switch preview:', error);
+                toast.error(`Failed to load preview: ${error.message}`);
+            } finally {
+                setSwitchingToDocId(null);
+            }
+        } else {
+            // Normal selection (not in preview mode)
+            actions.selectFile(documentId);
+        }
+    }, [isPreviewMode, selectedDocumentId, isLoadingPreview, switchingToDocId, previewConfig?.strategy, actions]);
 
     // Handle check in multi-select mode
     const handleCheck = useCallback((documentId) => {
@@ -66,16 +99,15 @@ export default function ConnectedFileQueue() {
         toast.info('Ingested file removed from cache');
     }, [actions]);
 
-    // Determine remove handler based on current mode
+    // Determine remove handler for uploaded files section
+    // Note: Ingested files section uses handleRemoveIngestedFile directly
     const getRemoveHandler = useCallback((documentId) => {
         if (isPreviewMode) {
             return () => handleRemoveFromPreview(documentId);
         }
-        if (contentType === CONTENT_TYPE.EMBEDDING) {
-            return () => handleRemoveIngestedFile(documentId);
-        }
+        // In the uploaded files section, always use handleRemoveUploadedFile
         return () => handleRemoveUploadedFile(documentId);
-    }, [isPreviewMode, contentType, handleRemoveFromPreview, handleRemoveIngestedFile, handleRemoveUploadedFile]);
+    }, [isPreviewMode, handleRemoveFromPreview, handleRemoveUploadedFile]);
 
     return (
         <div className="flex-1 overflow-y-auto flex flex-col">
@@ -102,6 +134,7 @@ export default function ConnectedFileQueue() {
                                 doc={doc}
                                 isSelected={doc.documentId === selectedDocumentId}
                                 isChecked={checkedDocumentIds.has(doc.documentId)}
+                                isLoading={switchingToDocId === doc.documentId}
                                 onSelect={() => handleSelect(doc.documentId)}
                                 onCheck={() => handleCheck(doc.documentId)}
                                 showCheckbox={multiSelectMode && !isPreviewMode}

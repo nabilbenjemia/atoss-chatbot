@@ -4,12 +4,12 @@ This document describes the responsibilities of each component in the Ingestion 
 
 ## Architecture Overview
 
-The refactored architecture uses **Connected Components** that own their business logic and communicate via shared context. The page component is now layout-only.
+The architecture uses **Connected Components** that own their business logic and communicate via shared context. The page component is layout-only.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         IngestionPageLayout                                  │
-│              (Layout-only: ~250 lines, no business logic)                   │
+│                            IngestionPage                                     │
+│              (Layout-only: ~550 lines, no business logic)                   │
 │  ┌─────────────────┐  ┌─────────────────────────┐  ┌─────────────────┐     │
 │  │  LeftSidebar    │  │     Main Content        │  │  RightSidebar   │     │
 │  │  ┌───────────┐  │  │  ┌───────────────────┐  │  │  ┌───────────┐  │     │
@@ -49,13 +49,14 @@ The refactored architecture uses **Connected Components** that own their busines
 ### Connected Components (Own Business Logic)
 
 These components subscribe to context and dispatch actions. They own their business logic.
+**Location**: `components/ingestion/`
 
 | Component | File | Responsibility |
 |-----------|------|----------------|
-| `ConnectedFileQueue` | `components/ingestion/ConnectedFileQueue.jsx` | File selection, check, removal |
-| `ConnectedUploadZone` | `components/ingestion/ConnectedUploadZone.jsx` | File upload, validation, caching |
-| `ConnectedContentViewer` | `components/ingestion/ConnectedContentViewer.jsx` | Page nav, item edit/delete/restore |
-| `ConnectedHelperPanel` | `components/ingestion/ConnectedHelperPanel.jsx` | Helper execution, regex trigger |
+| `ConnectedFileQueue` | `ConnectedFileQueue.jsx` | File selection, check, removal |
+| `ConnectedUploadZone` | `ConnectedUploadZone.jsx` | File upload, validation, caching |
+| `ConnectedContentViewer` | `ConnectedContentViewer.jsx` | Page nav, item edit/delete/restore |
+| `ConnectedHelperPanel` | `ConnectedHelperPanel.jsx` | Helper execution, regex trigger |
 
 ### Pure UI Components (Receive Props)
 
@@ -63,7 +64,7 @@ These components have no context dependency. They receive props and emit events.
 
 | Component | File | Responsibility |
 |-----------|------|----------------|
-| `FileQueueItem` | `components/ingestion/FileQueueItem.jsx` | Single file display |
+| `FileQueueItem` | `components/ingestion/FileQueueItem.jsx` | Single file display with loading state |
 | `PageContent` | `components/ingestion/PageContent.jsx` | Render page items |
 | `TextItem` | `components/ingestion/TextItem.jsx` | Editable text item |
 | `ImageItem` | `components/ingestion/ImageItem.jsx` | Image with description |
@@ -76,7 +77,7 @@ These components have no context dependency. They receive props and emit events.
 ```
 IngestionPage (entry point)
 └── IngestionProvider (context provider)
-    └── IngestionPageLayout (layout-only: ~250 lines)
+    └── IngestionPage (layout-only: ~550 lines)
         ├── LeftSidebar
         │   ├── ConnectedUploadZone (owns upload logic)
         │   ├── ConnectedFileQueue (owns selection logic)
@@ -103,10 +104,10 @@ IngestionPage (entry point)
 
 ### Layout Component
 
-#### `IngestionPageLayout`
-**File**: `frontend/src/pages/IngestionPageLayout.jsx`
+#### `IngestionPage`
+**File**: `frontend/src/pages/IngestionPage.jsx`
 
-**Responsibility**: Layout-only orchestrator (~250 lines)
+**Responsibility**: Layout-only orchestrator (~550 lines)
 
 | Aspect | Description |
 |--------|-------------|
@@ -123,14 +124,15 @@ IngestionPage (entry point)
 #### `ConnectedFileQueue`
 **File**: `frontend/src/components/ingestion/ConnectedFileQueue.jsx`
 
-**Responsibility**: File queue with selection and removal logic
+**Responsibility**: File queue with selection, removal, and preview switching logic
 
 | Aspect | Description |
 |--------|-------------|
 | **Hooks Used** | `useFileQueue`, `usePreview`, `useUI`, `useIngestionActions` |
-| **Business Logic** | File selection, multi-select, checking, removal |
-| **API Calls** | None (cache utilities for file content) |
-| **Events Handled** | Click to select, checkbox toggle, remove button |
+| **Business Logic** | File selection, multi-select, checking, removal, preview file switching |
+| **API Calls** | `previewEmbeddings()` (when switching preview files) |
+| **Events Handled** | Click to select (switches preview in preview mode), checkbox toggle, remove button |
+| **Local State** | `switchingToDocId` - tracks loading state during preview switch |
 
 ---
 
@@ -318,6 +320,7 @@ IngestionPage (entry point)
 | **Role** | View cache usage, clear specific cache types |
 | **Props** | `onClose`, `onCacheCleared` |
 | **Actions** | Clear uploaded, Clear embeddings, Clear all |
+| **Clear All Behavior** | Clears both uploadQueue AND ingestedFiles from sidebar via `actions.clearAllFiles()` |
 
 ---
 
@@ -374,7 +377,7 @@ User edits text → TextItem.onEdit (pure UI callback)
 ### Ingestion Flow
 ```
 User clicks Ingest → IngestionModal.onShowPreview (pure UI)
-    → IngestionPageLayout.handleShowPreview (modal handler)
+    → IngestionPage.handleShowPreview (modal handler)
     → actions.startPreview() → reducer → state.preview, state.ui
     → API call → actions.setPreviewGenerated()
     → EmbeddingPreviewViewer renders
@@ -386,7 +389,7 @@ User clicks Ingest → IngestionModal.onShowPreview (pure UI)
 
 | Component | useFileQueue | useDocument | usePreview | useUI | useIngestionActions |
 |-----------|:------------:|:-----------:|:----------:|:-----:|:-------------------:|
-| **IngestionPageLayout** | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **IngestionPage** | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **ConnectedFileQueue** | ✓ | - | ✓ | ✓ | ✓ |
 | **ConnectedUploadZone** | ✓ | - | ✓ | ✓ | ✓ |
 | **ConnectedContentViewer** | - | ✓ | - | - | ✓ |

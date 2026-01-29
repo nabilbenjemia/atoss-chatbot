@@ -1,6 +1,6 @@
 # Ingestion Page UI Components Documentation
 
-> **Last Updated**: 2026-01-28 (ADR-002 Context + Reducer implementation)
+> **Last Updated**: 2026-01-29 (Multi-file ingestion, preview switching, cache clearing)
 
 ## Table of Contents
 1. [Architecture Overview](#architecture-overview)
@@ -49,12 +49,12 @@ The Ingestion Page is a document processing and vector database ingestion UI tha
 
 ## Component Hierarchy
 
-### New Architecture (Connected Components)
+### Architecture (Connected Components)
 
 ```
 IngestionPage.jsx (entry point)
 └── IngestionProvider (context provider)
-    └── IngestionPageLayout.jsx (~400 lines - layout-only)
+    └── IngestionPage (~550 lines - layout-only)
         ├── ConnectedUploadZone.jsx      - Drag-drop upload (owns upload logic)
         ├── ConnectedFileQueue.jsx       - File list (owns selection logic)
         │   └── FileQueueItem.jsx        - Individual file item (pure UI)
@@ -229,7 +229,7 @@ User clicks "Confirm & Ingest"
            │
            ▼
 ┌────────────────────────────────────────────────────────────────┐
-│              IngestionPageLayout (Modal Handler)                │
+│              IngestionPage (Modal Handler)                │
 │        dispatch({ type: 'INGESTION_COMPLETE', payload })       │
 └────────────────────────────────────────────────────────────────┘
            │
@@ -374,17 +374,32 @@ Actions are defined in `context/ingestion/actionTypes.js`:
 
 ### API Endpoints (via `ingestionApi.js`)
 
-| Endpoint | Method | Trigger | Payload |
-|----------|--------|---------|---------|
-| `/api/ingestion/config` | GET | Page mount | - |
-| `/api/ingestion/upload` | POST | File drop/select | `FormData(file)` |
-| `/api/ingestion/ingest` | POST | Preview confirm | `{targetDb, embeddingPreview, strategy}` |
-| `/api/ingestion/helper` | POST | Backend helper run | `{helperId, content, params}` |
-| `/api/ingestion/preview-strategy` | POST | Backend strategy preview | `{strategy, documentState}` |
+| Endpoint | Method | Trigger | Response Format | Description |
+|----------|--------|---------|-----------------|-------------|
+| `/api/ingestion/config` | GET | Page mount | `{availableTargetDbs, embeddingModels, ...}` | Get backend configuration |
+| `/api/ingestion/upload` | POST | File drop/select | `{success: true, filename, content}` | Upload PDF for processing |
+| `/api/ingestion/preview` | POST | Click "Preview Embeddings" | `{success: true, preview: {...}}` | Generate embedding preview |
+| `/api/ingestion/ingest` | POST | Click "Confirm & Ingest" | `{success: true, documentCount, message}` | Ingest to vector database |
+| `/api/ingestion/helper` | POST | Backend helper run | `{success: true, modifiedItems, message}` | Run AI helper |
 
-> **Note**: Strategy preview follows a **hybrid pattern** (like helpers):
-> - **Local strategies** (`embed_per_page`): Frontend-only, no backend call
-> - **Backend strategies** (`semantic_sections`): Requires LLM service for AI processing
+### API Response Formats
+
+All API responses follow a consistent format:
+
+```javascript
+// Success response
+{
+    success: true,
+    // ... endpoint-specific data
+}
+
+// Error response
+{
+    success: false,
+    error: "Error message",
+    details: "Optional details"
+}
+```
 
 ### Trigger Flow 1: Upload Document
 ```
@@ -440,118 +455,146 @@ executeCommand(Commands.batchUpdate(changes))
 setHasUnsavedChanges(true)
 ```
 
-### Trigger Flow 3: Preview Embeddings (Hybrid Pattern)
+### Trigger Flow 3: Preview Embeddings
 ```
-User Action: Click "Ingest" → Select strategy → Confirm
+User Action: Click "Ingest" → Select DB & strategy → Click "Preview Embeddings"
      │
      ▼
-handleStartIngestion(targetDb, strategy)
+handleShowPreview(targetDb, strategy)
      │
-     ├─► setIsPreviewMode(true)
+     ├─► Validate documentState exists
      │
-     ▼
-isLocalStrategy(strategy) ? ─────────────────────────────────────┐
-     │                                                            │
-     │ YES (embed_per_page, chunked_fixed)                        │ NO (semantic_sections)
-     │                                                            │
-     ▼                                                            ▼
-generateEmbeddingPreview()          previewEmbeddingsBackend() ◄── BACKEND CALL
-     │ LOCAL (no backend)                     │
-     │                                        ├─► POST /api/ingestion/preview-strategy
-     │                                        ├─► LLM service uses NLP/AI to:
-     │                                        │   - Detect topic boundaries
-     │                                        │   - Split by semantic meaning
-     │                                        │   - Generate section summaries
-     │                                        │
-     └────────────────┬───────────────────────┘
-                      │
-                      ▼
-              Returns: {chunks: [{id, text, metadata, images}]}
-                      │
-                      ▼
-              setEmbeddingPreview(preview)
-```
-
-**Local Strategy Processing** (Frontend):
-- Filter deleted items
-- Merge text items per page/strategy
-- Collect images
-- Format as chunks
-- **No network latency**
-
-**Backend Strategy Processing** (LLM Service):
-- Uses Python NLP libraries (langchain, spacy)
-- AI-based topic detection
-- Semantic boundary detection
-- **Requires LLM service**
-
-### Trigger Flow 4: Confirm Ingestion
-```
-User Action: Click "✓ Confirm" in preview
+     ├─► actions.startPreview(targetDb, strategy, [documentId], sidebarState)
+     │   (sets isPreviewMode: true, isLoadingPreview: true)
      │
      ▼
-handleConfirmIngestion()
+previewEmbeddings(strategy, documentState) ◄───── API CALL
      │
-     ├─► setIsIngesting(true)
-     │
-     ▼
-ingestToVectorDb(targetDb, embeddingPreview, strategy) ◄───── BACKEND CALL
-     │
-     ├─► POST /api/ingestion/ingest
+     ├─► POST /api/ingestion/preview
      │   {
-     │     targetDb: "chroma_default",
-     │     chunks: embeddingPreview.chunks,
-     │     strategy: "embed_per_page",
-     │     filename: documentState.filename
+     │     strategy: "embed_per_page" | "chunked_document",
+     │     documentState: { filename, pages: [...] }
      │   }
      │
      ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    LLM Service Processing                           │
+│                    Backend Processing                               │
 ├─────────────────────────────────────────────────────────────────────┤
-│  1. For each chunk with images:                                     │
-│     ├─► Decode base64 PNG                                           │
-│     ├─► Generate UUID for image                                     │
-│     ├─► Save as {uuid}.png in static folder                         │
-│     └─► Replace imageUrl: "data:image/png;base64,..." →            │
-│                imageUrl: "mongodb:{uuid}" or "/static/{uuid}.png"   │
-│                                                                     │
-│  2. Generate embeddings for text:                                   │
-│     ├─► Send text to embedding model (Snowflake)                    │
-│     └─► Get vector representation                                   │
-│                                                                     │
-│  3. Store in ChromaDB:                                              │
-│     ├─► collection.add(                                             │
-│     │     ids=[chunk_ids],                                          │
-│     │     documents=[chunk_texts],                                  │
-│     │     embeddings=[vectors],                                     │
-│     │     metadatas=[{page, source, images: [uuid1, uuid2]}]        │
-│     │   )                                                           │
-│     └─► Return success status                                       │
+│  generateEmbeddingPreview(documentState, strategy)                  │
+│  - embed_per_page: One embedding per page with text + images        │
+│  - chunked_document: Merge all text, split into overlapping chunks  │
 └─────────────────────────────────────────────────────────────────────┘
      │
      ├─► Response: {
      │     success: true,
-     │     chunksIngested: 5,
-     │     imagesStored: 3,
-     │     collectionId: "chroma_default"
+     │     preview: {
+     │       source: "document.pdf",
+     │       total_embeddings: 5,
+     │       strategy: "embed_per_page",
+     │       documents: [{ id, content, metadata }]
+     │     }
      │   }
      │
      ▼
-markFileAsIngested(documentId, response)  ◄─ localStorage (for UI state)
-clearCache(editStateKey)                   ◄─ localStorage
+actions.setPreviewGenerated(result.preview)
+(sets isLoadingPreview: false, embeddingPreview: preview)
      │
      ▼
-Update uploadQueue → Remove document
-Update ingestedFilesList → Add document
-setIsPreviewMode(false)
-setIsIngesting(false)
-toast.success('Document ingested successfully!')
+EmbeddingPreviewViewer displays preview with "Confirm & Ingest" button
 ```
 
-**Current Implementation Note**: 
-> ⚠️ The current code has a **simulated delay** instead of a real backend call.
-> This needs to be implemented with the actual `POST /api/ingestion/ingest` endpoint.
+**Error Handling**:
+- On API error: `actions.failPreview()` exits preview mode
+- Toast notification shows error message
+- **Requires LLM service**
+
+### Trigger Flow 4: Confirm Ingestion
+```
+User Action: Click "✓ Confirm & Ingest" in preview
+     │
+     ▼
+handleConfirmIngestion()
+     │
+     ├─► actions.startIngestion()  (sets isIngesting: true)
+     │
+     ▼
+startIngestion(targetDb, documentState, strategy) ◄───── API CALL
+     │
+     ├─► POST /api/ingestion/ingest
+     │   {
+     │     targetDb: "chroma_default",
+     │     documentState: { filename, pages: [...] },
+     │     strategy: "embed_per_page"
+     │   }
+     │
+     ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Backend Processing                               │
+├─────────────────────────────────────────────────────────────────────┤
+│  1. Generate embedding preview from documentState                   │
+│  2. For each chunk with images:                                     │
+│     ├─► Store image with UUID                                       │
+│     └─► Update image references                                     │
+│  3. Generate embeddings for text via LLM service                    │
+│  4. Store in ChromaDB vector database                               │
+│  5. Return success status                                           │
+└─────────────────────────────────────────────────────────────────────┘
+     │
+     ├─► Response: {
+     │     success: true,
+     │     documentCount: 5,
+     │     message: "Successfully ingested..."
+     │   }
+     │
+     ▼
+createIngestedFile(documentId, strategy, embeddingPreview)  ◄─ localStorage
+     │
+     ▼
+actions.completeIngestion(documentId, ingestedEntry, embeddingPreview)
+     │
+     ▼
+State Updates:
+```
+
+**Implementation Status**: ✅ Fully implemented
+- Frontend: `IngestionPage.jsx` → `handleConfirmIngestion()` (single), `handleConfirmIngestionAll()` (batch)
+- API Service: `ingestionApi.js` → `startIngestion()`
+- Backend: `ingestionController.js` → `startIngestion()`
+- Service: `ingestionService.js` → `ingestToVectorDb()` (currently returns mock data)
+
+### Trigger Flow 5: Ingest All (Multi-File)
+```
+User Action: Click "Ingest All" in preview with multiple files
+     │
+     ▼
+handleConfirmIngestionAll()
+     │
+     ├─► actions.startIngestion()  (sets isIngesting: true)
+     │
+     ▼
+for each documentId in previewDocumentIds:
+     │
+     ├─► getFileContent(documentId)  ◄─ localStorage
+     │
+     ├─► actions.updateIngestionProgress(i / total * 100)
+     │
+     ├─► startIngestion(targetDb, content, strategy)  ◄─ API CALL
+     │
+     ├─► previewEmbeddings(strategy, content)  ◄─ API CALL (for preview data)
+     │
+     └─► createIngestedFile(docId, strategy, preview)  ◄─ localStorage
+     │
+     ▼
+actions.completeBatchIngestion(ingestedEntries, rightSidebarState)
+     │
+     ▼
+State Updates:
+- All files added to ingestedFiles array
+- Exit preview mode
+- Clear multiSelectMode and checkedDocumentIds
+- First ingested file selected
+- Toast: "Successfully ingested N file(s)"
+```
 
 ---
 
@@ -741,7 +784,7 @@ toast.success('Document ingested successfully!')
   isLoading: boolean,
   onCancel: () => void,
   onConfirm: () => void,
-  onConfirmAll: () => void,  // For multi-file
+  onConfirmAll: () => void,  // For multi-file "Ingest All"
   isMultiFile: boolean,
   totalFilesInPreview: number,
   readOnly: boolean,  // For viewing stored embeddings
@@ -752,6 +795,8 @@ toast.success('Document ingested successfully!')
 - Paginated chunk display
 - Image gallery per chunk
 - Cancel/Confirm buttons (hidden in readOnly)
+- "Ingest All" button for multi-file ingestion
+- File switching via left sidebar click (generates new preview)
 
 ---
 

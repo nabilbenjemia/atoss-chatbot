@@ -29,7 +29,10 @@ export default function ConnectedContentViewer({
 
     // Use passed command state or fall back to document state
     const doc = commandState || documentState;
-    const availableClasses = backendConfig?.availableImageClasses || [];
+    // Use availableImageClasses or imageClasses from backend config with fallback
+    const availableClasses = backendConfig?.availableImageClasses
+        || backendConfig?.imageClasses
+        || ['logo', 'figure', 'chart', 'diagram', 'photo', 'screenshot', 'table_image', 'other'];
     const totalPages = doc?.pages?.length || 0;
     const currentPageContent = doc?.pages?.[currentPage - 1];
 

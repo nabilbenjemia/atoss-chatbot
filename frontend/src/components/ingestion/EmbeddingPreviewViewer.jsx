@@ -7,10 +7,10 @@
  * 
  * Supports:
  * - Single file preview with "Confirm & Ingest"
- * - Multi-file preview with "More" dropdown containing "Confirm & Ingest All"
+ * - Multi-file preview with "Confirm & Ingest" and "Ingest All" buttons
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import PageNavigation from './PageNavigation';
 
 /**
@@ -223,8 +223,6 @@ export default function EmbeddingPreviewViewer({
 }) {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(3);
-    const [showMoreMenu, setShowMoreMenu] = useState(false);
-    const moreMenuRef = useRef(null);
 
     const documents = preview?.documents || [];
     const totalItems = documents.length;
@@ -234,17 +232,6 @@ export default function EmbeddingPreviewViewer({
     const hasVisualContent = documents.some(doc =>
         (doc.metadata?.images?.length > 0) || (doc.metadata?.tables?.length > 0)
     );
-
-    // Close dropdown when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (moreMenuRef.current && !moreMenuRef.current.contains(event.target)) {
-                setShowMoreMenu(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
 
     // Auto-adjust items per page if visual content is detected
     useEffect(() => {
@@ -266,13 +253,6 @@ export default function EmbeddingPreviewViewer({
     const handlePageChange = useCallback((page) => {
         setCurrentPage(page);
     }, []);
-
-    const handleConfirmAll = () => {
-        setShowMoreMenu(false);
-        if (onConfirmAll) {
-            onConfirmAll();
-        }
-    };
 
     if (isLoading) {
         return (
@@ -297,7 +277,7 @@ export default function EmbeddingPreviewViewer({
         <div className="flex-1 flex flex-col overflow-hidden">
             {/* Top Action Bar */}
             <div className="bg-gradient-to-r from-tum-blue-light-5 to-tum-blue-light-4 border-b border-tum-grey-7 px-6 py-3 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                     {!readOnly ? (
                         <>
                             <button
@@ -322,42 +302,19 @@ export default function EmbeddingPreviewViewer({
                                 Confirm & Ingest
                             </button>
 
-                            {/* More Menu for Multi-File */}
+                            {/* Confirm All button for Multi-File */}
                             {isMultiFile && totalFilesInPreview > 1 && (
-                                <div className="relative" ref={moreMenuRef}>
-                                    <button
-                                        onClick={() => setShowMoreMenu(!showMoreMenu)}
-                                        className="px-3 py-2 text-sm font-semibold text-tum-blue bg-white border border-tum-blue 
-                                            rounded-lg hover:bg-tum-blue-light-5 transition-colors flex items-center gap-2"
-                                    >
-                                        More
-                                        <svg
-                                            className={`w-4 h-4 transition-transform ${showMoreMenu ? 'rotate-180' : ''}`}
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                        >
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                    </button>
-
-                                    {/* Dropdown Menu */}
-                                    {showMoreMenu && (
-                                        <div className="absolute top-full left-0 mt-1 bg-white border border-tum-grey-7 
-                                            rounded-lg shadow-lg py-1 min-w-[200px] z-10">
-                                            <button
-                                                onClick={handleConfirmAll}
-                                                className="w-full px-4 py-2 text-sm text-left text-tum-black hover:bg-tum-blue-light-5 
-                                                    transition-colors flex items-center gap-2"
-                                            >
-                                                <svg className="w-4 h-4 text-tum-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                                Confirm & Ingest All ({totalFilesInPreview})
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
+                                <button
+                                    onClick={onConfirmAll}
+                                    className="px-4 py-2 text-sm font-semibold text-white bg-tum-green 
+                                        rounded-lg hover:bg-tum-green/90 transition-colors flex items-center gap-2
+                                        shadow-md shadow-tum-green/20"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Ingest All ({totalFilesInPreview})
+                                </button>
                             )}
                         </>
                     ) : (

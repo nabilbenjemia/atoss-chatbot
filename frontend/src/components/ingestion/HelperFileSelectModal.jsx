@@ -25,6 +25,7 @@ export default function HelperFileSelectModal({
     files = [],
     helper = null,
     currentDocumentId = null,
+    // eslint-disable-next-line no-unused-vars
     currentFilename = null,
 }) {
     const [selectedIds, setSelectedIds] = useState(new Set());
@@ -72,6 +73,8 @@ export default function HelperFileSelectModal({
         }
     };
 
+    // For future: quick apply to current file only
+    // eslint-disable-next-line no-unused-vars
     const handleApplyToCurrentOnly = () => {
         if (currentDocumentId) {
             onConfirm([currentDocumentId]);
@@ -82,7 +85,8 @@ export default function HelperFileSelectModal({
     const allSelected = eligibleFiles.length > 0 &&
         eligibleFiles.every(f => selectedIds.has(f.documentId));
 
-    // Check if current file is eligible
+    // For future: highlight current file in list
+    // eslint-disable-next-line no-unused-vars
     const currentFileEligible = currentDocumentId &&
         eligibleFiles.some(f => f.documentId === currentDocumentId);
 

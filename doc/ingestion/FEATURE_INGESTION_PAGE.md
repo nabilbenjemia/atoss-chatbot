@@ -10,6 +10,34 @@ The **IngestionPage** is an admin-only page for document ingestion workflow in t
 
 ---
 
+### File Structure
+
+```
+frontend/src/
+├── pages/
+│   └── IngestionPage.jsx        # Main page (~550 lines, layout-only)
+├── components/ingestion/
+│   ├── index.js                 # Central exports
+│   ├── ConnectedFileQueue.jsx   # Connected components (own business logic)
+│   ├── ConnectedUploadZone.jsx
+│   ├── ConnectedContentViewer.jsx
+│   ├── ConnectedHelperPanel.jsx
+│   ├── UploadZone.jsx           # Pure UI components
+│   ├── FileQueue.jsx
+│   ├── ContentViewer.jsx
+│   └── ...
+└── context/ingestion/           # Context infrastructure
+    ├── index.js
+    ├── IngestionProvider.jsx
+    ├── ingestionReducer.js
+    ├── hooks.js
+    ├── contexts.js
+    ├── actionTypes.js
+    └── constants.js
+```
+
+---
+
 ## Related Documentation
 
 | Document | Description |
@@ -53,8 +81,8 @@ The page uses **Connected Components** that own their business logic:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                       IngestionPageLayout                                │
-│                    (Layout-only: ~250 lines)                            │
+│                          IngestionPage                                   │
+│                    (Layout-only: ~550 lines)                            │
 │  ┌─────────────────┐  ┌──────────────────────┐  ┌─────────────────┐    │
 │  │  LeftSidebar    │  │    Main Content      │  │  RightSidebar   │    │
 │  │  ┌───────────┐  │  │  ┌────────────────┐  │  │  ┌───────────┐  │    │
@@ -72,10 +100,8 @@ The page uses **Connected Components** that own their business logic:
 
 **Key Files**:
 - `frontend/src/context/ingestion/` - Context, reducer, hooks
-- `frontend/src/pages/IngestionPageLayout.jsx` - Layout-only page (~250 lines)
+- `frontend/src/pages/IngestionPage.jsx` - Layout-only page (~550 lines)
 - `frontend/src/components/ingestion/Connected*.jsx` - Connected components
-
-### Service Architecture
 
 ### Service Architecture
 
@@ -134,7 +160,7 @@ The page uses **Connected Components** that own their business logic:
 ```
 IngestionPage.jsx (entry point)
 ├── IngestionProvider (Context provider)
-│   └── IngestionPageLayout.jsx (~400 lines - layout-only)
+│   └── IngestionPage.jsx (~400 lines - layout-only)
 │       ├── LeftSidebar
 │       │   ├── ConnectedUploadZone.jsx    # Drag-drop upload (owns upload logic)
 │       │   ├── ConnectedFileQueue.jsx     # File list (owns selection logic)
@@ -478,6 +504,78 @@ sequenceDiagram
         IngestionPage->>IngestionPage: Start fresh
     end
 ```
+
+### 9. Multi-File Preview and Ingestion Flow
+
+Multi-file ingestion allows users to select multiple files and ingest them all at once.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant FileQueue
+    participant IngestionPage
+    participant IngestionModal
+    participant EmbeddingPreviewViewer
+    participant ingestionApi
+
+    Note over User,FileQueue: Step 1: Enable Multi-Select Mode
+    User->>FileQueue: Click "Multi-Select" toggle
+    FileQueue->>IngestionPage: actions.toggleMultiSelect()
+    Note over FileQueue: Checkboxes appear on file items
+
+    Note over User,FileQueue: Step 2: Select Multiple Files
+    User->>FileQueue: Check multiple files
+    FileQueue->>IngestionPage: actions.checkDocument(docId) × N
+
+    Note over User,IngestionModal: Step 3: Open Ingestion Modal
+    User->>IngestionPage: Click "Ingest" button
+    IngestionPage->>IngestionModal: Open modal with file count
+
+    Note over User,EmbeddingPreviewViewer: Step 4: Preview First File
+    User->>IngestionModal: Select DB, strategy → Click "Preview"
+    IngestionModal->>IngestionPage: handleShowPreview(targetDb, strategy)
+    IngestionPage->>ingestionApi: previewEmbeddings(strategy, firstFileContent)
+    ingestionApi-->>IngestionPage: {preview for first file}
+    IngestionPage->>EmbeddingPreviewViewer: Show preview + "Ingest All" button
+
+    Note over User,EmbeddingPreviewViewer: Step 5: Switch Between Files (Optional)
+    User->>FileQueue: Click different file in sidebar
+    FileQueue->>ingestionApi: previewEmbeddings(strategy, otherFileContent)
+    ingestionApi-->>FileQueue: {preview for other file}
+    FileQueue->>IngestionPage: actions.switchPreviewFile(docId, preview)
+    Note over FileQueue: Loading spinner shown during switch
+
+    Note over User,ingestionApi: Step 6: Ingest All Files
+    User->>EmbeddingPreviewViewer: Click "Ingest All (N)"
+    EmbeddingPreviewViewer->>IngestionPage: handleConfirmIngestionAll()
+    
+    loop For each file in previewDocumentIds
+        IngestionPage->>ingestionApi: startIngestion(targetDb, content, strategy)
+        IngestionPage->>ingestionApi: previewEmbeddings(strategy, content)
+        IngestionPage->>IngestionPage: createIngestedFile(docId, strategy, preview)
+        IngestionPage->>IngestionPage: actions.updateIngestionProgress(i/N * 100)
+    end
+
+    IngestionPage->>IngestionPage: actions.completeBatchIngestion(ingestedEntries)
+    Note over IngestionPage: All files added to "Ingested" section
+    Note over IngestionPage: Multi-select mode disabled
+    Note over IngestionPage: Exit preview mode → Content view
+    IngestionPage->>User: Toast "Successfully ingested N file(s)"
+```
+
+**Key Actions:**
+| Action | Description |
+|--------|-------------|
+| `toggleMultiSelect()` | Toggle multi-select mode on/off |
+| `checkDocument(docId)` | Toggle file selection in multi-select mode |
+| `switchPreviewFile(docId, preview)` | Switch to different file's preview |
+| `completeBatchIngestion(entries)` | Add all ingested entries, exit preview mode |
+
+**UI States in Multi-File Preview:**
+- Left sidebar shows only files in preview (`previewDocumentIds`)
+- Clicking file in sidebar switches the preview with loading spinner
+- "Ingest All (N)" button shows total count
+- Progress bar shows batch ingestion progress
 
 ---
 

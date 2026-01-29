@@ -178,10 +178,17 @@ export default function IngestionModal({
 
     // Handle showing preview in main content area
     const handleShowPreview = useCallback(() => {
-        if (!selectedDb && (!isCreatingNewDb || !newDbName)) return;
-        if (!selectedStrategy) return;
+        const targetDb = isCreatingNewDb ? newDbName.trim() : selectedDb;
 
-        const targetDb = isCreatingNewDb ? newDbName : selectedDb;
+        if (!targetDb) {
+            toast.warning('Please select or create a collection first');
+            return;
+        }
+        if (!selectedStrategy) {
+            toast.warning('Please select an ingestion strategy');
+            return;
+        }
+
         onShowPreview(targetDb, selectedStrategy);
         onClose();
     }, [selectedDb, selectedStrategy, isCreatingNewDb, newDbName, onShowPreview, onClose]);
@@ -451,7 +458,7 @@ export default function IngestionModal({
                             </button>
                             <button
                                 onClick={handleShowPreview}
-                                disabled={(!selectedDb && (!isCreatingNewDb || !newDbName)) || !selectedStrategy}
+                                disabled={(!selectedDb && (!isCreatingNewDb || !newDbName.trim())) || !selectedStrategy}
                                 className="px-6 py-2.5 rounded-xl bg-tum-blue text-white text-sm font-semibold shadow-md shadow-tum-blue/20 hover:bg-tum-dark-blue hover:shadow-lg hover:shadow-tum-blue/30 transform active:scale-95 transition-all disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed flex items-center gap-2"
                             >
                                 Preview Embeddings
