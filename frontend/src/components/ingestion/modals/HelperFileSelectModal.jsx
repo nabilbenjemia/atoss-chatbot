@@ -25,8 +25,7 @@ export default function HelperFileSelectModal({
     files = [],
     helper = null,
     currentDocumentId = null,
-    // eslint-disable-next-line no-unused-vars
-    currentFilename = null,
+
 }) {
     const [selectedIds, setSelectedIds] = useState(new Set());
 
