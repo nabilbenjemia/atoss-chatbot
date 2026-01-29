@@ -28,7 +28,6 @@ const AnalyticsDashboard = () => {
             const response = await fetch(url);
             if (!response.ok) throw new Error('Failed to fetch analytics data');
             const data = await response.json();
-            console.log('Dashboard data received:', data); // Debug log
             setDashboardData(data);
         } catch (err) {
             setError(err.message);
@@ -47,7 +46,6 @@ const AnalyticsDashboard = () => {
             });
             if (!response.ok) throw new Error('Failed to process queries');
             const result = await response.json();
-            console.log('Process result:', result); // Debug log
             
             // Show appropriate notification based on result
             if (result.processed === 0) {
@@ -105,14 +103,7 @@ const AnalyticsDashboard = () => {
         );
     }
 
-    // Debug logs
-    console.log('Dashboard data state:', dashboardData);
-    
     const { overall, keywords, categories, timeline } = dashboardData || {};
-    
-    console.log('Keywords:', keywords);
-    console.log('Categories:', categories);
-    console.log('Timeline:', timeline);
 
     // Prepare data for keyword bar chart
     const keywordData = keywords && keywords.length > 0 ? [{
