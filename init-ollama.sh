@@ -25,7 +25,7 @@ if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
     exit 1
 fi
 
-# Pull the model
+# Pull the main model
 MODEL="${OLLAMA_MODEL:-qwen2.5:7b-instruct-q4_0}"
 echo "Checking if model $MODEL exists..."
 
@@ -41,12 +41,26 @@ else
     echo "Model $MODEL downloaded successfully"
 fi
 
-# Preload the model into memory
+# Pull the smaller analytics model
+ANALYTICS_MODEL="qwen3:4b-instruct"
+echo "Checking if analytics model $ANALYTICS_MODEL exists..."
+
+if ollama list | grep -q "$ANALYTICS_MODEL"; then
+    echo "Analytics model $ANALYTICS_MODEL already exists, skipping download"
+else
+    echo "Pulling $ANALYTICS_MODEL for analytics classification..."
+    ollama pull "$ANALYTICS_MODEL" || {
+        echo "Warning: Failed to pull analytics model $ANALYTICS_MODEL"
+    }
+    echo "Analytics model $ANALYTICS_MODEL downloaded successfully"
+fi
+
+# Preload the main model into memory
 echo "Preloading model $MODEL into memory..."
 echo "Hello" | ollama run "$MODEL" --keepalive -1 > /dev/null 2>&1 &
 sleep 2
 echo "Model preloaded and will stay in memory"
 
 # Keep the server running
-echo "Ollama is ready with model $MODEL"
+echo "Ollama is ready with models: $MODEL, $ANALYTICS_MODEL"
 wait $pid
