@@ -130,6 +130,21 @@ export const runBackendHelper = async (helperId, content, params = {}) => {
     return response.data;
 };
 
+/**
+ * Generate AI descriptions for images
+ * Sends document ID and image data to backend for AI processing
+ * @param {string} documentId - The document ID
+ * @param {Array} images - Array of { id, imageUrl, classification, pageNumber }
+ * @returns {Promise<{success: boolean, descriptions: Array<{imageId: string, description: string}>, message?: string}>}
+ */
+export const generateImageDescriptions = async (documentId, images) => {
+    const response = await ingestionApi.post('/api/ingestion/helper/image-descriptions', {
+        documentId,
+        images,
+    });
+    return response.data;
+};
+
 // Export all functions as named exports
 export default {
     getBackendConfig,
@@ -137,4 +152,5 @@ export default {
     previewEmbeddings,
     startIngestion,
     runBackendHelper,
+    generateImageDescriptions,
 };

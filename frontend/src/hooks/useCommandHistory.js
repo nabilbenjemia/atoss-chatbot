@@ -123,6 +123,18 @@ export const Commands = {
             return result;
         },
     }),
+
+    /**
+     * Batch insert items after specific items (for AI image description)
+     * Inserts a new item immediately after the specified target item
+     */
+    batchInsertAfter: (insertions) => ({
+        // insertions: [{ afterItemId, newItem }, ...]
+        type: 'BATCH_INSERT_AFTER',
+        insertions,
+        execute: (doc) => insertItemsAfter(doc, insertions),
+        undo: (doc) => removeInsertedItems(doc, insertions.map(i => i.newItem.id)),
+    }),
 };
 
 // ============================================================================
@@ -163,6 +175,8 @@ export function deserializeCommand(data) {
             return Commands.renameDocument(data.newFilename, data.oldFilename);
         case 'BATCH_UPDATE':
             return Commands.batchUpdate(data.changes);
+        case 'BATCH_INSERT_AFTER':
+            return Commands.batchInsertAfter(data.insertions);
         default:
             console.warn(`[deserializeCommand] Unknown command type: ${data.type}`);
             return null;
@@ -230,6 +244,70 @@ function applyToItems(doc, itemIds, transform) {
                 items: page.items.map((item) =>
                     idSet.has(item.id) ? transform(item) : item
                 ),
+            };
+        }),
+    };
+}
+
+/**
+ * Insert items after specific target items
+ * @param {Object} doc - The document state
+ * @param {Array} insertions - Array of { afterItemId, newItem }
+ * @returns {Object} - New document state with inserted items
+ */
+function insertItemsAfter(doc, insertions) {
+    if (!doc?.pages || !insertions?.length) return doc;
+
+    // Create a map of afterItemId -> newItem for O(1) lookup
+    const insertionMap = new Map();
+    for (const { afterItemId, newItem } of insertions) {
+        insertionMap.set(afterItemId, newItem);
+    }
+
+    return {
+        ...doc,
+        pages: doc.pages.map((page) => {
+            // Check if this page contains any of the target items
+            const hasAnyTarget = page.items?.some((item) => insertionMap.has(item.id));
+            if (!hasAnyTarget) return page; // Structural sharing
+
+            // Build new items array with insertions
+            const newItems = [];
+            for (const item of page.items) {
+                newItems.push(item);
+                if (insertionMap.has(item.id)) {
+                    newItems.push(insertionMap.get(item.id));
+                }
+            }
+
+            return {
+                ...page,
+                items: newItems,
+            };
+        }),
+    };
+}
+
+/**
+ * Remove items by their IDs (for undo of insert)
+ * @param {Object} doc - The document state
+ * @param {Array} itemIds - Array of item IDs to remove
+ * @returns {Object} - New document state without the items
+ */
+function removeInsertedItems(doc, itemIds) {
+    if (!doc?.pages || !itemIds?.length) return doc;
+    const idSet = new Set(itemIds);
+
+    return {
+        ...doc,
+        pages: doc.pages.map((page) => {
+            // Check if this page contains any items to remove
+            const hasAnyItem = page.items?.some((item) => idSet.has(item.id));
+            if (!hasAnyItem) return page; // Structural sharing
+
+            return {
+                ...page,
+                items: page.items.filter((item) => !idSet.has(item.id)),
             };
         }),
     };

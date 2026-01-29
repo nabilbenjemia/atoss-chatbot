@@ -591,7 +591,8 @@ The Ingestion Service (`backend/ingestion/`) acts as a **proxy** between the fro
 | 2 | `/api/ingestion/upload` | POST | Upload PDF file for content extraction | ✅ Mock data |
 | 3 | `/api/ingestion/preview` | POST | Generate embedding preview from document state | ✅ Local (no LLM needed) |
 | 4 | `/api/ingestion/ingest` | POST | Ingest document into vector database | ✅ Mock success |
-| 5 | `/api/ingestion/helper` | POST | Run AI helper function | ✅ Mock data |
+| 5 | `/api/ingestion/helper` | POST | Run AI helper function (generic) | ✅ Mock data |
+| 6 | `/api/ingestion/helper/image-descriptions` | POST | Generate AI descriptions for images | ✅ Mock data |
 
 ### API Specifications
 
@@ -614,7 +615,7 @@ The Ingestion Service (`backend/ingestion/`) acts as a **proxy** between the fro
         { id: 'remove_logos', label: 'Remove All Logos', type: 'local', enabled: true },
         { id: 'remove_empty', label: 'Remove Empty Text', type: 'local', enabled: true },
         { id: 'delete_regex', label: 'Delete by Regex', type: 'local', enabled: true, hasInput: true },
-        { id: 'ai_image_descriptions', label: 'AI Image Descriptions', type: 'backend', enabled: false },
+        { id: 'ai_image_descriptions', label: 'AI Image Descriptions', type: 'backend', enabled: true },
     ],
     // Target databases
     collections: [
@@ -718,7 +719,7 @@ formData.append('file', file);
 }
 ```
 
-#### 5. Run AI Helper
+#### 5. Run AI Helper (Generic)
 ```javascript
 // POST /api/ingestion/helper
 
@@ -739,6 +740,62 @@ formData.append('file', file);
     message: "Generated descriptions for 2 images"
 }
 ```
+
+#### 6. Generate Image Descriptions (New Endpoint)
+```javascript
+// POST /api/ingestion/helper/image-descriptions
+// Dedicated endpoint for generating AI descriptions for images
+// Frontend sends specific images, backend returns descriptions
+
+// Request
+{
+    documentId: "doc_1706428800000",
+    images: [
+        { id: "img_1", imageUrl: "data:image/png;base64,...", classification: "chart", pageNumber: 1 },
+        { id: "img_2", imageUrl: "data:image/png;base64,...", classification: "logo", pageNumber: 2 }
+    ]
+}
+
+// Response (currently MOCK data - classification-aware)
+{
+    success: true,
+    descriptions: [
+        { 
+            imageId: "img_1", 
+            classification: "chart",
+            description: "This is a chart or graph presenting data. It likely shows trends, comparisons, or distributions. Found on page 1. [Mock description - replace with actual AI vision model output]" 
+        },
+        { 
+            imageId: "img_2", 
+            classification: "logo",
+            description: "This appears to be a company or brand logo. Found on page 2. [Mock description - replace with actual AI vision model output]" 
+        }
+    ],
+    message: "Generated descriptions for 2 image(s)"
+}
+```
+
+**Classification-Aware Prompts:**
+The backend uses different prompts for each image classification to generate more relevant descriptions:
+
+| Classification | Prompt Hint |
+|---------------|-------------|
+| `logo` | "This appears to be a company or brand logo." |
+| `figure` | "This is a figure or illustration that visualizes concepts from the document." |
+| `chart` | "This is a chart or graph presenting data. It likely shows trends, comparisons, or distributions." |
+| `diagram` | "This is a diagram illustrating a process, structure, or relationship between components." |
+| `photo` | "This is a photograph capturing a real-world scene or subject." |
+| `screenshot` | "This is a screenshot showing a user interface or application window." |
+| `table_image` | "This is an image of a table containing structured data." |
+| `other` | "This is a visual element that provides context to the document content." |
+| `unclassified` | "This is a visual element found in the document." |
+
+**Frontend Flow for Image Descriptions:**
+1. Frontend collects all non-deleted images (type `'image'` or `'picture'`) with their URLs, IDs, classifications, and page numbers
+2. Sends to `/api/ingestion/helper/image-descriptions`
+3. Backend uses classification-aware prompts (mock) or real AI model to generate descriptions
+4. Frontend **inserts a new TextItem** below each image with content: `**Image Description:** {description}`
+5. The insertion is wrapped in `Commands.batchInsertAfter` for undo/redo support
 
 ### LLM Service Integration (TODO)
 

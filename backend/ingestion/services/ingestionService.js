@@ -64,7 +64,7 @@ const getDefaultConfig = () => {
             { id: 'remove_logos', label: 'Remove All Logos', type: 'local', enabled: true },
             { id: 'remove_empty', label: 'Remove Empty Text', type: 'local', enabled: true },
             { id: 'delete_regex', label: 'Delete by Regex', type: 'local', enabled: true, hasInput: true },
-            { id: 'ai_image_descriptions', label: 'AI Image Descriptions', type: 'backend', enabled: false }, // Not implemented yet
+            { id: 'ai_image_descriptions', label: 'AI Image Descriptions', type: 'backend', enabled: true }, // Mock data for now
         ],
         // Target vector databases (always from backend)
         collections: [

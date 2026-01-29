@@ -32,7 +32,7 @@ import {
 
 // External hooks
 import useBackendConfig from '../hooks/useBackendConfig';
-import useCommandHistory, { Commands } from '../hooks/useCommandHistory';
+import useCommandHistory, { Commands, serializeCommand } from '../hooks/useCommandHistory';
 import { loadFromCache, clearCache, hasCache } from '../hooks/useLocalCache';
 
 // Utility functions
@@ -50,7 +50,7 @@ import {
     createIngestedFile,
 } from '../utils/fileCacheManager';
 import { INGESTION_CONFIG } from '../config/ingestionConfig';
-import { previewEmbeddings, startIngestion } from '../services/ingestionApi';
+import { previewEmbeddings, startIngestion, generateImageDescriptions } from '../services/ingestionApi';
 
 // Connected components (own their business logic)
 import {
@@ -322,14 +322,186 @@ function IngestionPageLayout() {
         actions.closeModal();
     }, [documentState, executeCommand, actions]);
 
-    const handleHelperFileSelectConfirm = useCallback(async () => {
+    const handleHelperFileSelectConfirm = useCallback(async (selectedDocumentIds) => {
         actions.closeModal();
-        // Helper execution logic is in ConnectedHelperPanel
-        if (pendingHelper) {
-            actions.startHelper(pendingHelper.id);
-            // Execute helper on selected files...
+
+        if (!pendingHelper || !selectedDocumentIds || selectedDocumentIds.length === 0) {
+            actions.clearPendingHelper();
+            return;
         }
-    }, [actions, pendingHelper]);
+
+        actions.startHelper(pendingHelper.id);
+
+        try {
+            let totalAffected = 0;
+            let filesProcessed = 0;
+
+            // Process each selected file
+            for (const docId of selectedDocumentIds) {
+                const isCurrentDocument = docId === selectedDocumentId;
+
+                // Get document content
+                const docContent = isCurrentDocument && documentState
+                    ? documentState
+                    : getFileContent(docId);
+
+                if (!docContent || !docContent.pages) {
+                    console.warn(`[Helper] No content found for document: ${docId}`);
+                    continue;
+                }
+
+                let affectedIds = [];
+
+                // Collect items to modify based on helper type
+                switch (pendingHelper.id) {
+                    case 'remove_logos': {
+                        for (const page of docContent.pages) {
+                            for (const item of page.items) {
+                                if ((item.type === 'image' || item.type === 'picture') && item.classification === 'logo' && !item.deleted) {
+                                    affectedIds.push(item.id);
+                                }
+                            }
+                        }
+                        break;
+                    }
+
+                    case 'remove_empty': {
+                        for (const page of docContent.pages) {
+                            for (const item of page.items) {
+                                if (item.type === 'text' && !item.deleted) {
+                                    const trimmed = item.content.trim();
+                                    if (!trimmed || trimmed.length <= 1) {
+                                        affectedIds.push(item.id);
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    }
+
+                    case 'ai_image_descriptions': {
+                        // Collect all images from this document
+                        const images = [];
+                        for (const page of docContent.pages) {
+                            for (const item of page.items) {
+                                if ((item.type === 'image' || item.type === 'picture') && !item.deleted) {
+                                    images.push({
+                                        id: item.id,
+                                        imageUrl: item.imageUrl,
+                                        classification: item.classification || 'unclassified',
+                                        pageNumber: page.pageNumber,
+                                    });
+                                }
+                            }
+                        }
+
+                        if (images.length > 0) {
+                            // Call backend to generate descriptions
+                            const result = await generateImageDescriptions(docId, images);
+
+                            if (result.success && result.descriptions) {
+                                // Create insertions: new text items after each image
+                                const insertions = result.descriptions
+                                    .filter(d => d.description)
+                                    .map(d => ({
+                                        afterItemId: d.imageId,
+                                        newItem: {
+                                            id: `desc_${d.imageId}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                                            type: 'text',
+                                            content: `**Image Description:** ${d.description}`,
+                                            deleted: false,
+                                        },
+                                    }));
+
+                                if (insertions.length > 0) {
+                                    const command = Commands.batchInsertAfter(insertions);
+
+                                    if (isCurrentDocument) {
+                                        executeCommand(command);
+                                    } else {
+                                        // Execute on non-current document
+                                        const newContent = command.execute(docContent);
+                                        const existingHistory = getFileHistory(docId) || { past: [], future: [] };
+                                        const serializedCmd = serializeCommand(command);
+                                        const newHistory = {
+                                            past: [...existingHistory.past, serializedCmd],
+                                            future: [],
+                                        };
+                                        saveFileContent(docId, newContent);
+                                        saveFileHistory(docId, newHistory);
+                                    }
+                                    totalAffected += insertions.length;
+                                }
+                            }
+                        }
+                        filesProcessed++;
+                        continue; // Skip the default batchDelete logic below
+                    }
+
+                    default:
+                        break;
+                }
+
+                if (affectedIds.length > 0) {
+                    // Create the command
+                    const command = Commands.batchDelete(affectedIds);
+
+                    if (isCurrentDocument) {
+                        // For current document, use the hook (updates UI immediately)
+                        executeCommand(command);
+                    } else {
+                        // For other documents, execute command and save with history
+                        // 1. Execute command to get new state
+                        const newContent = command.execute(docContent);
+
+                        // 2. Load existing history (or create empty)
+                        const existingHistory = getFileHistory(docId) || { past: [], future: [] };
+
+                        // 3. Add command to past (serialized), clear future
+                        const serializedCmd = serializeCommand(command);
+                        const newHistory = {
+                            past: [...existingHistory.past, serializedCmd],
+                            future: [], // Clear redo stack when new command is executed
+                        };
+
+                        // 4. Save both content and history
+                        saveFileContent(docId, newContent);
+                        saveFileHistory(docId, newHistory);
+                    }
+                    totalAffected += affectedIds.length;
+                }
+                filesProcessed++;
+            }
+
+            // Show result
+            let helperLabel;
+            let actionVerb;
+            if (pendingHelper.id === 'remove_logos') {
+                helperLabel = 'logo(s)';
+                actionVerb = 'removed from';
+            } else if (pendingHelper.id === 'ai_image_descriptions') {
+                helperLabel = 'image description(s)';
+                actionVerb = 'generated for';
+            } else {
+                helperLabel = 'item(s)';
+                actionVerb = 'removed from';
+            }
+
+            if (totalAffected > 0) {
+                toast.success(`${totalAffected} ${helperLabel} ${actionVerb} ${filesProcessed} file(s)`);
+            } else {
+                toast.info(`No ${helperLabel} found in selected files`);
+            }
+
+            actions.completeHelper();
+        } catch (error) {
+            console.error('Helper failed:', error);
+            toast.error('Helper failed: ' + error.message);
+            actions.failHelper();
+        }
+
+        actions.clearPendingHelper();
+    }, [actions, pendingHelper, selectedDocumentId, documentState, executeCommand]);
 
     // Confirm and ingest (single file)
     const handleConfirmIngestion = useCallback(async () => {
