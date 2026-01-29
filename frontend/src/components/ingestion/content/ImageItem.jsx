@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { INGESTION_CONFIG } from '../../config/ingestionConfig';
+import { INGESTION_CONFIG } from '../../../config/ingestionConfig';
 
 /**
  * @param {Object} props

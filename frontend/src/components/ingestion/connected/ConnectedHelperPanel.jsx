@@ -14,10 +14,10 @@ import {
     useDocument,
     useIngestionActions,
     MODAL_TYPES,
-} from '../../context/ingestion';
-import { INGESTION_CONFIG } from '../../config/ingestionConfig';
-import { runBackendHelper } from '../../services/ingestionApi';
-import { Commands } from '../../hooks/useCommandHistory';
+} from '../../../context/ingestion';
+import { INGESTION_CONFIG } from '../../../config/ingestionConfig';
+import { runBackendHelper } from '../../../services/ingestionApi';
+import { Commands } from '../../../hooks/useCommandHistory';
 
 export default function ConnectedHelperPanel({ executeCommand }) {
     const { runningHelper, isIngesting } = useUI();

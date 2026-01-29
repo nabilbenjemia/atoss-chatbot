@@ -12,11 +12,11 @@ import { toast } from 'react-toastify';
 import {
     useDocument,
     useIngestionActions,
-} from '../../context/ingestion';
-import useBackendConfig from '../../hooks/useBackendConfig';
-import { Commands } from '../../hooks/useCommandHistory';
-import PageContent from './PageContent';
-import PageNavigation from './PageNavigation';
+} from '../../../context/ingestion';
+import useBackendConfig from '../../../hooks/useBackendConfig';
+import { Commands } from '../../../hooks/useCommandHistory';
+import PageContent from '../content/PageContent';
+import PageNavigation from '../content/PageNavigation';
 
 export default function ConnectedContentViewer({
     // Command history is passed in because it's shared with header for undo/redo

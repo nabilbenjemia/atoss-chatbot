@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import { DOC_STATUS } from './constants';
+import { DOC_STATUS } from '../../../context/ingestion';
 
 /**
  * Get status icon for document
