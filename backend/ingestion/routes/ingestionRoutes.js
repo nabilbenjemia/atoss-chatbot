@@ -57,4 +57,7 @@ router.post('/ingest', ingestionController.startIngestion);
 // POST /api/ingestion/helper - Run AI helper on document content
 router.post('/helper', ingestionController.runHelper);
 
+// POST /api/ingestion/helper/image-descriptions - Generate AI descriptions for images
+router.post('/helper/image-descriptions', ingestionController.generateImageDescriptions);
+
 module.exports = router;

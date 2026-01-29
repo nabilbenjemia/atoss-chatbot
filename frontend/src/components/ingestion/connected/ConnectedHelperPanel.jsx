@@ -12,35 +12,38 @@ import { toast } from 'react-toastify';
 import {
     useUI,
     useDocument,
+    useFileQueue,
     useIngestionActions,
     MODAL_TYPES,
+    DOC_STATUS,
 } from '../../../context/ingestion';
 import { INGESTION_CONFIG } from '../../../config/ingestionConfig';
-import { runBackendHelper } from '../../../services/ingestionApi';
+import { generateImageDescriptions } from '../../../services/ingestionApi';
 import { Commands } from '../../../hooks/useCommandHistory';
 
 export default function ConnectedHelperPanel({ executeCommand }) {
     const { runningHelper, isIngesting } = useUI();
     const { documentState } = useDocument();
+    const { uploadQueue } = useFileQueue();
     const actions = useIngestionActions();
 
     const disabled = !documentState || isIngesting;
     const localHelpers = useMemo(() => INGESTION_CONFIG.helpers.local || [], []);
     const backendHelpers = useMemo(() => INGESTION_CONFIG.helpers.backend || [], []);
 
+    // Get all helpers as a flat array for lookup
+    const allHelpers = useMemo(() => [...localHelpers, ...backendHelpers], [localHelpers, backendHelpers]);
+
+    // Count ready files (files that helper can be applied to)
+    const readyFiles = useMemo(
+        () => uploadQueue.filter(f => f.status === DOC_STATUS.READY),
+        [uploadQueue]
+    );
+
     // Execute helper directly on current document
+    // NOTE: Must be defined BEFORE handleHelperClick since it's called by that function
     const executeHelper = useCallback(async (helperId) => {
-        if (!documentState) {
-            toast.warning('No document loaded to apply helper');
-            return;
-        }
-
-        // Handle regex helper separately
-        if (helperId === 'delete_regex') {
-            actions.openModal(MODAL_TYPES.REGEX);
-            return;
-        }
-
+        console.log('[ExecuteHelper] Starting helper:', helperId);
         actions.startHelper(helperId);
 
         try {
@@ -51,7 +54,7 @@ export default function ConnectedHelperPanel({ executeCommand }) {
                     const logoItemIds = [];
                     for (const page of documentState.pages) {
                         for (const item of page.items) {
-                            if (item.type === 'image' && item.classification === 'logo' && !item.deleted) {
+                            if ((item.type === 'image' || item.type === 'picture') && item.classification === 'logo' && !item.deleted) {
                                 logoItemIds.push(item.id);
                             }
                         }
@@ -83,29 +86,72 @@ export default function ConnectedHelperPanel({ executeCommand }) {
                 }
 
                 case 'ai_image_descriptions': {
-                    const result = await runBackendHelper(helperId, documentState, {});
-                    if (result.success && result.modifiedItems) {
-                        const changes = result.modifiedItems
-                            .filter(m => m.description)
-                            .map(m => {
-                                let oldDescription = '';
-                                for (const page of documentState.pages) {
-                                    const item = page.items.find(i => i.id === m.id);
-                                    if (item) {
-                                        oldDescription = item.description || '';
-                                        break;
-                                    }
-                                }
-                                return {
-                                    itemId: m.id,
-                                    newValues: { description: m.description },
-                                    oldValues: { description: oldDescription },
-                                };
-                            });
-                        if (changes.length > 0) {
-                            executeCommand(Commands.batchUpdate(changes));
+                    // Collect all non-deleted images/pictures with their info
+                    // Support both 'image' and 'picture' types for compatibility
+                    const images = [];
+
+                    // Debug: log document structure
+                    console.log('[AI Image Helper] Document state:', {
+                        documentId: documentState?.documentId,
+                        filename: documentState?.filename,
+                        pageCount: documentState?.pages?.length,
+                    });
+
+                    if (!documentState?.pages) {
+                        console.error('[AI Image Helper] No pages in document state');
+                        message = 'No document loaded or document has no pages.';
+                        break;
+                    }
+
+                    for (const page of documentState.pages) {
+                        for (const item of page.items) {
+                            // Debug: log each item type
+                            console.log(`[AI Image Helper] Page ${page.pageNumber}, Item: ${item.id}, Type: ${item.type}, Deleted: ${item.deleted}`);
+
+                            if ((item.type === 'image' || item.type === 'picture') && !item.deleted) {
+                                images.push({
+                                    id: item.id,
+                                    imageUrl: item.imageUrl,
+                                    classification: item.classification || 'unclassified',
+                                    pageNumber: page.pageNumber,
+                                });
+                            }
                         }
-                        message = result.message || 'AI descriptions generated';
+                    }
+
+                    console.log(`[AI Image Helper] Found ${images.length} images:`, images.map(i => ({ id: i.id, classification: i.classification })));
+
+                    if (images.length === 0) {
+                        message = 'No images found in document. Make sure the document contains image items.';
+                        break;
+                    }
+
+                    // Call backend to generate descriptions
+                    const result = await generateImageDescriptions(
+                        documentState.documentId,
+                        images
+                    );
+
+                    if (result.success && result.descriptions) {
+                        // Create insertions: new text items after each image
+                        const insertions = result.descriptions
+                            .filter(d => d.description)
+                            .map(d => ({
+                                afterItemId: d.imageId,
+                                newItem: {
+                                    id: `desc_${d.imageId}_${Date.now()}`,
+                                    type: 'text',
+                                    content: `**Image Description:** ${d.description}`,
+                                    deleted: false,
+                                },
+                            }));
+
+                        if (insertions.length > 0) {
+                            executeCommand(Commands.batchInsertAfter(insertions));
+                        }
+                        message = result.message || `Generated descriptions for ${insertions.length} image(s)`;
+                    } else {
+                        message = result.error || 'Failed to generate descriptions';
                     }
                     break;
                 }
@@ -123,6 +169,37 @@ export default function ConnectedHelperPanel({ executeCommand }) {
         }
     }, [documentState, executeCommand, actions]);
 
+    // Handle helper button click
+    const handleHelperClick = useCallback((helperId) => {
+        console.log('[HelperPanel] Button clicked:', helperId);
+        console.log('[HelperPanel] documentState:', documentState ? 'exists' : 'null');
+        console.log('[HelperPanel] readyFiles.length:', readyFiles.length);
+
+        if (!documentState) {
+            toast.warning('No document loaded to apply helper');
+            return;
+        }
+
+        // Handle regex helper separately (always shows its own modal)
+        if (helperId === 'delete_regex') {
+            actions.openModal(MODAL_TYPES.REGEX);
+            return;
+        }
+
+        // If multiple ready files exist, show file selection modal
+        if (readyFiles.length > 1) {
+            console.log('[HelperPanel] Multiple files - showing file selection modal');
+            const helper = allHelpers.find(h => h.id === helperId);
+            actions.setPendingHelper(helper);
+            actions.openHelperFileSelectModal();
+            return;
+        }
+
+        // Only one file - execute directly
+        console.log('[HelperPanel] Executing helper directly');
+        executeHelper(helperId);
+    }, [documentState, readyFiles.length, allHelpers, actions, executeHelper]);
+
     return (
         <div className="flex-1 p-4 overflow-y-auto">
             {/* Local Helpers */}
@@ -133,7 +210,7 @@ export default function ConnectedHelperPanel({ executeCommand }) {
                 {localHelpers.map((helper) => (
                     <button
                         key={helper.id}
-                        onClick={() => executeHelper(helper.id)}
+                        onClick={() => handleHelperClick(helper.id)}
                         disabled={disabled || runningHelper === helper.id}
                         className={`
                             w-full px-3 py-2 text-left text-sm transition-all border
@@ -164,7 +241,7 @@ export default function ConnectedHelperPanel({ executeCommand }) {
                 {backendHelpers.map((helper) => (
                     <button
                         key={helper.id}
-                        onClick={() => executeHelper(helper.id)}
+                        onClick={() => handleHelperClick(helper.id)}
                         disabled={disabled || runningHelper === helper.id}
                         className={`
                             w-full px-3 py-2 text-left text-sm transition-all border

@@ -65,6 +65,7 @@ export default function PageContent({
                         );
 
                     case 'image':
+                    case 'picture':
                         return (
                             <ImageItem
                                 key={item.id}

@@ -12,66 +12,72 @@ This document explains the non-obvious algorithms and code patterns used in the 
 
 ## AI Image Description Helper
 
-**Location**: `frontend/src/pages/IngestionPage.jsx` (lines ~484-514)
+**Location**: `frontend/src/components/ingestion/connected/ConnectedHelperPanel.jsx`
 
 ### What It Does
 
 This code handles the flow when a user clicks "Generate Image Descriptions (AI)" helper. It:
-1. Sends all document content to the backend LLM service
-2. Receives AI-generated descriptions for each image
-3. Updates the local document state with these descriptions
-4. Makes the changes undoable
+1. Collects all non-deleted images from the document with their URLs and metadata
+2. Sends the documentId and images array to the backend
+3. Receives AI-generated descriptions for each image
+4. **Inserts a new TextItem** right below each image containing the description
+5. Makes the changes undoable as a single action
 
 ### Step-by-Step Explanation
 
 ```javascript
 case 'ai_image_descriptions': {
-    // 1. CALL BACKEND
-    // Send the entire documentState to the LLM service
-    // The backend will:
-    //   - Extract all images from the document
-    //   - Send each image to an AI model (e.g., Ollama vision model)
-    //   - Return descriptions for each image
-    const result = await runBackendHelper(helperId, documentState, {});
-    
-    // 2. CHECK RESPONSE
-    // Backend returns: { success: true, modifiedItems: [{id: "item_123", description: "A bar chart showing..."}] }
-    if (result.success && result.modifiedItems) {
-        
-        // 3. BUILD UNDO/REDO CHANGES
-        // For each item the backend modified, we need to:
-        //   - Find what the OLD description was (for undo)
-        //   - Store the NEW description (for redo)
-        const changes = result.modifiedItems
-            .filter(m => m.description)  // Only items that got descriptions
-            .map(m => {
-                // Find the old description by searching through all pages/items
-                let oldDescription = '';
-                for (const page of documentState.pages) {
-                    const item = page.items.find(i => i.id === m.id);
-                    if (item) {
-                        oldDescription = item.description || '';
-                        break;
-                    }
-                }
-                
-                // Return a change object for the Command Pattern
-                return {
-                    itemId: m.id,
-                    newValues: { description: m.description },  // What to set on execute/redo
-                    oldValues: { description: oldDescription }, // What to set on undo
-                };
-            });
-
-        // 4. EXECUTE AS BATCH COMMAND
-        // This applies all changes at once AND makes them undoable as a single action
-        // User presses Ctrl+Z → ALL descriptions are removed at once
-        if (changes.length > 0) {
-            executeCommand(Commands.batchUpdate(changes));
-            setHasUnsavedChanges(true);  // Show "unsaved" indicator
+    // 1. COLLECT IMAGES
+    // Gather all non-deleted images from all pages
+    const images = [];
+    for (const page of documentState.pages) {
+        for (const item of page.items) {
+            if (item.type === 'image' && !item.deleted) {
+                images.push({
+                    id: item.id,
+                    imageUrl: item.imageUrl,
+                    classification: item.classification || 'unclassified',
+                    pageNumber: page.pageNumber,
+                });
+            }
         }
-        
-        message = result.message || 'AI descriptions generated';
+    }
+
+    if (images.length === 0) {
+        message = 'No images found in document';
+        break;
+    }
+
+    // 2. CALL BACKEND
+    // Send documentId and images array to the backend
+    // Backend returns: { success: true, descriptions: [{imageId, description}] }
+    const result = await generateImageDescriptions(
+        documentState.documentId,
+        images
+    );
+
+    // 3. CHECK RESPONSE AND BUILD INSERTIONS
+    if (result.success && result.descriptions) {
+        // Create insertions: new text items after each image
+        const insertions = result.descriptions
+            .filter(d => d.description)
+            .map(d => ({
+                afterItemId: d.imageId,  // Insert after this image
+                newItem: {
+                    id: `desc_${d.imageId}_${Date.now()}`,
+                    type: 'text',
+                    content: `**Image Description:** ${d.description}`,
+                    deleted: false,
+                },
+            }));
+
+        // 4. EXECUTE AS BATCH INSERT COMMAND
+        // This inserts all text items at once AND makes them undoable
+        // User presses Ctrl+Z → ALL description items are removed at once
+        if (insertions.length > 0) {
+            executeCommand(Commands.batchInsertAfter(insertions));
+        }
+        message = result.message || `Generated descriptions for ${insertions.length} image(s)`;
     }
     break;
 }
@@ -86,82 +92,139 @@ case 'ai_image_descriptions': {
 │                                                                          │
 │  documentState (before)                                                  │
 │  {                                                                       │
+│    documentId: "doc_123",                                                │
 │    pages: [                                                              │
-│      { items: [                                                          │
-│        { id: "img_1", type: "image", imageUrl: "...", description: "" }, │
-│        { id: "img_2", type: "image", imageUrl: "...", description: "" }, │
+│      { pageNumber: 1, items: [                                           │
+│        { id: "img_1", type: "image", imageUrl: "...", classification: "chart" },
+│        { id: "txt_1", type: "text", content: "..." },                    │
+│        { id: "img_2", type: "image", imageUrl: "...", classification: "logo" },
 │      ]}                                                                  │
 │    ]                                                                     │
 │  }                                                                       │
 │         │                                                                │
 │         ▼                                                                │
-│  runBackendHelper("ai_image_descriptions", documentState)                │
+│  Collect images: [{id: "img_1", imageUrl, classification, pageNumber},  │
+│                   {id: "img_2", imageUrl, classification, pageNumber}]   │
+│         │                                                                │
+│         ▼                                                                │
+│  generateImageDescriptions(documentId, images)                           │
 │         │                                                                │
 └─────────┼────────────────────────────────────────────────────────────────┘
           │
           ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    Backend (LLM Service)                                 │
+│                    Backend (Ingestion Service)                           │
 ├─────────────────────────────────────────────────────────────────────────┤
-│  1. Extract images from documentState                                    │
-│  2. For each image:                                                      │
-│     - Decode base64 or fetch URL                                         │
-│     - Send to vision model: "Describe this image"                        │
+│  POST /api/ingestion/helper/image-descriptions                           │
+│  Request: { documentId, images: [{id, imageUrl, classification, pageNumber}] }
+│                                                                          │
+│  1. For each image:                                                      │
+│     - Get classification-specific prompt (see table below)               │
+│     - Process image (decode base64 or fetch URL)                         │
+│     - Send to AI/LLM with classification hint                            │
 │     - Collect response                                                   │
-│  3. Return: { success: true, modifiedItems: [...] }                      │
+│  2. Return: { success: true, descriptions: [{imageId, classification, description}] }
+│                                                                          │
+│  Classification-Aware Prompts:                                           │
+│  ┌──────────────┬────────────────────────────────────────────────────┐  │
+│  │ logo         │ "This appears to be a company or brand logo."      │  │
+│  │ chart        │ "This is a chart or graph presenting data..."      │  │
+│  │ diagram      │ "This is a diagram illustrating a process..."      │  │
+│  │ figure       │ "This is a figure or illustration..."              │  │
+│  │ photo        │ "This is a photograph capturing a real-world..."   │  │
+│  │ screenshot   │ "This is a screenshot showing a user interface..." │  │
+│  │ table_image  │ "This is an image of a table..."                   │  │
+│  │ other        │ "This is a visual element..."                      │  │
+│  └──────────────┴────────────────────────────────────────────────────┘  │
+│                                                                          │
+│  NOTE: Currently returns MOCK data. LLM integration pending.             │
 └─────────────────────────────────────────────────────────────────────────┘
           │
           ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           Frontend                                       │
 ├─────────────────────────────────────────────────────────────────────────┤
-│  result.modifiedItems:                                                   │
+│  result.descriptions:                                                    │
 │  [                                                                       │
-│    { id: "img_1", description: "A bar chart showing Q1 revenue..." },    │
-│    { id: "img_2", description: "Company logo with blue background" },    │
+│    { imageId: "img_1", description: "A bar chart showing Q1 revenue..." },
+│    { imageId: "img_2", description: "Company logo with blue background" },
 │  ]                                                                       │
 │         │                                                                │
 │         ▼                                                                │
-│  Build changes array (for undo/redo):                                    │
+│  Build insertions array:                                                 │
 │  [                                                                       │
-│    { itemId: "img_1", newValues: {description: "A bar..."}, oldValues: {description: ""} },
-│    { itemId: "img_2", newValues: {description: "Company..."}, oldValues: {description: ""} },
+│    { afterItemId: "img_1", newItem: {id: "desc_img_1_...", type: "text", content: "**Image Description:** A bar..."} },
+│    { afterItemId: "img_2", newItem: {id: "desc_img_2_...", type: "text", content: "**Image Description:** Company..."} },
 │  ]                                                                       │
 │         │                                                                │
 │         ▼                                                                │
-│  executeCommand(Commands.batchUpdate(changes))                           │
+│  executeCommand(Commands.batchInsertAfter(insertions))                   │
 │         │                                                                │
 │         ▼                                                                │
 │  documentState (after)                                                   │
 │  {                                                                       │
 │    pages: [                                                              │
-│      { items: [                                                          │
-│        { id: "img_1", ..., description: "A bar chart showing Q1..." },   │
-│        { id: "img_2", ..., description: "Company logo with blue..." },   │
+│      { pageNumber: 1, items: [                                           │
+│        { id: "img_1", type: "image", ... },                              │
+│        { id: "desc_img_1_...", type: "text", content: "**Image Description:** A bar chart..." }, ← NEW
+│        { id: "txt_1", type: "text", content: "..." },                    │
+│        { id: "img_2", type: "image", ... },                              │
+│        { id: "desc_img_2_...", type: "text", content: "**Image Description:** Company logo..." }, ← NEW
 │      ]}                                                                  │
 │    ]                                                                     │
 │  }                                                                       │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Why Store Old Values?
+```javascript
+// batchInsertAfter command (in useCommandHistory.js)
+batchInsertAfter: (insertions) => ({
+    // insertions: [{ afterItemId, newItem }, ...]
+    type: 'BATCH_INSERT_AFTER',
+    insertions,
+    execute: (doc) => insertItemsAfter(doc, insertions),
+    undo: (doc) => removeInsertedItems(doc, insertions.map(i => i.newItem.id)),
+})
 
-The `oldValues` are needed for the **Command Pattern** undo/redo system:
+// Helper: Insert items after specific target items
+function insertItemsAfter(doc, insertions) {
+    const insertionMap = new Map();
+    for (const { afterItemId, newItem } of insertions) {
+        insertionMap.set(afterItemId, newItem);
+    }
+
+    return {
+        ...doc,
+        pages: doc.pages.map((page) => {
+            const hasAnyTarget = page.items?.some((item) => insertionMap.has(item.id));
+            if (!hasAnyTarget) return page;
+
+            const newItems = [];
+            for (const item of page.items) {
+                newItems.push(item);
+                if (insertionMap.has(item.id)) {
+                    newItems.push(insertionMap.get(item.id));  // Insert after
+                }
+            }
+            return { ...page, items: newItems };
+        }),
+    };
+}
+```
 
 | Action | What Happens |
 |--------|--------------|
-| **Execute** | Set `item.description = newValues.description` |
-| **Undo** | Set `item.description = oldValues.description` |
-| **Redo** | Set `item.description = newValues.description` |
+| **Execute** | Insert new TextItem after each ImageItem |
+| **Undo** | Remove all inserted TextItems by their IDs |
+| **Redo** | Re-insert the TextItems in the same positions |
 
-Without storing old values, we couldn't undo the AI descriptions.
+### Why Insert Instead of Update?
 
-### Why Batch Update?
-
-Using `Commands.batchUpdate(changes)` instead of individual updates means:
-- ✅ **Single undo** - Ctrl+Z removes ALL descriptions at once
-- ✅ **Atomic operation** - Either all succeed or all fail
-- ✅ **Performance** - One state update instead of N updates
+The new approach inserts **separate TextItems** instead of updating the image's description field:
+- ✅ **Visible content** - Description appears as editable text below the image
+- ✅ **User can edit** - The generated description can be manually refined
+- ✅ **Markdown support** - Content is rendered with markdown formatting
+- ✅ **Independent deletion** - Description can be deleted without affecting the image
 
 ---
 
@@ -202,6 +265,7 @@ executeCommand(Commands.deleteItem(itemId));
 | `editItem(id, new, old)` | Set `item.content = new` | Set `item.content = old` |
 | `batchDelete([ids])` | Set all `deleted = true` | Set all `deleted = false` |
 | `batchUpdate([changes])` | Apply all newValues | Apply all oldValues |
+| `batchInsertAfter([insertions])` | Insert items after targets | Remove inserted items |
 | `renameDocument(new, old)` | Set `filename = new` | Set `filename = old` |
 
 ### Memory Efficiency
@@ -215,7 +279,7 @@ The command pattern is memory-efficient because:
 
 ## Commands.batchUpdate() Deep Dive
 
-**Location**: `frontend/src/hooks/useCommandHistory.js` (lines ~95-110)
+**Location**: `frontend/src/hooks/useCommandHistory.js`
 
 ### The Function
 

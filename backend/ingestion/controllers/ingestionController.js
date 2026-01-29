@@ -156,10 +156,38 @@ const runHelper = async (req, res) => {
     }
 };
 
+/**
+ * POST /api/ingestion/helper/image-descriptions
+ * Generate AI descriptions for images
+ * 
+ * Receives documentId and array of images, returns descriptions for each image.
+ */
+const generateImageDescriptions = async (req, res) => {
+    try {
+        const { documentId, images } = req.body;
+
+        if (!documentId) {
+            return res.status(400).json({ success: false, error: 'documentId is required' });
+        }
+
+        if (!images || !Array.isArray(images) || images.length === 0) {
+            return res.status(400).json({ success: false, error: 'images array is required' });
+        }
+
+        // Generate descriptions via content viewer service
+        const result = await contentViewerService.generateImageDescriptionsFromImages(documentId, images);
+        res.json(result);
+    } catch (error) {
+        console.error('Image descriptions error:', error);
+        res.status(500).json({ success: false, error: 'Failed to generate image descriptions', details: error.message });
+    }
+};
+
 module.exports = {
     getConfig,
     uploadDocument,
     previewEmbeddings,
     startIngestion,
     runHelper,
+    generateImageDescriptions,
 };
