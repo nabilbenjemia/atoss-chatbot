@@ -406,26 +406,26 @@ All API responses follow a consistent format:
 User Action: Drop PDF file on UploadZone
      │
      ▼
-handleFilesSelected(files)
+handleFilesSelected(files)                    ──► ConnectedUploadZone.jsx
      │
-     ├─► Add to uploadQueue with status: QUEUED
+     ├─► validateFiles(files)                 ──► ConnectedUploadZone.jsx
      │
-     ▼
-processUploadQueue() (useEffect)
-     │
-     ├─► Set status: UPLOADING
+     ├─► actions.startFileUpload()            ──► context/ingestion/hooks.js
      │
      ▼
-uploadDocument(file) ◄────────────────── BACKEND CALL
+uploadDocument(file)                          ──► services/ingestionApi.js  ◄── BACKEND CALL
      │
      ├─► Response: {success, filename, content: {pages: [...]}}
      │
      ▼
-saveUploadedFile(documentId, metadata)  ◄─ localStorage
-saveFileContent(documentId, content)     ◄─ localStorage
+saveFileContent(documentId, content)          ──► utils/fileCacheManager.js  ◄── localStorage
+addUploadedFile(metadata)                     ──► utils/fileCacheManager.js  ◄── localStorage
      │
      ▼
-Set status: READY
+actions.completeFileUpload(uploadId, docId)   ──► context/ingestion/hooks.js
+     │
+     ▼
+actions.selectFile(documentId)                ──► context/ingestion/hooks.js (if no file selected)
 ```
 
 ### Trigger Flow 2: Run Backend Helper
@@ -433,26 +433,25 @@ Set status: READY
 User Action: Click "AI Image Descriptions" in HelperPanel
      │
      ▼
-handleRunHelper('ai_image_descriptions')
+handleHelperClick(helperId)                   ──► ConnectedHelperPanel.jsx
      │
-     ├─► Check if backend helper → Show file select modal
+     ├─► Check if backend helper → opens HELPER_FILE_SELECT modal
      │
      ▼
 User Action: Select files → Confirm
      │
      ▼
-executeHelperOnFiles([documentIds])
+handleHelperFileSelectConfirm()               ──► IngestionPage.jsx
      │
      ├─► Load each document from localStorage
      │
      ▼
-runBackendHelper('ai_image_descriptions', content) ◄── BACKEND CALL
+runBackendHelper(helperId, content, params)   ──► services/ingestionApi.js  ◄── BACKEND CALL
      │
      ├─► Response: {modifiedItems: [{id, description}], message}
      │
      ▼
-executeCommand(Commands.batchUpdate(changes))
-setHasUnsavedChanges(true)
+executeCommand(Commands.batchUpdate(changes)) ──► IngestionPage.jsx (via useCommandHistory)
 ```
 
 ### Trigger Flow 3: Preview Embeddings
@@ -460,15 +459,16 @@ setHasUnsavedChanges(true)
 User Action: Click "Ingest" → Select DB & strategy → Click "Preview Embeddings"
      │
      ▼
-handleShowPreview(targetDb, strategy)
+handleShowPreview(targetDb, strategy)         ──► IngestionPage.jsx
      │
      ├─► Validate documentState exists
      │
      ├─► actions.startPreview(targetDb, strategy, [documentId], sidebarState)
+     │                                        ──► context/ingestion/hooks.js
      │   (sets isPreviewMode: true, isLoadingPreview: true)
      │
      ▼
-previewEmbeddings(strategy, documentState) ◄───── API CALL
+previewEmbeddings(strategy, documentState)    ──► services/ingestionApi.js  ◄── API CALL
      │
      ├─► POST /api/ingestion/preview
      │   {
@@ -496,7 +496,7 @@ previewEmbeddings(strategy, documentState) ◄───── API CALL
      │   }
      │
      ▼
-actions.setPreviewGenerated(result.preview)
+actions.setPreviewGenerated(result.preview)   ──► context/ingestion/hooks.js
 (sets isLoadingPreview: false, embeddingPreview: preview)
      │
      ▼
@@ -513,12 +513,14 @@ EmbeddingPreviewViewer displays preview with "Confirm & Ingest" button
 User Action: Click "✓ Confirm & Ingest" in preview
      │
      ▼
-handleConfirmIngestion()
+handleConfirmIngestion()                      ──► IngestionPage.jsx
      │
-     ├─► actions.startIngestion()  (sets isIngesting: true)
+     ├─► actions.startIngestion()             ──► context/ingestion/hooks.js
+     │   (sets isIngesting: true)
      │
      ▼
-startIngestion(targetDb, documentState, strategy) ◄───── API CALL
+startIngestion(targetDb, documentState, strategy)
+                                              ──► services/ingestionApi.js  ◄── API CALL
      │
      ├─► POST /api/ingestion/ingest
      │   {
@@ -547,53 +549,121 @@ startIngestion(targetDb, documentState, strategy) ◄───── API CALL
      │   }
      │
      ▼
-createIngestedFile(documentId, strategy, embeddingPreview)  ◄─ localStorage
+createIngestedFile(documentId, strategy, preview)
+                                              ──► utils/fileCacheManager.js  ◄── localStorage
      │
      ▼
 actions.completeIngestion(documentId, ingestedEntry, embeddingPreview)
+                                              ──► context/ingestion/hooks.js
      │
      ▼
-State Updates:
+State Updates (via ingestionReducer.js):
+- Add to ingestedFiles array
+- Exit preview mode
+- Set contentType to 'embedding'
+- Set mode to 'readonly'
 ```
 
 **Implementation Status**: ✅ Fully implemented
-- Frontend: `IngestionPage.jsx` → `handleConfirmIngestion()` (single), `handleConfirmIngestionAll()` (batch)
-- API Service: `ingestionApi.js` → `startIngestion()`
-- Backend: `ingestionController.js` → `startIngestion()`
-- Service: `ingestionService.js` → `ingestToVectorDb()` (currently returns mock data)
+- Frontend: `pages/IngestionPage.jsx` → `handleConfirmIngestion()` (single), `handleConfirmIngestionAll()` (batch)
+- API Service: `services/ingestionApi.js` → `startIngestion()`
+- Backend: `backend/ingestion/controllers/ingestionController.js` → `startIngestion()`
+- Service: `backend/ingestion/services/ingestionService.js` → `ingestToVectorDb()` (currently returns mock data)
 
 ### Trigger Flow 5: Ingest All (Multi-File)
 ```
 User Action: Click "Ingest All" in preview with multiple files
      │
      ▼
-handleConfirmIngestionAll()
+handleConfirmIngestionAll()                   ──► IngestionPage.jsx
      │
-     ├─► actions.startIngestion()  (sets isIngesting: true)
+     ├─► actions.startIngestion()             ──► context/ingestion/hooks.js
+     │   (sets isIngesting: true)
      │
      ▼
 for each documentId in previewDocumentIds:
      │
-     ├─► getFileContent(documentId)  ◄─ localStorage
+     ├─► getFileContent(documentId)           ──► utils/fileCacheManager.js  ◄── localStorage
      │
      ├─► actions.updateIngestionProgress(i / total * 100)
+     │                                        ──► context/ingestion/hooks.js
      │
-     ├─► startIngestion(targetDb, content, strategy)  ◄─ API CALL
+     ├─► startIngestion(targetDb, content, strategy)
+     │                                        ──► services/ingestionApi.js  ◄── API CALL
      │
-     ├─► previewEmbeddings(strategy, content)  ◄─ API CALL (for preview data)
+     ├─► previewEmbeddings(strategy, content)
+     │                                        ──► services/ingestionApi.js  ◄── API CALL
      │
-     └─► createIngestedFile(docId, strategy, preview)  ◄─ localStorage
+     └─► createIngestedFile(docId, strategy, preview)
+                                              ──► utils/fileCacheManager.js  ◄── localStorage
      │
      ▼
 actions.completeBatchIngestion(ingestedEntries, rightSidebarState)
+                                              ──► context/ingestion/hooks.js
      │
      ▼
-State Updates:
+State Updates (via ingestionReducer.js):
 - All files added to ingestedFiles array
 - Exit preview mode
 - Clear multiSelectMode and checkedDocumentIds
 - First ingested file selected
 - Toast: "Successfully ingested N file(s)"
+```
+
+### Trigger Flow 6: Switch Preview File
+```
+User Action: Click different file in left sidebar during preview mode
+     │
+     ▼
+handleSelect(documentId)                      ──► ConnectedFileQueue.jsx
+     │
+     ├─► Check isPreviewMode && documentId !== selectedDocumentId
+     │
+     ├─► setSwitchingToDocId(documentId)      ──► ConnectedFileQueue.jsx (local state)
+     │   (shows loading spinner on file item)
+     │
+     ├─► getFileContent(documentId)           ──► utils/fileCacheManager.js  ◄── localStorage
+     │
+     ▼
+previewEmbeddings(strategy, content)          ──► services/ingestionApi.js  ◄── API CALL
+     │
+     ├─► Response: { success, preview }
+     │
+     ▼
+actions.switchPreviewFile(documentId, preview)
+                                              ──► context/ingestion/hooks.js
+     │
+     ▼
+setSwitchingToDocId(null)                     ──► ConnectedFileQueue.jsx (local state)
+(hides loading spinner)
+```
+
+### Trigger Flow 7: Clear All Cache
+```
+User Action: Click "Clear All" in CacheManagement modal
+     │
+     ▼
+handleClearAll()                              ──► CacheManagement.jsx
+     │
+     ├─► clearAllCachedData()                 ──► utils/fileCacheManager.js  ◄── localStorage
+     │
+     ▼
+onCacheCleared()                              ──► IngestionPage.jsx (prop callback)
+     │
+     ▼
+handleCacheCleared()                          ──► IngestionPage.jsx
+     │
+     ├─► actions.clearAllFiles()              ──► context/ingestion/hooks.js
+     │
+     ├─► resetCommandDocument(null)           ──► useCommandHistory hook
+     │
+     ▼
+State Updates (via ingestionReducer.js):
+- uploadQueue: []
+- ingestedFiles: []
+- documentState: null
+- contentType: null
+- storedEmbeddings: null
 ```
 
 ---
