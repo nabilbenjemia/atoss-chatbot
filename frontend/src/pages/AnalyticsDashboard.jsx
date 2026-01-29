@@ -265,10 +265,10 @@ const AnalyticsDashboard = () => {
                                     showlegend: true,
                                     legend: {
                                         orientation: 'v',
-                                        x: 1.05,
+                                        x: 1.15,
                                         y: 0.5
                                     },
-                                    margin: { t: 30, b: 30, l: 30, r: 150 },
+                                    margin: { t: 30, b: 30, l: 30, r: 220 },
                                     height: 350
                                 }}
                                 config={{ displayModeBar: false }}
