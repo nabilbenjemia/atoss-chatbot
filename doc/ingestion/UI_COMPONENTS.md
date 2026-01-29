@@ -402,268 +402,369 @@ All API responses follow a consistent format:
 ```
 
 ### Trigger Flow 1: Upload Document
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User
+    participant UploadZone as ConnectedUploadZone.jsx
+    participant Hooks as hooks.js (useIngestionActions)
+    participant Reducer as ingestionReducer.js
+    participant API as ingestionApi.js
+    participant Cache as fileCacheManager.js
+    participant Backend as Backend Service
+
+    User->>UploadZone: Drop/Select PDF file
+    
+    Note over UploadZone: validateFiles(files)
+    UploadZone->>UploadZone: isValidFileType() + isValidFileSize()
+    
+    alt Invalid file
+        UploadZone-->>User: toast.error("Invalid file")
+    else Valid file
+        UploadZone->>Hooks: actions.startFileUpload(uploadId, file, filename)
+        Hooks->>Reducer: dispatch({ type: FILE_UPLOAD_STARTED })
+        Reducer-->>Reducer: Add to uploadQueue with status: QUEUED
+        
+        UploadZone->>Hooks: actions.updateFileProgress(uploadId, UPLOADING, 10)
+        Hooks->>Reducer: dispatch({ type: FILE_UPLOAD_PROGRESS })
+        Reducer-->>Reducer: Update status to UPLOADING
+        
+        UploadZone->>API: await uploadDocument(file)
+        API->>Backend: POST /api/ingestion/upload (multipart/form-data)
+        Backend-->>API: { success, content: { documentId, pages: [...] } }
+        API-->>UploadZone: result
+        
+        alt Upload failed
+            UploadZone->>Hooks: actions.failFileUpload(uploadId, error)
+            Hooks->>Reducer: dispatch({ type: FILE_UPLOAD_FAILED })
+            UploadZone-->>User: toast.error("Upload failed")
+        else Upload success
+            Note over UploadZone: Side effects (not in reducer)
+            UploadZone->>Cache: saveFileContent(documentId, content)
+            Cache-->>Cache: localStorage.setItem()
+            
+            UploadZone->>Cache: addUploadedFile(metadata)
+            Cache-->>Cache: localStorage.setItem()
+            
+            UploadZone->>Hooks: actions.completeFileUpload(uploadId, documentId)
+            Hooks->>Reducer: dispatch({ type: FILE_UPLOAD_COMPLETE })
+            Reducer-->>Reducer: Update status to READY, set documentId
+            
+            UploadZone-->>User: toast.success("Document ready")
+            
+            opt No file currently selected
+                UploadZone->>Hooks: actions.selectFile(documentId)
+                Hooks->>Reducer: dispatch({ type: FILE_SELECTED })
+                Reducer-->>Reducer: Set selectedDocumentId
+            end
+        end
+    end
 ```
-User Action: Drop PDF file on UploadZone
-     │
-     ▼
-handleFilesSelected(files)                    ──► ConnectedUploadZone.jsx
-     │
-     ├─► validateFiles(files)                 ──► ConnectedUploadZone.jsx
-     │
-     ├─► actions.startFileUpload()            ──► context/ingestion/hooks.js
-     │
-     ▼
-uploadDocument(file)                          ──► services/ingestionApi.js  ◄── BACKEND CALL
-     │
-     ├─► Response: {success, filename, content: {pages: [...]}}
-     │
-     ▼
-saveFileContent(documentId, content)          ──► utils/fileCacheManager.js  ◄── localStorage
-addUploadedFile(metadata)                     ──► utils/fileCacheManager.js  ◄── localStorage
-     │
-     ▼
-actions.completeFileUpload(uploadId, docId)   ──► context/ingestion/hooks.js
-     │
-     ▼
-actions.selectFile(documentId)                ──► context/ingestion/hooks.js (if no file selected)
-```
+
+**Key Files:**
+| Step | File | Function |
+|------|------|----------|
+| Validation | `config/ingestionConfig.js` | `isValidFileType()`, `isValidFileSize()` |
+| Action Creators | `context/ingestion/hooks.js` | `useIngestionActions()` returns action methods |
+| State Updates | `context/ingestion/ingestionReducer.js` | Handles `FILE_UPLOAD_*` action types |
+| API Call | `services/ingestionApi.js` | `uploadDocument(file)` |
+| Side Effects | `utils/fileCacheManager.js` | `saveFileContent()`, `addUploadedFile()` |
+
+**Important:** The reducer is **pure** (no side effects). LocalStorage writes happen in the component after dispatch.
 
 ### Trigger Flow 2: Run Backend Helper
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User
+    participant HelperPanel as ConnectedHelperPanel.jsx
+    participant Hooks as hooks.js
+    participant Reducer as ingestionReducer.js
+    participant API as ingestionApi.js
+    participant CmdHistory as useCommandHistory
+    participant Backend as Backend Service
+
+    User->>HelperPanel: Click "AI Image Descriptions"
+    
+    HelperPanel->>Hooks: actions.startHelper(helperId)
+    Hooks->>Reducer: dispatch({ type: HELPER_STARTED })
+    Reducer-->>Reducer: Set runningHelper = helperId
+    
+    HelperPanel->>API: await runBackendHelper(helperId, documentState, {})
+    API->>Backend: POST /api/ingestion/helper
+    Note over Backend: AI processes images,<br/>generates descriptions
+    Backend-->>API: { success, modifiedItems: [{id, description}], message }
+    API-->>HelperPanel: result
+    
+    alt Helper failed
+        HelperPanel->>Hooks: actions.failHelper()
+        Hooks->>Reducer: dispatch({ type: HELPER_FAILED })
+        HelperPanel-->>User: toast.error("Helper failed")
+    else Helper success
+        Note over HelperPanel: Build command with old/new values
+        HelperPanel->>CmdHistory: executeCommand(Commands.batchUpdate(changes))
+        CmdHistory-->>CmdHistory: Add to undo stack
+        CmdHistory-->>Reducer: Triggers DOCUMENT_MODIFIED via useEffect
+        
+        HelperPanel->>Hooks: actions.completeHelper()
+        Hooks->>Reducer: dispatch({ type: HELPER_COMPLETED })
+        Reducer-->>Reducer: Set runningHelper = null
+        
+        HelperPanel-->>User: toast.success("AI descriptions generated")
+    end
 ```
-User Action: Click "AI Image Descriptions" in HelperPanel
-     │
-     ▼
-handleHelperClick(helperId)                   ──► ConnectedHelperPanel.jsx
-     │
-     ├─► Check if backend helper → opens HELPER_FILE_SELECT modal
-     │
-     ▼
-User Action: Select files → Confirm
-     │
-     ▼
-handleHelperFileSelectConfirm()               ──► IngestionPage.jsx
-     │
-     ├─► Load each document from localStorage
-     │
-     ▼
-runBackendHelper(helperId, content, params)   ──► services/ingestionApi.js  ◄── BACKEND CALL
-     │
-     ├─► Response: {modifiedItems: [{id, description}], message}
-     │
-     ▼
-executeCommand(Commands.batchUpdate(changes)) ──► IngestionPage.jsx (via useCommandHistory)
-```
+
+**Key Files:**
+| Step | File | Function |
+|------|------|----------|
+| Helper Registry | `config/ingestionConfig.js` | `INGESTION_CONFIG.helpers.backend` |
+| Execute Helper | `components/ingestion/ConnectedHelperPanel.jsx` | `executeHelper()` |
+| API Call | `services/ingestionApi.js` | `runBackendHelper()` |
+| Undo/Redo | `hooks/useCommandHistory.js` | `Commands.batchUpdate()` |
 
 ### Trigger Flow 3: Preview Embeddings
-```
-User Action: Click "Ingest" → Select DB & strategy → Click "Preview Embeddings"
-     │
-     ▼
-handleShowPreview(targetDb, strategy)         ──► IngestionPage.jsx
-     │
-     ├─► Validate documentState exists
-     │
-     ├─► actions.startPreview(targetDb, strategy, [documentId], sidebarState)
-     │                                        ──► context/ingestion/hooks.js
-     │   (sets isPreviewMode: true, isLoadingPreview: true)
-     │
-     ▼
-previewEmbeddings(strategy, documentState)    ──► services/ingestionApi.js  ◄── API CALL
-     │
-     ├─► POST /api/ingestion/preview
-     │   {
-     │     strategy: "embed_per_page" | "chunked_document",
-     │     documentState: { filename, pages: [...] }
-     │   }
-     │
-     ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                    Backend Processing                               │
-├─────────────────────────────────────────────────────────────────────┤
-│  generateEmbeddingPreview(documentState, strategy)                  │
-│  - embed_per_page: One embedding per page with text + images        │
-│  - chunked_document: Merge all text, split into overlapping chunks  │
-└─────────────────────────────────────────────────────────────────────┘
-     │
-     ├─► Response: {
-     │     success: true,
-     │     preview: {
-     │       source: "document.pdf",
-     │       total_embeddings: 5,
-     │       strategy: "embed_per_page",
-     │       documents: [{ id, content, metadata }]
-     │     }
-     │   }
-     │
-     ▼
-actions.setPreviewGenerated(result.preview)   ──► context/ingestion/hooks.js
-(sets isLoadingPreview: false, embeddingPreview: preview)
-     │
-     ▼
-EmbeddingPreviewViewer displays preview with "Confirm & Ingest" button
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User
+    participant Modal as IngestionModal.jsx
+    participant Page as IngestionPage.jsx
+    participant Hooks as hooks.js
+    participant Reducer as ingestionReducer.js
+    participant API as ingestionApi.js
+    participant Backend as Backend Service
+
+    User->>Modal: Click "Ingest" button
+    Note over Modal: Opens IngestionModal
+    User->>Modal: Select DB & strategy
+    User->>Modal: Click "Preview Embeddings"
+    
+    Modal->>Page: onShowPreview(targetDb, strategy)
+    Modal->>Modal: onClose()
+    
+    Page->>Hooks: actions.startPreview(targetDb, strategy, [documentId], sidebarState)
+    Hooks->>Reducer: dispatch({ type: PREVIEW_STARTED })
+    Reducer-->>Reducer: isPreviewMode=true, isLoadingPreview=true<br/>previewDocumentIds=Set([documentId])
+    
+    Page->>API: await previewEmbeddings(strategy, documentState)
+    API->>Backend: POST /api/ingestion/preview
+    Note over Backend: Generate embedding chunks<br/>based on strategy
+    Backend-->>API: { success, preview: { documents, total_embeddings } }
+    API-->>Page: result
+    
+    alt Preview failed
+        Page->>Hooks: actions.failPreview(rightSidebarState)
+        Hooks->>Reducer: dispatch({ type: PREVIEW_FAILED })
+        Reducer-->>Reducer: isPreviewMode=false
+        Page-->>User: toast.error("Preview failed")
+    else Preview success
+        Page->>Hooks: actions.setPreviewGenerated(result.preview)
+        Hooks->>Reducer: dispatch({ type: PREVIEW_GENERATED })
+        Reducer-->>Reducer: embeddingPreview=preview<br/>isLoadingPreview=false
+        
+        Note over Page: EmbeddingPreviewViewer renders<br/>with "Confirm & Ingest" button
+    end
 ```
 
-**Error Handling**:
-- On API error: `actions.failPreview()` exits preview mode
-- Toast notification shows error message
-- **Requires LLM service**
+**Key Files:**
+| Step | File | Function |
+|------|------|----------|
+| Modal UI | `components/ingestion/IngestionModal.jsx` | Strategy/DB selection |
+| Orchestration | `pages/IngestionPage.jsx` | `handleShowPreview()` |
+| API Call | `services/ingestionApi.js` | `previewEmbeddings()` |
+| Preview Display | `components/ingestion/EmbeddingPreviewViewer.jsx` | Renders embedding cards |
 
 ### Trigger Flow 4: Confirm Ingestion
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User
+    participant PreviewViewer as EmbeddingPreviewViewer.jsx
+    participant Page as IngestionPage.jsx
+    participant Hooks as hooks.js
+    participant Reducer as ingestionReducer.js
+    participant API as ingestionApi.js
+    participant Cache as fileCacheManager.js
+    participant Backend as Backend Service
+
+    User->>PreviewViewer: Click "✓ Confirm & Ingest"
+    PreviewViewer->>Page: onConfirmIngestion()
+    
+    Page->>Hooks: actions.startIngestion()
+    Hooks->>Reducer: dispatch({ type: INGESTION_STARTED })
+    Reducer-->>Reducer: isIngesting=true, ingestionProgress=0
+    
+    Page->>API: await startIngestion(targetDb, documentState, strategy)
+    API->>Backend: POST /api/ingestion/ingest
+    Note over Backend: 1. Generate embeddings<br/>2. Store images with UUID<br/>3. Store in ChromaDB
+    Backend-->>API: { success, documentCount, message }
+    API-->>Page: result
+    
+    alt Ingestion failed
+        Page->>Hooks: actions.failIngestion()
+        Hooks->>Reducer: dispatch({ type: INGESTION_FAILED })
+        Reducer-->>Reducer: isIngesting=false
+        Page-->>User: toast.error("Ingestion failed")
+    else Ingestion success
+        Note over Page: Save to localStorage
+        Page->>Cache: createIngestedFile(documentId, strategy, preview)
+        Cache-->>Cache: localStorage.setItem()
+        
+        Page->>Hooks: actions.completeIngestion(documentId, ingestedEntry, embeddings, sidebarState)
+        Hooks->>Reducer: dispatch({ type: INGESTION_COMPLETE })
+        Reducer-->>Reducer: Add to ingestedFiles[]<br/>isPreviewMode=false<br/>contentType='embedding'
+        
+        Page-->>User: toast.success("Successfully ingested")
+    end
 ```
-User Action: Click "✓ Confirm & Ingest" in preview
-     │
-     ▼
-handleConfirmIngestion()                      ──► IngestionPage.jsx
-     │
-     ├─► actions.startIngestion()             ──► context/ingestion/hooks.js
-     │   (sets isIngesting: true)
-     │
-     ▼
-startIngestion(targetDb, documentState, strategy)
-                                              ──► services/ingestionApi.js  ◄── API CALL
-     │
-     ├─► POST /api/ingestion/ingest
-     │   {
-     │     targetDb: "chroma_default",
-     │     documentState: { filename, pages: [...] },
-     │     strategy: "embed_per_page"
-     │   }
-     │
-     ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                    Backend Processing                               │
-├─────────────────────────────────────────────────────────────────────┤
-│  1. Generate embedding preview from documentState                   │
-│  2. For each chunk with images:                                     │
-│     ├─► Store image with UUID                                       │
-│     └─► Update image references                                     │
-│  3. Generate embeddings for text via LLM service                    │
-│  4. Store in ChromaDB vector database                               │
-│  5. Return success status                                           │
-└─────────────────────────────────────────────────────────────────────┘
-     │
-     ├─► Response: {
-     │     success: true,
-     │     documentCount: 5,
-     │     message: "Successfully ingested..."
-     │   }
-     │
-     ▼
-createIngestedFile(documentId, strategy, preview)
-                                              ──► utils/fileCacheManager.js  ◄── localStorage
-     │
-     ▼
-actions.completeIngestion(documentId, ingestedEntry, embeddingPreview)
-                                              ──► context/ingestion/hooks.js
-     │
-     ▼
-State Updates (via ingestionReducer.js):
-- Add to ingestedFiles array
-- Exit preview mode
-- Set contentType to 'embedding'
-- Set mode to 'readonly'
-```
+
+**Key Files:**
+| Step | File | Function |
+|------|------|----------|
+| Confirm Button | `components/ingestion/EmbeddingPreviewViewer.jsx` | Triggers callback |
+| Orchestration | `pages/IngestionPage.jsx` | `handleConfirmIngestion()` |
+| API Call | `services/ingestionApi.js` | `startIngestion()` |
+| Cache Ingested | `utils/fileCacheManager.js` | `createIngestedFile()` |
 
 **Implementation Status**: ✅ Fully implemented
-- Frontend: `pages/IngestionPage.jsx` → `handleConfirmIngestion()` (single), `handleConfirmIngestionAll()` (batch)
-- API Service: `services/ingestionApi.js` → `startIngestion()`
-- Backend: `backend/ingestion/controllers/ingestionController.js` → `startIngestion()`
-- Service: `backend/ingestion/services/ingestionService.js` → `ingestToVectorDb()` (currently returns mock data)
 
 ### Trigger Flow 5: Ingest All (Multi-File)
-```
-User Action: Click "Ingest All" in preview with multiple files
-     │
-     ▼
-handleConfirmIngestionAll()                   ──► IngestionPage.jsx
-     │
-     ├─► actions.startIngestion()             ──► context/ingestion/hooks.js
-     │   (sets isIngesting: true)
-     │
-     ▼
-for each documentId in previewDocumentIds:
-     │
-     ├─► getFileContent(documentId)           ──► utils/fileCacheManager.js  ◄── localStorage
-     │
-     ├─► actions.updateIngestionProgress(i / total * 100)
-     │                                        ──► context/ingestion/hooks.js
-     │
-     ├─► startIngestion(targetDb, content, strategy)
-     │                                        ──► services/ingestionApi.js  ◄── API CALL
-     │
-     ├─► previewEmbeddings(strategy, content)
-     │                                        ──► services/ingestionApi.js  ◄── API CALL
-     │
-     └─► createIngestedFile(docId, strategy, preview)
-                                              ──► utils/fileCacheManager.js  ◄── localStorage
-     │
-     ▼
-actions.completeBatchIngestion(ingestedEntries, rightSidebarState)
-                                              ──► context/ingestion/hooks.js
-     │
-     ▼
-State Updates (via ingestionReducer.js):
-- All files added to ingestedFiles array
-- Exit preview mode
-- Clear multiSelectMode and checkedDocumentIds
-- First ingested file selected
-- Toast: "Successfully ingested N file(s)"
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User
+    participant PreviewViewer as EmbeddingPreviewViewer.jsx
+    participant Page as IngestionPage.jsx
+    participant Hooks as hooks.js
+    participant Reducer as ingestionReducer.js
+    participant API as ingestionApi.js
+    participant Cache as fileCacheManager.js
+    participant Backend as Backend Service
+
+    User->>PreviewViewer: Click "Ingest All (N files)"
+    PreviewViewer->>Page: onConfirmIngestionAll()
+    
+    Page->>Hooks: actions.startIngestion()
+    Hooks->>Reducer: dispatch({ type: INGESTION_STARTED })
+    Reducer-->>Reducer: isIngesting=true
+    
+    loop For each documentId in previewDocumentIds
+        Page->>Cache: getFileContent(documentId)
+        Cache-->>Page: documentContent
+        
+        Page->>Hooks: actions.updateIngestionProgress(i/total * 100)
+        Hooks->>Reducer: dispatch({ type: INGESTION_PROGRESS })
+        
+        Page->>API: await startIngestion(targetDb, content, strategy)
+        API->>Backend: POST /api/ingestion/ingest
+        Backend-->>API: { success }
+        
+        Page->>API: await previewEmbeddings(strategy, content)
+        API->>Backend: POST /api/ingestion/preview
+        Backend-->>API: { preview }
+        
+        Page->>Cache: createIngestedFile(docId, strategy, preview)
+        Cache-->>Cache: localStorage.setItem()
+    end
+    
+    Page->>Hooks: actions.completeBatchIngestion(ingestedEntries, sidebarState)
+    Hooks->>Reducer: dispatch({ type: INGESTION_BATCH_COMPLETE })
+    Reducer-->>Reducer: Add all to ingestedFiles[]<br/>Clear multiSelectMode<br/>Clear checkedDocumentIds<br/>isPreviewMode=false
+    
+    Page-->>User: toast.success("Successfully ingested N file(s)")
 ```
 
+**Key Files:**
+| Step | File | Function |
+|------|------|----------|
+| Orchestration | `pages/IngestionPage.jsx` | `handleConfirmIngestionAll()` |
+| Progress Updates | `context/ingestion/hooks.js` | `actions.updateIngestionProgress()` |
+| Batch Complete | `context/ingestion/ingestionReducer.js` | `INGESTION_BATCH_COMPLETE` handler |
+
 ### Trigger Flow 6: Switch Preview File
-```
-User Action: Click different file in left sidebar during preview mode
-     │
-     ▼
-handleSelect(documentId)                      ──► ConnectedFileQueue.jsx
-     │
-     ├─► Check isPreviewMode && documentId !== selectedDocumentId
-     │
-     ├─► setSwitchingToDocId(documentId)      ──► ConnectedFileQueue.jsx (local state)
-     │   (shows loading spinner on file item)
-     │
-     ├─► getFileContent(documentId)           ──► utils/fileCacheManager.js  ◄── localStorage
-     │
-     ▼
-previewEmbeddings(strategy, content)          ──► services/ingestionApi.js  ◄── API CALL
-     │
-     ├─► Response: { success, preview }
-     │
-     ▼
-actions.switchPreviewFile(documentId, preview)
-                                              ──► context/ingestion/hooks.js
-     │
-     ▼
-setSwitchingToDocId(null)                     ──► ConnectedFileQueue.jsx (local state)
-(hides loading spinner)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User
+    participant FileQueue as ConnectedFileQueue.jsx
+    participant Cache as fileCacheManager.js
+    participant API as ingestionApi.js
+    participant Hooks as hooks.js
+    participant Reducer as ingestionReducer.js
+    participant Backend as Backend Service
+
+    User->>FileQueue: Click different file in sidebar
+    
+    Note over FileQueue: Check isPreviewMode &&<br/>documentId !== selectedDocumentId
+    
+    FileQueue->>FileQueue: setSwitchingToDocId(documentId)
+    Note over FileQueue: Shows loading spinner
+    
+    FileQueue->>Cache: getFileContent(documentId)
+    Cache-->>FileQueue: documentContent
+    
+    FileQueue->>API: await previewEmbeddings(strategy, content)
+    API->>Backend: POST /api/ingestion/preview
+    Backend-->>API: { success, preview }
+    API-->>FileQueue: result
+    
+    alt Preview failed
+        FileQueue->>FileQueue: setSwitchingToDocId(null)
+        FileQueue-->>User: toast.error("Failed to load preview")
+    else Preview success
+        FileQueue->>Hooks: actions.switchPreviewFile(documentId, preview)
+        Hooks->>Reducer: dispatch({ type: PREVIEW_FILE_SWITCHED })
+        Reducer-->>Reducer: selectedDocumentId=documentId<br/>embeddingPreview=preview
+        
+        FileQueue->>FileQueue: setSwitchingToDocId(null)
+        Note over FileQueue: Hides loading spinner
+    end
 ```
 
 ### Trigger Flow 7: Clear All Cache
-```
-User Action: Click "Clear All" in CacheManagement modal
-     │
-     ▼
-handleClearAll()                              ──► CacheManagement.jsx
-     │
-     ├─► clearAllCachedData()                 ──► utils/fileCacheManager.js  ◄── localStorage
-     │
-     ▼
-onCacheCleared()                              ──► IngestionPage.jsx (prop callback)
-     │
-     ▼
-handleCacheCleared()                          ──► IngestionPage.jsx
-     │
-     ├─► actions.clearAllFiles()              ──► context/ingestion/hooks.js
-     │
-     ├─► resetCommandDocument(null)           ──► useCommandHistory hook
-     │
-     ▼
-State Updates (via ingestionReducer.js):
-- uploadQueue: []
-- ingestedFiles: []
-- documentState: null
-- contentType: null
-- storedEmbeddings: null
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User
+    participant Modal as CacheManagement.jsx
+    participant Page as IngestionPage.jsx
+    participant Hooks as hooks.js
+    participant Reducer as ingestionReducer.js
+    participant CacheUtils as useLocalCache.js
+    participant CacheMgr as fileCacheManager.js
+
+    User->>Modal: Click "Clear All"
+    Modal->>Page: onClearAll()
+    
+    Page->>CacheUtils: clearAllIngestionCache()
+    Note over CacheUtils: Removes all keys with<br/>'ingestion_' prefix
+    CacheUtils-->>CacheUtils: localStorage.removeItem() × N
+    
+    Page->>CacheMgr: saveUploadedFiles([])
+    CacheMgr-->>CacheMgr: localStorage.setItem()
+    
+    Page->>CacheMgr: saveIngestedFiles([])
+    CacheMgr-->>CacheMgr: localStorage.setItem()
+    
+    Page->>Hooks: actions.clearAllFiles()
+    Hooks->>Reducer: dispatch({ type: FILES_RESTORED_FROM_CACHE, payload: { uploadQueue: [], ingestedFiles: [] } })
+    Reducer-->>Reducer: uploadQueue=[]<br/>ingestedFiles=[]<br/>selectedDocumentId=null
+    
+    Page->>Hooks: actions.resetDocument()
+    Hooks->>Reducer: dispatch({ type: DOCUMENT_RESET })
+    Reducer-->>Reducer: documentState=null
+    
+    Page->>Hooks: actions.closeModal()
+    Hooks->>Reducer: dispatch({ type: MODAL_CLOSED })
+    
+    Page-->>User: toast.success("All cache cleared")
 ```
 
 ---
