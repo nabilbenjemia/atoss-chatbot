@@ -17,8 +17,8 @@ import {
     clearCache,
     getKeysWithPrefix,
     clearKeysWithPrefix,
-} from '../../hooks/useLocalCache';
-import { INGESTION_CONFIG } from '../../config/ingestionConfig';
+} from '../../../hooks/useLocalCache';
+import { INGESTION_CONFIG } from '../../../config/ingestionConfig';
 
 /**
  * Format bytes to human readable

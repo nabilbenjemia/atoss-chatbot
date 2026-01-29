@@ -26,6 +26,7 @@ import {
 } from '../../config/ingestionConfig';
 
 export default function ConnectedUploadZone() {
+    //subscribe to contexts
     const { isDragging, isIngesting } = useUI();
     const { isPreviewMode } = usePreview();
     const { selectedDocumentId } = useFileQueue();

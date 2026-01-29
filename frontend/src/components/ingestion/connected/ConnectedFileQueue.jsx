@@ -14,10 +14,10 @@ import {
     usePreview,
     useUI,
     useIngestionActions,
-} from '../../context/ingestion';
-import { removeUploadedFile, removeIngestedFile, getIngestedFiles, getFileContent } from '../../utils/fileCacheManager';
-import { previewEmbeddings } from '../../services/ingestionApi';
-import FileQueueItem from './FileQueueItem';
+} from '../../../context/ingestion';
+import { removeUploadedFile, removeIngestedFile, getIngestedFiles, getFileContent } from '../../../utils/fileCacheManager';
+import { previewEmbeddings } from '../../../services/ingestionApi';
+import FileQueueItem from '../content/FileQueueItem';
 
 export default function ConnectedFileQueue() {
     // Subscribe to relevant state
