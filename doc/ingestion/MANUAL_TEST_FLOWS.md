@@ -367,10 +367,9 @@
 2. Click the "🗑️ Delete" button that appears
 
 **Expected Observations:**
-- Item fades (opacity) and shows "Deleted" badge
-- "Restore" button appears on the deleted item
-- Toast: "Item deleted (can be undone)"
-- Undo button becomes enabled
+- Item is removed from view immediately
+- Undo button becomes enabled in the SaveBar
+- Press Ctrl+Z (or click Undo) to restore the deleted item
 
 **Sequence Diagram:**
 
@@ -397,65 +396,63 @@
         │                   │                      │─────────────────────────>│                     │
         │                   │                      │                          │                     │
         │                   │                      │          6. command.execute(doc)               │
-        │                   │                      │             → applyToItem(doc, itemId,         │
-        │                   │                      │                item => {..., deleted: true})   │
+        │                   │                      │             → removeItem(doc, itemId)          │
+        │                   │                      │             → stores removed item for undo     │
         │                   │                      │                          │                     │
         │                   │                      │          7. Push to history.past               │
         │                   │                      │                          │                     │
-        │                   │                      │ 8. toast.info("Item deleted (can be undone)")  │
-        │                   │                      │                          │                     │
-        │                   │                      │ 9. actions.modifyDocument(newState)            │
+        │                   │                      │ 8. actions.modifyDocument(newState)            │
         │                   │                      │──────────────────────────────────────────────>│
         │                   │                      │                          │                     │
-        │ 10. UI re-renders │                      │                          │                     │
-        │    - Item faded   │                      │                          │                     │
-        │    - "Deleted"    │                      │                          │                     │
-        │    - Restore btn  │                      │                          │                     │
+        │ 9. UI re-renders  │                      │                          │                     │
+        │    - Item removed │                      │                          │                     │
+        │    - Undo enabled │                      │                          │                     │
         │<──────────────────│                      │                          │                     │
         │                   │                      │                          │                     │
 ```
 
 ---
 
-### 4.3 Restore Item
+### 4.3 Restore Item (via Undo)
 
 **User Steps:**
 1. After deleting an item (see 4.2)
-2. Click "Restore" button on the deleted item
+2. Press `Ctrl+Z` (or `Cmd+Z` on Mac) or click the Undo button in SaveBar
 
 **Expected Observations:**
-- Item returns to normal appearance
-- "Deleted" badge and "Restore" button disappear
-- Toast: "Item restored"
-- Undo button still works (restoring creates new command)
+- Deleted item reappears in its original position
+- Undo button disables (if no more history)
+- Redo button enables
 
 **Sequence Diagram:**
 
 ```
-┌───────────────┐     ┌───────────┐     ┌──────────────────────┐     ┌────────────────┐
-│     User      │     │ TextItem  │     │ConnectedContentViewer│     │useCommandHistory│
-└───────┬───────┘     └─────┬─────┘     └──────────┬───────────┘     └────────┬───────┘
-        │                   │                      │                          │
-        │ 1. Click Restore  │                      │                          │
-        │──────────────────>│                      │                          │
-        │                   │                      │                          │
-        │                   │ 2. onRestore(item.id)│                          │
-        │                   │─────────────────────>│                          │
-        │                   │                      │                          │
-        │                   │                      │ 3. handleRestoreItem(itemId)
-        │                   │                      │    executeCommand(Commands.restoreItem(itemId))
-        │                   │                      │─────────────────────────>│
-        │                   │                      │                          │
-        │                   │                      │          4. command.execute(doc)
-        │                   │                      │             → applyToItem(doc, itemId,
-        │                   │                      │                item => {..., deleted: false})
-        │                   │                      │                          │
-        │                   │                      │ 5. toast.info("Item restored")
-        │                   │                      │                          │
-        │ 6. UI re-renders  │                      │                          │
-        │    - Item normal  │                      │                          │
-        │<──────────────────│                      │                          │
-        │                   │                      │                          │
+┌───────────────┐     ┌───────────────┐     ┌────────────────┐     ┌───────────────┐
+│     User      │     │IngestionPage │     │useCommandHistory│    │    Reducer    │
+└───────┬───────┘     └───────┬───────┘     └────────┬───────┘     └───────┬───────┘
+        │                     │                      │                     │
+        │ 1. Press Ctrl+Z     │                      │                     │
+        │────────────────────>│                      │                     │
+        │                     │                      │                     │
+        │                     │ 2. undo()            │                     │
+        │                     │─────────────────────>│                     │
+        │                     │                      │                     │
+        │                     │          3. Pop deleteCommand from past    │
+        │                     │             command.undo(currentState)     │
+        │                     │             → re-insert removed item       │
+        │                     │             Push command to future         │
+        │                     │                      │                     │
+        │                     │          4. Return restored state          │
+        │                     │<─────────────────────│                     │
+        │                     │                      │                     │
+        │                     │ 5. actions.modifyDocument(restoredState)   │
+        │                     │───────────────────────────────────────────>│
+        │                     │                      │                     │
+        │ 6. UI re-renders    │                      │                     │
+        │    - Item restored  │                      │                     │
+        │    - Redo enabled   │                      │                     │
+        │<────────────────────│                      │                     │
+        │                     │                      │                     │
 ```
 
 ---
@@ -572,9 +569,9 @@
 
 **Expected Observations:**
 - Button shows loading state briefly
-- All logo images become "deleted" (faded with restore option)
+- All logo images are removed from view
 - Toast: "X logo(s) removed" or "No logos found"
-- Single command in undo history (can undo all at once)
+- Undo button enables (can undo all at once with Ctrl+Z)
 
 **Sequence Diagram:**
 
@@ -607,8 +604,8 @@
         │                       │─────────────────────────>│                    │
         │                       │                         │                     │
         │                       │          6. command.execute(doc)              │
-        │                       │             → applyToItems(doc, ids,          │
-        │                       │                item => {..., deleted: true})  │
+        │                       │             → removeItems(doc, ids)           │
+        │                       │             → stores removed items for undo   │
         │                       │                         │                     │
         │                       │ 7. toast.success("X logo(s) removed")         │
         │                       │                         │                     │
@@ -619,7 +616,7 @@
         │                       │         → runningHelper = null                │
         │                       │                         │                     │
         │ 9. UI re-renders      │                         │                     │
-        │    - Logos deleted    │                         │                     │
+        │    - Logos removed    │                         │                     │
         │    - Undo enabled     │                         │                     │
         │<──────────────────────│                         │                     │
         │                       │                         │                     │
@@ -634,8 +631,9 @@
 2. Click "Remove Empty Text" helper
 
 **Expected Observations:**
-- Text items with empty/whitespace-only content are deleted
+- Text items with empty/whitespace-only content are removed from view
 - Toast: "X empty item(s) removed" or "No empty items found"
+- Undo button enables (can restore all with Ctrl+Z)
 
 **Sequence Diagram:**
 Same as 6.1, but:
@@ -653,8 +651,9 @@ Same as 6.1, but:
 
 **Expected Observations:**
 - Modal opens with text input
-- After confirm, all text items matching regex are deleted
+- After confirm, all text items matching regex are removed from view
 - Toast: "X item(s) matched and deleted" or "No items matched"
+- Undo button enables (can restore all with Ctrl+Z)
 
 **Sequence Diagram:**
 
