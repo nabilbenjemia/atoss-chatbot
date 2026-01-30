@@ -41,7 +41,6 @@ const getStatusIcon = (status) => {
  * @param {boolean} props.isLoading - Whether this document is being loaded (preview switching)
  * @param {Function} props.onSelect - Selection handler
  * @param {Function} props.onCheck - Check handler for multi-select
- * @param {Function} props.onRemove - Remove handler (optional)
  * @param {boolean} props.showCheckbox - Whether to show checkbox for multi-select
  * @param {boolean} props.removableMode - Whether to show hover X for removal
  * @param {Function} props.onRemoveFromSelection - Handler for removing from selection (for preview mode)
@@ -53,7 +52,6 @@ export default function FileQueueItem({
     isLoading = false,
     onSelect,
     onCheck,
-    onRemove,
     showCheckbox = false,
     removableMode = false,
     onRemoveFromSelection,
@@ -156,19 +154,6 @@ export default function FileQueueItem({
                 <p className="mt-1 text-xs text-red-500 truncate" title={doc.error}>
                     {doc.error}
                 </p>
-            )}
-
-            {/* Remove button for queued files (only when not in removable mode) */}
-            {!removableMode && doc.status === DOC_STATUS.QUEUED && onRemove && (
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onRemove(doc.id);
-                    }}
-                    className="mt-2 text-xs text-red-500 hover:text-red-700"
-                >
-                    Remove
-                </button>
             )}
         </li>
     );

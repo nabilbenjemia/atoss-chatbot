@@ -35,14 +35,6 @@ export {
     useDispatch,
     // Action creator hook
     useIngestionActions,
-    // Selector hooks
-    useSelectedDocument,
-    useIsDocumentSelected,
-    useTotalPages,
-    useIsPreviewMode,
-    useIsInPreviewSet,
-    useActiveModal,
-    useIsModalOpen,
 } from './hooks';
 
 // Constants

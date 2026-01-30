@@ -30,7 +30,65 @@
    - What types each field should have
    - What the valid values are (e.g., is `status` a string? which strings?)
 
-2. **High Coupling**: The reducer directly manipulates state objects:
+   **Example - `ingestedFiles` in reducer:**
+   ```javascript
+   // ingestionReducer.js - Initial state
+   fileQueue: {
+       uploadQueue: [],           // [{ id, documentId, filename, status, progress, error }]
+       ingestedFiles: [],         // [{ ingestedId, documentId, filename, strategy, timestamp }]
+       selectedDocumentId: null,
+   },
+   ```
+   
+   The comment says `[{ ingestedId, documentId, filename, strategy, timestamp }]` but:
+   - Is `ingestedId` always present? 
+   - Is `documentId` always present?
+   - What about `id`? Some code uses `doc.id`
+   - What about `embeddingPreview`? It's added in some actions
+   
+   **Result - Defensive code in components:**
+   ```javascript
+   // ConnectedFileQueue.jsx - Has to guess at field names
+   {ingestedFiles.map((doc) => (
+       <FileQueueItem
+           key={doc.ingestedId || doc.id || doc.documentId}  // ❌ Which one is it?!
+           doc={{
+               ...doc,
+               id: doc.ingestedId || doc.id || doc.documentId,      // ❌ Triple fallback
+               documentId: doc.ingestedId || doc.documentId,        // ❌ Double fallback
+               status: 'ingested'                                    // ❌ Hardcoded
+           }}
+           isSelected={(doc.ingestedId || doc.documentId) === selectedDocumentId}
+           onSelect={() => handleSelect(doc.ingestedId || doc.documentId)}
+           onRemoveFromSelection={() => handleRemoveIngestedFile(doc.ingestedId || doc.documentId)}
+       />
+   ))}
+   ```
+   
+   **Why this happens:**
+   - No enforced schema for `ingestedFiles` items
+   - Different reducer actions add different fields
+   - Component authors don't know which fields are guaranteed
+   - Results in defensive `||` chains that hide bugs
+
+2. **Inconsistent Item Shapes Across Actions**: The same array gets different shapes from different actions:
+   ```javascript
+   // INGESTION_COMPLETE adds this shape:
+   ingestedEntry = {
+       ingestedId: '...',
+       documentId: '...',
+       filename: '...',
+       strategy: '...',
+       timestamp: Date.now(),
+       // But also sometimes:
+       embeddingPreview: {...},  // Added in INGESTION_BATCH_COMPLETE
+   }
+   
+   // INGESTED_FILES_LOADED might load from cache with different shape:
+   ingestedFiles = [...] // Whatever was serialized - no validation!
+   ```
+
+3. **High Coupling**: The reducer directly manipulates state objects:
    ```javascript
    // Current: Reducer knows internal structure of fileQueue
    return {
@@ -58,6 +116,32 @@
    - Reducer (state transitions)
    - Components (event handlers)
    - Services (API calls)
+
+6. **Component-State Coupling**: Components directly access internal state structure:
+   ```javascript
+   // ConnectedContentViewer.jsx - Components know too much about state shape
+   const totalPages = doc?.pages?.length || 0;           // Knows pages is array
+   const currentPageContent = doc?.pages?.[currentPage - 1];  // Knows array indexing
+   
+   const handlePageChange = useCallback((page) => {
+       if (!doc?.pages) return;
+       const maxPage = doc.pages.length;                  // Duplicated logic
+       const newPage = Math.max(1, Math.min(page, maxPage)); // Business logic in component
+       actions.changePage(newPage);
+   }, [doc, actions]);
+   
+   // Finding item requires knowing nested structure
+   for (const page of doc.pages) {
+       const item = page.items.find(i => i.id === itemId);
+       if (item) { oldContent = item.content; break; }
+   }
+   ```
+   
+   **Problems:**
+   - If state structure changes (e.g., `pages` becomes a Map), ALL components break
+   - Business logic (page clamping) duplicated across components
+   - Null-checking (`?.`) repeated everywhere
+   - Components are tightly coupled to internal state shape
 
 ---
 
@@ -89,9 +173,17 @@
    - `actions.completeFileUpload()` works identically
    - Only internal implementation changes
 
+5. **Discoverable State Lifecycle**: With models, you can understand:
+   - What fields exist (class definition)
+   - What fields are required vs optional (constructor validation)
+   - How state changes (setter methods)
+   - Where state comes from (factory methods like `fromJSON()`, `fromAPI()`)
+
 ---
 
 ## 3. Proposed Architecture
+
+### 3.1 Layer Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -145,6 +237,127 @@
 │  └────────────────────┘ └────────────────────┘ └─────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### 3.2 State Lifecycle Example: `ingestedFiles`
+
+**The Problem:** Looking at `ingestedFiles: []` tells you nothing about how items are added/modified.
+
+**Current Code Analysis** - You have to read the ENTIRE reducer to understand:
+
+```javascript
+// 1. INGESTION_COMPLETE - Adds single item
+case ActionTypes.INGESTION_COMPLETE: {
+    const { ingestedEntry, ingestedData } = action.payload;
+    // ingestedEntry shape: { ingestedId, documentId, filename, strategy, timestamp }
+    // But wait, sometimes also has embeddingPreview? Who knows!
+    
+    let updatedIngestedFiles = state.fileQueue.ingestedFiles;
+    if (ingestedEntry) {
+        const existingIndex = updatedIngestedFiles.findIndex(...);
+        // ... 15 lines of array manipulation
+    }
+}
+
+// 2. INGESTION_BATCH_COMPLETE - Adds multiple items
+case ActionTypes.INGESTION_BATCH_COMPLETE: {
+    const { ingestedEntries } = action.payload;
+    // ingestedEntries shape: array of... what exactly?
+    // Has embeddingPreview? Maybe?
+    
+    for (const entry of ingestedEntries) {
+        // ... more array manipulation
+    }
+}
+
+// 3. INGESTED_FILES_LOADED - Replaces entire array (from cache)
+case ActionTypes.INGESTED_FILES_LOADED: {
+    const { ingestedFiles } = action.payload;
+    // What shape? Whatever was serialized!
+}
+
+// 4. INGESTED_FILE_REMOVED - Removes item
+case ActionTypes.INGESTED_FILE_REMOVED: {
+    // Uses ingestedId to filter
+}
+
+// 5. CACHE_CLEARED - Clears array
+case ActionTypes.CACHE_CLEARED: {
+    // Sets to []
+}
+```
+
+**With Data Models** - Lifecycle is documented in one place:
+
+```javascript
+// frontend/src/context/ingestion/models/FileQueueModel.js
+
+class IngestedFileItem {
+    // FIELDS ARE DOCUMENTED HERE
+    constructor({ ingestedId, documentId, filename, strategy, targetDb, timestamp, embeddingCount, embeddingPreview }) {
+        // Required fields validated
+        if (!ingestedId) throw new Error('ingestedId required');
+        // ... 
+    }
+    
+    // CANONICAL IDENTIFIER
+    get id() { return this.ingestedId; }
+}
+
+class FileQueueModel {
+    // HOW ITEMS ARE ADDED - documented via setter methods
+    
+    /**
+     * Add or update an ingested file entry.
+     * Called by: INGESTION_COMPLETE, INGESTION_BATCH_COMPLETE
+     */
+    addIngestedFile(entry) {
+        const item = new IngestedFileItem(entry); // Validates shape!
+        // ... immutable update
+    }
+    
+    /**
+     * Add multiple ingested file entries.
+     * Called by: INGESTION_BATCH_COMPLETE
+     */
+    addIngestedFiles(entries) {
+        let result = this;
+        for (const entry of entries) {
+            result = result.addIngestedFile(entry);
+        }
+        return result;
+    }
+    
+    /**
+     * Load ingested files from cache.
+     * Called by: INGESTED_FILES_LOADED
+     * Note: Validates each item via IngestedFileItem constructor
+     */
+    loadFromCache(ingestedFiles) {
+        return new FileQueueModel({
+            ...this,
+            ingestedFiles: ingestedFiles.map(f => new IngestedFileItem(f)),
+        });
+    }
+    
+    /**
+     * Remove an ingested file.
+     * Called by: INGESTED_FILE_REMOVED
+     */
+    removeIngestedFile(ingestedId) { ... }
+    
+    /**
+     * Clear all ingested files.
+     * Called by: CACHE_CLEARED
+     */
+    clearIngested() { ... }
+}
+```
+
+**Benefits:**
+- Open `FileQueueModel.js` → see ALL operations on `ingestedFiles`
+- Each method documents when it's called
+- Constructor validates shape → no more "which field exists?" guessing
+- Components use `item.id` → no more `item.ingestedId || item.id || item.documentId`
 
 ---
 
@@ -256,28 +469,77 @@ export class UploadQueueItem {
 
 /**
  * Represents an ingested file
+ * 
+ * SOLVES: The "which field do I use?" problem
+ * 
+ * Before (component code):
+ *   key={doc.ingestedId || doc.id || doc.documentId}  // Guessing!
+ *   documentId: doc.ingestedId || doc.documentId      // More guessing!
+ * 
+ * After (with this model):
+ *   key={doc.id}           // Always use .id
+ *   documentId: doc.id     // .id is the canonical identifier
  */
 export class IngestedFileItem {
     /**
      * @param {Object} data
-     * @param {string} data.ingestedId - Unique ingested ID
-     * @param {string} data.documentId - Original document ID
-     * @param {string} data.filename - Filename
+     * @param {string} data.ingestedId - Unique ingested ID (REQUIRED)
+     * @param {string} data.documentId - Original document ID before ingestion
+     * @param {string} data.filename - Filename (REQUIRED)
      * @param {string} data.strategy - Ingestion strategy used
      * @param {string} data.targetDb - Target database
      * @param {number} data.timestamp - Ingestion timestamp
      * @param {number} [data.embeddingCount] - Number of embeddings created
+     * @param {Object} [data.embeddingPreview] - Preview data (optional, for display)
      */
-    constructor({ ingestedId, documentId, filename, strategy, targetDb, timestamp, embeddingCount = 0 }) {
+    constructor({ 
+        ingestedId, 
+        documentId, 
+        filename, 
+        strategy, 
+        targetDb, 
+        timestamp, 
+        embeddingCount = 0,
+        embeddingPreview = null,
+    }) {
+        // Validate required fields
+        if (!ingestedId) {
+            throw new Error('IngestedFileItem requires ingestedId');
+        }
+        if (!filename) {
+            throw new Error('IngestedFileItem requires filename');
+        }
+
         this.ingestedId = ingestedId;
-        this.documentId = documentId;
+        this.documentId = documentId || ingestedId; // Fallback for compatibility
         this.filename = filename;
-        this.strategy = strategy;
-        this.targetDb = targetDb;
-        this.timestamp = timestamp;
+        this.strategy = strategy || 'unknown';
+        this.targetDb = targetDb || 'unknown';
+        this.timestamp = timestamp || Date.now();
         this.embeddingCount = embeddingCount;
+        this.embeddingPreview = embeddingPreview;
         Object.freeze(this);
     }
+
+    // ============ CANONICAL IDENTIFIERS ============
+    // Components should ALWAYS use these, never raw field access
+
+    /**
+     * The canonical unique identifier for this item.
+     * Use this for React keys and selection comparisons.
+     */
+    get id() {
+        return this.ingestedId;
+    }
+
+    /**
+     * The status is always 'ingested' for IngestedFileItem
+     */
+    get status() {
+        return 'ingested';
+    }
+
+    // ============ DISPLAY GETTERS ============
 
     get displayName() {
         return this.filename.replace(/\.[^/.]+$/, '');
@@ -287,8 +549,53 @@ export class IngestedFileItem {
         return new Date(this.timestamp).toLocaleDateString();
     }
 
+    get formattedDateTime() {
+        return new Date(this.timestamp).toLocaleString();
+    }
+
+    // ============ COMPONENT HELPER ============
+    
+    /**
+     * Returns props ready for FileQueueItem component.
+     * Eliminates the need for inline object transformation.
+     * 
+     * Before (in component):
+     *   doc={{
+     *       ...doc,
+     *       id: doc.ingestedId || doc.id || doc.documentId,
+     *       documentId: doc.ingestedId || doc.documentId,
+     *       status: 'ingested'
+     *   }}
+     * 
+     * After:
+     *   doc={doc.toFileQueueItemProps()}
+     */
+    toFileQueueItemProps() {
+        return {
+            id: this.id,
+            documentId: this.id,
+            filename: this.filename,
+            status: this.status,
+            strategy: this.strategy,
+            targetDb: this.targetDb,
+            timestamp: this.timestamp,
+            embeddingCount: this.embeddingCount,
+        };
+    }
+
+    // ============ SERIALIZATION ============
+
     toJSON() {
-        return { ...this };
+        return {
+            ingestedId: this.ingestedId,
+            documentId: this.documentId,
+            filename: this.filename,
+            strategy: this.strategy,
+            targetDb: this.targetDb,
+            timestamp: this.timestamp,
+            embeddingCount: this.embeddingCount,
+            embeddingPreview: this.embeddingPreview,
+        };
     }
 
     static fromJSON(json) {
@@ -637,9 +944,51 @@ export class DocumentState {
         Object.freeze(this);
     }
 
+    // ============ PAGE NAVIGATION GETTERS ============
+
     get totalPages() {
         return this.pages.length;
     }
+
+    get maxPage() {
+        return this.pages.length;
+    }
+
+    get isEmpty() {
+        return this.pages.length === 0;
+    }
+
+    /**
+     * Get page by 1-indexed page number
+     * @param {number} pageNumber - 1-indexed page number
+     * @returns {DocumentPage|null}
+     */
+    getPage(pageNumber) {
+        if (pageNumber < 1 || pageNumber > this.maxPage) return null;
+        return this.pages[pageNumber - 1] || null;
+    }
+
+    /**
+     * Clamp page number to valid range [1, maxPage]
+     * Used by components to ensure valid page navigation
+     * @param {number} page - Requested page number
+     * @returns {number} - Valid page number
+     */
+    clampPage(page) {
+        if (this.isEmpty) return 1;
+        return Math.max(1, Math.min(page, this.maxPage));
+    }
+
+    /**
+     * Check if page number is valid
+     * @param {number} page - Page number to check
+     * @returns {boolean}
+     */
+    isValidPage(page) {
+        return page >= 1 && page <= this.maxPage;
+    }
+
+    // ============ ITEM GETTERS ============
 
     get totalItems() {
         return this.pages.reduce((sum, page) => sum + page.items.length, 0);
@@ -657,10 +1006,6 @@ export class DocumentState {
         return this.pages.flatMap(page => page.imageItems);
     }
 
-    getPage(pageNumber) {
-        return this.pages.find(page => page.pageNumber === pageNumber);
-    }
-
     getItemById(itemId) {
         for (const page of this.pages) {
             const item = page.getItemById(itemId);
@@ -668,6 +1013,8 @@ export class DocumentState {
         }
         return null;
     }
+
+    // ============ SETTERS (return new instance) ============
 
     withPage(pageNumber, updater) {
         return new DocumentState({
@@ -1757,11 +2104,158 @@ export function ingestionReducer(state, action) {
 2. Update `ingestionApi.js` to use contracts
 3. Add validation to API calls
 
-### Phase 5: Update Components (Optional)
+### Phase 5: Update Components (Recommended)
 
-1. Components can start using getter methods
-2. Replace `file.status === DOC_STATUS.READY` with `file.isReady`
-3. Gradual, non-breaking
+Components should migrate from direct state access to using model getters.
+This decouples components from internal state structure.
+
+**Priority Order:**
+1. `ConnectedContentViewer.jsx` - page navigation, item access
+2. `ConnectedFileQueue.jsx` - file list, status checks
+3. `ConnectedHelperPanel.jsx` - item queries for helpers
+4. Other Connected components
+
+**Migration Examples:**
+
+```javascript
+// ============ BEFORE ============
+// ConnectedContentViewer.jsx
+
+const totalPages = doc?.pages?.length || 0;
+const currentPageContent = doc?.pages?.[currentPage - 1];
+
+const handlePageChange = useCallback((page) => {
+    if (!doc?.pages) return;
+    const maxPage = doc.pages.length;
+    const newPage = Math.max(1, Math.min(page, maxPage));
+    actions.changePage(newPage);
+}, [doc, actions]);
+
+const handleEditItem = useCallback((itemId, newContent) => {
+    if (!doc) return;
+    let oldContent = '';
+    for (const page of doc.pages) {
+        const item = page.items.find(i => i.id === itemId);
+        if (item) {
+            oldContent = item.content;
+            break;
+        }
+    }
+    executeCommand(Commands.editItem(itemId, newContent, oldContent));
+}, [doc, executeCommand]);
+
+
+// ============ AFTER ============
+// ConnectedContentViewer.jsx
+
+const totalPages = doc?.totalPages || 0;
+const currentPageContent = doc?.getPage(currentPage);
+
+const handlePageChange = useCallback((page) => {
+    if (!doc) return;
+    actions.changePage(doc.clampPage(page));
+}, [doc, actions]);
+
+const handleEditItem = useCallback((itemId, newContent) => {
+    if (!doc) return;
+    const oldContent = doc.getItemById(itemId)?.content || '';
+    executeCommand(Commands.editItem(itemId, newContent, oldContent));
+}, [doc, executeCommand]);
+```
+
+```javascript
+// ============ BEFORE ============
+// ConnectedFileQueue.jsx
+
+const readyFiles = uploadQueue.filter(f => f.status === DOC_STATUS.READY);
+const hasUploading = uploadQueue.some(f => 
+    f.status === DOC_STATUS.UPLOADING || f.status === DOC_STATUS.QUEUED
+);
+
+
+// ============ AFTER ============
+// ConnectedFileQueue.jsx
+
+const readyFiles = fileQueue.readyFiles;
+const hasUploading = fileQueue.uploadingFiles.length > 0;
+```
+
+```javascript
+// ============ BEFORE ============
+// ConnectedFileQueue.jsx - Ingested files section
+// Developer doesn't know which fields exist, uses defensive fallbacks
+
+{ingestedFiles.map((doc) => (
+    <FileQueueItem
+        key={doc.ingestedId || doc.id || doc.documentId}      // ❌ Which one?!
+        doc={{
+            ...doc,
+            id: doc.ingestedId || doc.id || doc.documentId,   // ❌ Triple fallback
+            documentId: doc.ingestedId || doc.documentId,     // ❌ Double fallback  
+            status: 'ingested'                                 // ❌ Hardcoded
+        }}
+        isSelected={(doc.ingestedId || doc.documentId) === selectedDocumentId}
+        onSelect={() => handleSelect(doc.ingestedId || doc.documentId)}
+        onRemoveFromSelection={() => handleRemoveIngestedFile(doc.ingestedId || doc.documentId)}
+    />
+))}
+
+
+// ============ AFTER ============
+// ConnectedFileQueue.jsx - With IngestedFileItem model
+// Model guarantees fields exist, provides canonical .id getter
+
+{ingestedFiles.map((doc) => (
+    <FileQueueItem
+        key={doc.id}                                          // ✅ Always use .id
+        doc={doc.toFileQueueItemProps()}                      // ✅ Model handles shape
+        isSelected={doc.id === selectedDocumentId}            // ✅ Simple comparison
+        onSelect={() => handleSelect(doc.id)}                 // ✅ Just .id
+        onRemoveFromSelection={() => handleRemoveIngestedFile(doc.id)}
+    />
+))}
+
+// Or even simpler with a dedicated component prop:
+{ingestedFiles.map((doc) => (
+    <IngestedFileQueueItem
+        key={doc.id}
+        item={doc}                                            // ✅ Pass model directly
+        isSelected={fileQueue.isSelected(doc.id)}             // ✅ Model method
+        onSelect={handleSelect}
+        onRemove={handleRemoveIngestedFile}
+    />
+))}
+```
+
+```javascript
+// ============ BEFORE ============
+// ConnectedHelperPanel.jsx (collecting images for AI helper)
+
+const images = [];
+for (const page of documentState.pages) {
+    for (const item of page.items) {
+        if ((item.type === 'image' || item.type === 'picture') && !item.deleted) {
+            images.push({
+                id: item.id,
+                imageUrl: item.imageUrl,
+                classification: item.classification,
+                pageNumber: page.pageNumber,
+            });
+        }
+    }
+}
+
+
+// ============ AFTER ============
+// ConnectedHelperPanel.jsx
+
+const images = documentState.allImages.map(item => ({
+    id: item.id,
+    imageUrl: item.imageUrl,
+    classification: item.classification,
+    pageNumber: documentState.getPageForItem(item.id)?.pageNumber,
+}));
+```
 
 ---
 
@@ -1789,19 +2283,111 @@ class UploadQueueItem {
 
 ### 8.2 Encapsulated Logic
 
-**Before:** Logic scattered across reducer
+**Before:** Logic scattered across reducer AND components
 ```javascript
-// Checking if file is ready - repeated everywhere
+// In reducer:
 if (file.status === DOC_STATUS.READY) { ... }
+
+// In ConnectedContentViewer.jsx:
+const maxPage = doc.pages.length;
+const newPage = Math.max(1, Math.min(page, maxPage));
 ```
 
-**After:** Logic in one place
+**After:** Logic in one place (model)
 ```javascript
 // Getter encapsulates the check
 if (file.isReady) { ... }
+
+// In component - clean, declarative
+const newPage = doc.clampPage(page);
+// or
+const maxPage = doc.maxPage;
 ```
 
-### 8.3 Immutability Guaranteed
+### 8.3 Component Access Pattern Improvement
+
+**Current Problem:** Components directly access internal state structure:
+
+```javascript
+// ConnectedContentViewer.jsx - PROBLEMATIC
+const handlePageChange = useCallback((page) => {
+    if (!doc?.pages) return;
+    const maxPage = doc.pages.length;        // ❌ Accesses internal structure
+    const newPage = Math.max(1, Math.min(page, maxPage));  // ❌ Business logic in component
+    actions.changePage(newPage);
+}, [doc, actions]);
+
+// Also in the same file:
+const totalPages = doc?.pages?.length || 0;  // ❌ Repeated pattern
+const currentPageContent = doc?.pages?.[currentPage - 1];  // ❌ Direct array access
+```
+
+**After Refactoring:** Components use getter methods:
+
+```javascript
+// ConnectedContentViewer.jsx - CLEAN
+const handlePageChange = useCallback((page) => {
+    if (!doc) return;
+    const newPage = doc.clampPage(page);     // ✅ Model handles bounds
+    actions.changePage(newPage);
+}, [doc, actions]);
+
+// Clean property access:
+const totalPages = doc?.totalPages || 0;     // ✅ Getter method
+const currentPageContent = doc?.getPage(currentPage);  // ✅ Getter method
+```
+
+**DocumentState Model with Getters:**
+
+```javascript
+class DocumentState {
+    // ... constructor ...
+
+    // ============ GETTERS ============
+    
+    get totalPages() {
+        return this.pages.length;
+    }
+
+    get maxPage() {
+        return this.pages.length;
+    }
+
+    get isEmpty() {
+        return this.pages.length === 0;
+    }
+
+    getPage(pageNumber) {
+        // 1-indexed page number
+        return this.pages[pageNumber - 1] || null;
+    }
+
+    /**
+     * Clamp page number to valid range
+     * @param {number} page - Requested page number
+     * @returns {number} - Valid page number (1 to maxPage)
+     */
+    clampPage(page) {
+        return Math.max(1, Math.min(page, this.maxPage));
+    }
+
+    isValidPage(page) {
+        return page >= 1 && page <= this.maxPage;
+    }
+}
+```
+
+**Benefits of Getter Pattern:**
+
+| Aspect | Before | After |
+|--------|--------|-------|
+| Structure coupling | Component knows `doc.pages` is array | Component only knows `doc.totalPages` |
+| Null safety | `doc?.pages?.length \|\| 0` everywhere | `doc?.totalPages \|\| 0` (handled in getter) |
+| Business logic | Scattered in components | Centralized in model |
+| Refactoring | Change structure = change all components | Change structure = change only model |
+| Testing | Test component + state structure | Test model independently |
+
+### 8.4 Immutability Guaranteed
 
 **Before:** Easy to accidentally mutate
 ```javascript

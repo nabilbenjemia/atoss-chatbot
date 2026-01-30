@@ -270,6 +270,3 @@ export default function ConnectedHelperPanel({ executeCommand }) {
         </div>
     );
 }
-
-// Export the execute helper for use by file selection modal
-export { ConnectedHelperPanel };
