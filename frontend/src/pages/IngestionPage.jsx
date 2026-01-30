@@ -47,6 +47,7 @@ import {
     saveFileHistory,
     updateUploadedFile,
     createIngestedFile,
+    checkIngestionDuplicate,
 } from '../utils/fileCacheManager';
 import { INGESTION_CONFIG } from '../config/ingestionConfig';
 import { previewEmbeddings, startIngestion, generateImageDescriptions } from '../services/ingestionApi';
@@ -494,6 +495,21 @@ function IngestionPageLayout() {
             return;
         }
 
+        // Check for duplicate ingestion (same content + strategy + targetDb)
+        const { isDuplicate, existingEntry, ingestionId } = checkIngestionDuplicate(
+            commandDocumentState,
+            previewConfig.strategy,
+            previewConfig.targetDb
+        );
+
+        if (isDuplicate) {
+            toast.warning(
+                `This exact content was already ingested to ${previewConfig.targetDb} with ${previewConfig.strategy} strategy on ${new Date(existingEntry.timestamp).toLocaleString()}`,
+                { autoClose: 5000 }
+            );
+            return;
+        }
+
         // Start ingestion (sets isIngesting: true)
         actions.startIngestion();
 
@@ -505,12 +521,14 @@ function IngestionPageLayout() {
             );
 
             if (result.success) {
-                // Create ingested entry in cache
+                // Create ingested entry in cache with ingestionId for future duplicate detection
                 const ingestedEntry = createIngestedFile(
                     selectedDocumentId,
                     previewConfig.strategy,
                     embeddingPreview,
-                    { filename: commandDocumentState.filename, documentId: selectedDocumentId }
+                    { filename: commandDocumentState.filename, documentId: selectedDocumentId },
+                    previewConfig.targetDb,
+                    ingestionId
                 );
 
                 // Update state
@@ -550,6 +568,7 @@ function IngestionPageLayout() {
 
         let successCount = 0;
         let failCount = 0;
+        let skipCount = 0;
         const ingestedEntries = [];
 
         for (let i = 0; i < documentIds.length; i++) {
@@ -559,6 +578,19 @@ function IngestionPageLayout() {
             if (!content) {
                 console.error(`No content found for document ${docId}`);
                 failCount++;
+                continue;
+            }
+
+            // Check for duplicate ingestion
+            const { isDuplicate, ingestionId } = checkIngestionDuplicate(
+                content,
+                previewConfig.strategy,
+                previewConfig.targetDb
+            );
+
+            if (isDuplicate) {
+                console.info(`Skipping duplicate: ${docId} already ingested with same content/strategy/db`);
+                skipCount++;
                 continue;
             }
 
@@ -584,12 +616,14 @@ function IngestionPageLayout() {
                         console.warn(`Could not generate preview for ${docId}:`, previewError);
                     }
 
-                    // Create ingested entry in cache
+                    // Create ingested entry in cache with ingestionId
                     const ingestedEntry = createIngestedFile(
                         docId,
                         previewConfig.strategy,
                         filePreview,
-                        { filename: content.filename, documentId: docId }
+                        { filename: content.filename, documentId: docId },
+                        previewConfig.targetDb,
+                        ingestionId
                     );
 
                     // Collect all ingested entries
@@ -609,11 +643,18 @@ function IngestionPageLayout() {
         if (successCount > 0) {
             actions.completeBatchIngestion(ingestedEntries, rightSidebarCollapsed);
 
-            if (failCount > 0) {
-                toast.warning(`Ingested ${successCount} file(s), ${failCount} failed`);
+            if (failCount > 0 || skipCount > 0) {
+                const parts = [];
+                parts.push(`${successCount} ingested`);
+                if (skipCount > 0) parts.push(`${skipCount} skipped (duplicates)`);
+                if (failCount > 0) parts.push(`${failCount} failed`);
+                toast.warning(parts.join(', '));
             } else {
                 toast.success(`Successfully ingested ${successCount} file(s) to ${previewConfig.targetDb}`);
             }
+        } else if (skipCount > 0 && failCount === 0) {
+            actions.failIngestion();
+            toast.info(`All ${skipCount} file(s) were already ingested with the same content/strategy/db`);
         } else {
             actions.failIngestion();
             toast.error('All ingestions failed');

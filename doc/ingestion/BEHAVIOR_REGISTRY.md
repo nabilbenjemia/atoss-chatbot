@@ -211,6 +211,39 @@ if (existingIndex >= 0) {
 
 ---
 
+### BHV-009: Duplicate Ingestion Prevention
+**Trigger:** User attempts to ingest content that has already been ingested with the same strategy to the same database
+
+**Expected Behavior:**
+- Ingestion is **blocked** with a warning message
+- User is informed when the previous ingestion occurred
+- No duplicate data is sent to the backend
+
+**Duplicate Detection Logic:**
+The system generates a content-based `ingestionId` from:
+1. **Content fingerprint** - hash of all active text/image/table items
+2. **Strategy** - ingestion strategy (e.g., `slides_qa`, `full_text`)
+3. **Target DB** - destination collection
+
+```
+ingestionId = hash(content) + "_" + strategy + "_" + targetDb
+```
+
+**Scenarios:**
+
+| Scenario | Content | Strategy | Target DB | Result |
+|----------|---------|----------|-----------|--------|
+| Exact duplicate | Same | Same | Same | ❌ Blocked |
+| Edited content | **Modified** | Same | Same | ✅ Allowed |
+| Different strategy | Same | **Different** | Same | ✅ Allowed |
+| Different database | Same | Same | **Different** | ✅ Allowed |
+
+**Implementation:**
+- `fileCacheManager.js` → `generateContentFingerprint()`, `generateIngestionId()`, `checkIngestionDuplicate()`
+- `IngestionPage.jsx` → `handleConfirmIngestion()`, `handleConfirmIngestionAll()`
+
+---
+
 ## Identifiers Reference
 
 | Identifier | Format | Purpose | Example |
@@ -218,6 +251,7 @@ if (existingIndex >= 0) {
 | `uploadId` | UUID | Unique upload session ID | `"f47ac10b-58cc..."` |
 | `documentId` | Server-assigned | Processed document ID | `"doc_abc123"` |
 | `ingestedId` | `${documentId}_${strategy}` | Unique per document+strategy | `"doc_abc123_slides_qa"` |
+| `ingestionId` | `${contentHash}_${strategy}_${targetDb}` | Content-based deduplication key | `"a1b2c3_slides_qa_lectures"` |
 
 ---
 
@@ -226,3 +260,4 @@ if (existingIndex >= 0) {
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-01-31 | Initial behavior registry |
+| 1.1 | 2026-01-31 | Added BHV-009: Duplicate Ingestion Prevention |

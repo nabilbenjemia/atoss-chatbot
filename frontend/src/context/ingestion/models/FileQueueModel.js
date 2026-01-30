@@ -463,6 +463,12 @@ export class FileQueueModel {
     // ============ INGESTED FILES SETTERS ============
 
     addIngestedFile(entry) {
+        // Guard against null/undefined entries
+        if (!entry) {
+            console.warn('[FileQueueModel] addIngestedFile called with null entry');
+            return this;
+        }
+
         const item = entry instanceof IngestedFileItem
             ? entry
             : new IngestedFileItem(entry);
