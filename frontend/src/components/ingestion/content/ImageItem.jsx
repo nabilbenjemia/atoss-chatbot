@@ -10,16 +10,14 @@ import { INGESTION_CONFIG } from '../../../config/ingestionConfig';
 
 /**
  * @param {Object} props
- * @param {Object} props.item - Image item object { id, type, imageUrl, classification, deleted }
+ * @param {Object} props.item - Image item object { id, type, imageUrl, classification }
  * @param {Function} props.onDelete - Delete handler (itemId)
- * @param {Function} props.onRestore - Restore handler (itemId)
  * @param {Function} props.onClassChange - Classification change handler (itemId, newClass)
  * @param {Array} props.availableClasses - Available classification options
  */
 export default function ImageItem({
     item,
     onDelete,
-    onRestore,
     onClassChange,
     availableClasses = [],
 }) {
@@ -38,29 +36,6 @@ export default function ImageItem({
         }
         setShowClassDropdown(false);
     }, [item.id, onClassChange]);
-
-    // Deleted state
-    if (item.deleted) {
-        return (
-            <div className="bg-tum-blue-light-5 p-4 border border-tum-grey-7 opacity-60">
-                <div className="flex items-center justify-between">
-                    <span className="text-xs text-tum-orange font-bold uppercase">Deleted</span>
-                    {onRestore && (
-                        <button
-                            onClick={() => onRestore(item.id)}
-                            className="px-3 py-1 text-xs font-bold bg-white border border-tum-blue 
-                                text-tum-blue hover:bg-tum-blue hover:text-white transition-colors"
-                        >
-                            Restore
-                        </button>
-                    )}
-                </div>
-                <div className="mt-2 h-16 bg-tum-grey-8 flex items-center justify-center">
-                    <span className="text-tum-grey-4 text-sm">Image deleted</span>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <>

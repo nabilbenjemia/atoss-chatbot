@@ -14,19 +14,15 @@ import TableItem from './TableItem';
  * @param {Object} props.page - Page object { pageNumber, items }
  * @param {Function} props.onEditItem - Edit handler (itemId, newContent)
  * @param {Function} props.onDeleteItem - Delete handler (itemId)
- * @param {Function} props.onRestoreItem - Restore handler (itemId)
  * @param {Function} props.onClassChange - Classification change handler (itemId, newClass)
  * @param {Array} props.availableClasses - Available image classification options
- * @param {boolean} props.showDeleted - Whether to show deleted items (for trash view)
  */
 export default function PageContent({
     page,
     onEditItem,
     onDeleteItem,
-    onRestoreItem,
     onClassChange,
     availableClasses = [],
-    showDeleted = false,
 }) {
     if (!page || !page.items) {
         return (
@@ -36,15 +32,13 @@ export default function PageContent({
         );
     }
 
-    // Filter items based on showDeleted flag
-    const items = showDeleted
-        ? page.items
-        : page.items.filter((item) => !item.deleted);
+    // Filter out deleted items (soft-deleted items stay in state for undo)
+    const items = page.items.filter((item) => !item.deleted);
 
     if (items.length === 0) {
         return (
             <div className="text-center text-tum-grey-4 py-12">
-                {showDeleted ? 'No content on this page' : 'All items on this page have been deleted'}
+                All items on this page have been deleted
             </div>
         );
     }
@@ -60,7 +54,6 @@ export default function PageContent({
                                 item={item}
                                 onEdit={onEditItem}
                                 onDelete={onDeleteItem}
-                                onRestore={onRestoreItem}
                             />
                         );
 
@@ -71,7 +64,6 @@ export default function PageContent({
                                 key={item.id}
                                 item={item}
                                 onDelete={onDeleteItem}
-                                onRestore={onRestoreItem}
                                 onClassChange={onClassChange}
                                 availableClasses={availableClasses}
                             />
@@ -83,7 +75,6 @@ export default function PageContent({
                                 key={item.id}
                                 item={item}
                                 onDelete={onDeleteItem}
-                                onRestore={onRestoreItem}
                             />
                         );
 
