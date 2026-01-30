@@ -15,7 +15,7 @@ import {
     useUI,
     useIngestionActions,
 } from '../../../context/ingestion';
-import { removeUploadedFile, removeIngestedFile, getIngestedFiles, getFileContent } from '../../../utils/fileCacheManager';
+import { removeUploadedFile, removeIngestedFile, getFileContent } from '../../../utils/fileCacheManager';
 import { previewEmbeddings } from '../../../services/ingestionApi';
 import FileQueueItem from '../content/FileQueueItem';
 
@@ -85,18 +85,28 @@ export default function ConnectedFileQueue() {
     }, [actions, previewDocumentIds.size]);
 
     // Handle remove uploaded file
+    // This also removes any ingested versions of this file
     const handleRemoveUploadedFile = useCallback((documentId) => {
-        removeUploadedFile(documentId);
+        // removeUploadedFile returns the removed ingested IDs and cleans up all related caches
+        const removedIngestedIds = removeUploadedFile(documentId);
+        
+        // Remove from context state
         actions.removeFile(documentId);
+        
+        // Also remove any related ingested files from context state
+        removedIngestedIds.forEach(ingestedId => {
+            actions.removeIngestedFile(ingestedId);
+        });
+        
         toast.info('File removed');
     }, [actions]);
 
     // Handle remove ingested file
+    // Only removes the ingested file - uploaded file is preserved for potential re-ingestion
     const handleRemoveIngestedFile = useCallback((ingestedId) => {
         removeIngestedFile(ingestedId);
         actions.removeIngestedFile(ingestedId);
-        actions.loadIngestedFiles(getIngestedFiles());
-        toast.info('Ingested file removed from cache');
+        toast.info('Ingested file removed');
     }, [actions]);
 
     // Determine remove handler for uploaded files section
@@ -156,19 +166,14 @@ export default function ConnectedFileQueue() {
                     <ul className="space-y-2">
                         {ingestedFiles.map((doc) => (
                             <FileQueueItem
-                                key={doc.ingestedId || doc.id || doc.documentId}
-                                doc={{
-                                    ...doc,
-                                    id: doc.ingestedId || doc.id || doc.documentId,
-                                    documentId: doc.ingestedId || doc.documentId,
-                                    status: 'ingested'
-                                }}
-                                isSelected={(doc.ingestedId || doc.documentId) === selectedDocumentId}
+                                key={doc.id}
+                                doc={doc.toFileQueueItemProps()}
+                                isSelected={doc.id === selectedDocumentId}
                                 isChecked={false}
-                                onSelect={() => handleSelect(doc.ingestedId || doc.documentId)}
+                                onSelect={() => handleSelect(doc.id)}
                                 showCheckbox={false}
                                 removableMode={true}
-                                onRemoveFromSelection={() => handleRemoveIngestedFile(doc.ingestedId || doc.documentId)}
+                                onRemoveFromSelection={() => handleRemoveIngestedFile(doc.id)}
                             />
                         ))}
                     </ul>

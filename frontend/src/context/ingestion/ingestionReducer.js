@@ -1,70 +1,42 @@
 /**
- * Ingestion Reducer
+ * Ingestion Reducer (Refactored with Data Models)
  * 
  * Central state management for the Ingestion Page.
  * All state transitions are handled here for traceability.
  * 
- * State is split into domains for fine-grained re-renders via split contexts:
- * - fileQueue: File upload queue and ingested files
- * - document: Current document state and editing
- * - preview: Embedding preview state
- * - ui: UI state (sidebars, modals, modes)
+ * State is split into domains using immutable data model classes:
+ * - fileQueue: FileQueueModel - File upload queue and ingested files
+ * - document: DocumentModel - Current document state and editing
+ * - preview: PreviewModel - Embedding preview state
+ * - ui: UIModel - UI state (sidebars, modals, modes)
+ * 
+ * REFACTORING: This reducer now delegates to model methods instead of
+ * directly manipulating state objects. This provides:
+ * - Type safety via class constructors
+ * - Encapsulated business logic
+ * - Immutability guarantees via Object.freeze()
+ * - Self-documenting state structure
  * 
  * @see doc/ingestion/REDUCER.md for detailed documentation
+ * @see doc/ingestion/REFACTORING_PLAN_DATA_MODELS.md for refactoring rationale
  * @see doc/ingestion/ADR.md ADR-002 for architectural decisions
  */
 
 import * as ActionTypes from './actionTypes';
-import { DOC_STATUS, CONTENT_TYPE, UI_MODE, MODAL_TYPES } from './constants';
+import { CONTENT_TYPE } from './constants';
+import { FileQueueModel } from './models/FileQueueModel';
+import { DocumentModel } from './models/DocumentModel';
+import { PreviewModel } from './models/PreviewModel';
+import { UIModel } from './models/UIModel';
 
 /**
- * Initial state structure
+ * Initial state structure using model classes
  */
 export const initialState = {
-    // File Queue Domain - manages uploaded and ingested files
-    fileQueue: {
-        uploadQueue: [],           // [{ id, documentId, filename, status, progress, error }]
-        ingestedFiles: [],         // [{ ingestedId, documentId, filename, strategy, timestamp }]
-        selectedDocumentId: null,  // Currently selected file
-    },
-
-    // Document Domain - manages current document content and editing
-    document: {
-        documentState: null,       // { filename, documentId, pages: [...] } - from useCommandHistory
-        currentPage: 1,
-        contentType: CONTENT_TYPE.EDITOR,
-        storedEmbeddings: null,    // Stored embeddings for read-only view
-        // Note: Command history (undo/redo) is managed by useCommandHistory hook
-    },
-
-    // Preview Domain - manages embedding preview state
-    preview: {
-        isPreviewMode: false,
-        isLoadingPreview: false,
-        embeddingPreview: null,    // Preview data from API
-        previewConfig: {           // Config used for preview
-            targetDb: '',
-            strategy: '',
-        },
-        previewDocumentIds: new Set(), // Document IDs in current preview (for multi-file)
-    },
-
-    // UI Domain - manages UI state
-    ui: {
-        mode: UI_MODE.EDITING,     // 'editing' | 'preview' | 'readonly'
-        leftSidebarCollapsed: false,
-        rightSidebarCollapsed: false,
-        rightSidebarStateBeforePreview: false, // Store state before entering preview
-        isDragging: false,         // Drag state for upload zone
-        multiSelectMode: false,
-        checkedDocumentIds: new Set(),
-        isIngesting: false,
-        ingestionProgress: 0,
-        runningHelper: null,       // Currently running helper ID
-        pendingHelper: null,       // Helper waiting for file selection
-        // Modal states
-        activeModal: null,         // Current open modal (or null)
-    },
+    fileQueue: FileQueueModel.empty(),
+    document: DocumentModel.empty(),
+    preview: PreviewModel.empty(),
+    ui: UIModel.empty(),
 };
 
 /**
@@ -72,6 +44,7 @@ export const initialState = {
  * 
  * Handles all state transitions atomically.
  * Cross-domain actions update multiple domains in a single dispatch.
+ * Delegates to model setters for all state modifications.
  */
 export function ingestionReducer(state, action) {
     switch (action.type) {
@@ -83,19 +56,7 @@ export function ingestionReducer(state, action) {
             const { id, file, filename } = action.payload;
             return {
                 ...state,
-                fileQueue: {
-                    ...state.fileQueue,
-                    uploadQueue: [
-                        ...state.fileQueue.uploadQueue,
-                        {
-                            id,
-                            file,
-                            filename,
-                            status: DOC_STATUS.QUEUED,
-                            progress: 0,
-                        },
-                    ],
-                },
+                fileQueue: state.fileQueue.addUpload(id, file, filename),
             };
         }
 
@@ -103,12 +64,7 @@ export function ingestionReducer(state, action) {
             const { id, status, progress } = action.payload;
             return {
                 ...state,
-                fileQueue: {
-                    ...state.fileQueue,
-                    uploadQueue: state.fileQueue.uploadQueue.map(f =>
-                        f.id === id ? { ...f, status, progress } : f
-                    ),
-                },
+                fileQueue: state.fileQueue.updateUploadProgress(id, status, progress),
             };
         }
 
@@ -116,14 +72,7 @@ export function ingestionReducer(state, action) {
             const { id, documentId } = action.payload;
             return {
                 ...state,
-                fileQueue: {
-                    ...state.fileQueue,
-                    uploadQueue: state.fileQueue.uploadQueue.map(f =>
-                        f.id === id
-                            ? { ...f, documentId, status: DOC_STATUS.READY, progress: 100 }
-                            : f
-                    ),
-                },
+                fileQueue: state.fileQueue.completeUpload(id, documentId),
             };
         }
 
@@ -131,14 +80,7 @@ export function ingestionReducer(state, action) {
             const { id, error } = action.payload;
             return {
                 ...state,
-                fileQueue: {
-                    ...state.fileQueue,
-                    uploadQueue: state.fileQueue.uploadQueue.map(f =>
-                        f.id === id
-                            ? { ...f, status: DOC_STATUS.ERROR, error }
-                            : f
-                    ),
-                },
+                fileQueue: state.fileQueue.failUpload(id, error),
             };
         }
 
@@ -146,33 +88,21 @@ export function ingestionReducer(state, action) {
             const { documentId } = action.payload;
             return {
                 ...state,
-                fileQueue: {
-                    ...state.fileQueue,
-                    selectedDocumentId: documentId,
-                },
+                fileQueue: state.fileQueue.selectFile(documentId),
             };
         }
 
         case ActionTypes.FILE_REMOVED: {
             const { documentId } = action.payload;
-            const isSelected = state.fileQueue.selectedDocumentId === documentId;
+            const wasSelected = state.fileQueue.selectedDocumentId === documentId;
             return {
                 ...state,
-                fileQueue: {
-                    ...state.fileQueue,
-                    uploadQueue: state.fileQueue.uploadQueue.filter(
-                        f => f.documentId !== documentId
-                    ),
-                    selectedDocumentId: isSelected ? null : state.fileQueue.selectedDocumentId,
-                },
-                // Clear document state if this was selected
-                document: isSelected
-                    ? {
-                        ...state.document,
-                        documentState: null,
-                        contentType: CONTENT_TYPE.EDITOR,
-                        storedEmbeddings: null,
-                    }
+                fileQueue: state.fileQueue.removeFile(documentId),
+                document: wasSelected
+                    ? state.document
+                        .resetDocument()
+                        .setContentType(CONTENT_TYPE.EDITOR)
+                        .clearStoredEmbeddings()
                     : state.document,
             };
         }
@@ -181,35 +111,23 @@ export function ingestionReducer(state, action) {
             const { documentId, newFilename } = action.payload;
             return {
                 ...state,
-                fileQueue: {
-                    ...state.fileQueue,
-                    uploadQueue: state.fileQueue.uploadQueue.map(f =>
-                        f.documentId === documentId ? { ...f, filename: newFilename } : f
-                    ),
-                },
+                fileQueue: state.fileQueue.renameFile(documentId, newFilename),
             };
         }
 
         case ActionTypes.FILES_RESTORED_FROM_CACHE: {
             const { uploadQueue, ingestedFiles } = action.payload;
+            const newFileQueue = state.fileQueue.restoreFromCache(uploadQueue, ingestedFiles);
+            
+            // Reset document state when clearing all files
+            const shouldResetDocument = uploadQueue.length === 0;
+            
             return {
                 ...state,
-                fileQueue: {
-                    ...state.fileQueue,
-                    uploadQueue,
-                    // Also clear ingestedFiles if provided (for cache clear)
-                    ...(ingestedFiles !== undefined && { ingestedFiles }),
-                },
-                // Reset document state when clearing all files
-                ...(uploadQueue.length === 0 && {
-                    document: {
-                        ...state.document,
-                        documentState: null,
-                        currentPage: 0,
-                        contentType: null,
-                        storedEmbeddings: null,
-                    },
-                }),
+                fileQueue: newFileQueue,
+                document: shouldResetDocument
+                    ? DocumentModel.empty()
+                    : state.document,
             };
         }
 
@@ -217,31 +135,20 @@ export function ingestionReducer(state, action) {
             const { ingestedFiles } = action.payload;
             return {
                 ...state,
-                fileQueue: {
-                    ...state.fileQueue,
-                    ingestedFiles,
-                },
+                fileQueue: state.fileQueue.loadIngestedFiles(ingestedFiles),
             };
         }
 
         case ActionTypes.INGESTED_FILE_REMOVED: {
             const { ingestedId } = action.payload;
-            const isSelected = state.fileQueue.selectedDocumentId === ingestedId;
+            const wasSelected = state.fileQueue.selectedDocumentId === ingestedId;
             return {
                 ...state,
-                fileQueue: {
-                    ...state.fileQueue,
-                    ingestedFiles: state.fileQueue.ingestedFiles.filter(
-                        f => f.ingestedId !== ingestedId
-                    ),
-                    selectedDocumentId: isSelected ? null : state.fileQueue.selectedDocumentId,
-                },
-                document: isSelected
-                    ? {
-                        ...state.document,
-                        storedEmbeddings: null,
-                        contentType: CONTENT_TYPE.EDITOR,
-                    }
+                fileQueue: state.fileQueue.removeIngestedFile(ingestedId),
+                document: wasSelected
+                    ? state.document
+                        .clearStoredEmbeddings()
+                        .setContentType(CONTENT_TYPE.EDITOR)
                     : state.document,
             };
         }
@@ -254,17 +161,8 @@ export function ingestionReducer(state, action) {
             const { documentState, documentId } = action.payload;
             return {
                 ...state,
-                fileQueue: {
-                    ...state.fileQueue,
-                    selectedDocumentId: documentId,
-                },
-                document: {
-                    ...state.document,
-                    documentState,
-                    currentPage: 1,
-                    contentType: CONTENT_TYPE.EDITOR,
-                    storedEmbeddings: null,
-                },
+                fileQueue: state.fileQueue.selectFile(documentId),
+                document: state.document.loadDocument(documentState, documentId),
             };
         }
 
@@ -272,21 +170,14 @@ export function ingestionReducer(state, action) {
             const { documentState } = action.payload;
             return {
                 ...state,
-                document: {
-                    ...state.document,
-                    documentState,
-                },
+                document: state.document.modifyDocument(documentState),
             };
         }
 
         case ActionTypes.DOCUMENT_RESET: {
             return {
                 ...state,
-                document: {
-                    ...state.document,
-                    documentState: null,
-                    currentPage: 1,
-                },
+                document: state.document.resetDocument(),
             };
         }
 
@@ -294,10 +185,7 @@ export function ingestionReducer(state, action) {
             const { page } = action.payload;
             return {
                 ...state,
-                document: {
-                    ...state.document,
-                    currentPage: page,
-                },
+                document: state.document.changePage(page),
             };
         }
 
@@ -305,10 +193,7 @@ export function ingestionReducer(state, action) {
             const { contentType } = action.payload;
             return {
                 ...state,
-                document: {
-                    ...state.document,
-                    contentType,
-                },
+                document: state.document.setContentType(contentType),
             };
         }
 
@@ -316,17 +201,8 @@ export function ingestionReducer(state, action) {
             const { embeddings, documentId } = action.payload;
             return {
                 ...state,
-                fileQueue: {
-                    ...state.fileQueue,
-                    selectedDocumentId: documentId,
-                },
-                document: {
-                    ...state.document,
-                    storedEmbeddings: embeddings,
-                    contentType: CONTENT_TYPE.EMBEDDING,
-                    documentState: null,
-                    currentPage: 1,
-                },
+                fileQueue: state.fileQueue.selectFile(documentId),
+                document: state.document.setStoredEmbeddings(embeddings, documentId),
             };
         }
 
@@ -338,20 +214,8 @@ export function ingestionReducer(state, action) {
             const { targetDb, strategy, documentIds, rightSidebarState } = action.payload;
             return {
                 ...state,
-                preview: {
-                    ...state.preview,
-                    isPreviewMode: true,
-                    isLoadingPreview: true,
-                    previewConfig: { targetDb, strategy },
-                    previewDocumentIds: new Set(documentIds),
-                },
-                ui: {
-                    ...state.ui,
-                    mode: UI_MODE.PREVIEW,
-                    rightSidebarStateBeforePreview: rightSidebarState,
-                    // Expand sidebar in preview mode to show file list (especially for multi-file)
-                    rightSidebarCollapsed: false,
-                },
+                preview: state.preview.startPreview(targetDb, strategy, documentIds),
+                ui: state.ui.enterPreviewMode(rightSidebarState),
             };
         }
 
@@ -359,11 +223,7 @@ export function ingestionReducer(state, action) {
             const { embeddingPreview } = action.payload;
             return {
                 ...state,
-                preview: {
-                    ...state.preview,
-                    isLoadingPreview: false,
-                    embeddingPreview,
-                },
+                preview: state.preview.setPreviewGenerated(embeddingPreview),
             };
         }
 
@@ -371,19 +231,8 @@ export function ingestionReducer(state, action) {
             const { rightSidebarState } = action.payload;
             return {
                 ...state,
-                preview: {
-                    ...state.preview,
-                    isPreviewMode: false,
-                    isLoadingPreview: false,
-                    embeddingPreview: null,
-                    previewConfig: { targetDb: '', strategy: '' },
-                    previewDocumentIds: new Set(),
-                },
-                ui: {
-                    ...state.ui,
-                    mode: UI_MODE.EDITING,
-                    rightSidebarCollapsed: rightSidebarState,
-                },
+                preview: PreviewModel.empty(),
+                ui: state.ui.exitPreviewMode().setRightSidebarCollapsed(rightSidebarState),
             };
         }
 
@@ -391,19 +240,8 @@ export function ingestionReducer(state, action) {
             const { rightSidebarState } = action.payload;
             return {
                 ...state,
-                preview: {
-                    ...state.preview,
-                    isPreviewMode: false,
-                    isLoadingPreview: false,
-                    embeddingPreview: null,
-                    previewConfig: { targetDb: '', strategy: '' },
-                    previewDocumentIds: new Set(),
-                },
-                ui: {
-                    ...state.ui,
-                    mode: UI_MODE.EDITING,
-                    rightSidebarCollapsed: rightSidebarState,
-                },
+                preview: state.preview.cancel(),
+                ui: state.ui.exitPreviewMode().setRightSidebarCollapsed(rightSidebarState),
             };
         }
 
@@ -411,49 +249,27 @@ export function ingestionReducer(state, action) {
             const { documentId, embeddingPreview } = action.payload;
             return {
                 ...state,
-                fileQueue: {
-                    ...state.fileQueue,
-                    selectedDocumentId: documentId,
-                },
-                preview: {
-                    ...state.preview,
-                    isLoadingPreview: false,
-                    embeddingPreview,
-                },
+                fileQueue: state.fileQueue.selectFile(documentId),
+                preview: state.preview.switchFile(documentId, embeddingPreview),
             };
         }
 
         case ActionTypes.PREVIEW_FILE_REMOVED: {
             const { documentId } = action.payload;
-            const newPreviewIds = new Set(state.preview.previewDocumentIds);
-            newPreviewIds.delete(documentId);
-
-            // If no files left, exit preview mode
-            if (newPreviewIds.size === 0) {
+            const newPreview = state.preview.removeDocument(documentId);
+            
+            // If preview becomes empty (no more documents), exit preview mode
+            if (!newPreview.isActive) {
                 return {
                     ...state,
-                    preview: {
-                        ...state.preview,
-                        isPreviewMode: false,
-                        isLoadingPreview: false,
-                        embeddingPreview: null,
-                        previewConfig: { targetDb: '', strategy: '' },
-                        previewDocumentIds: new Set(),
-                    },
-                    ui: {
-                        ...state.ui,
-                        mode: UI_MODE.EDITING,
-                        rightSidebarCollapsed: state.ui.rightSidebarStateBeforePreview,
-                    },
+                    preview: newPreview,
+                    ui: state.ui.exitPreviewMode(),
                 };
             }
 
             return {
                 ...state,
-                preview: {
-                    ...state.preview,
-                    previewDocumentIds: newPreviewIds,
-                },
+                preview: newPreview,
             };
         }
 
@@ -464,11 +280,7 @@ export function ingestionReducer(state, action) {
         case ActionTypes.INGESTION_STARTED: {
             return {
                 ...state,
-                ui: {
-                    ...state.ui,
-                    isIngesting: true,
-                    ingestionProgress: 0,
-                },
+                ui: state.ui.startIngestion(),
             };
         }
 
@@ -476,127 +288,47 @@ export function ingestionReducer(state, action) {
             const { progress } = action.payload;
             return {
                 ...state,
-                ui: {
-                    ...state.ui,
-                    ingestionProgress: progress,
-                },
+                ui: state.ui.setIngestionProgress(progress),
             };
         }
 
         case ActionTypes.INGESTION_COMPLETE: {
             const { ingestedEntry, ingestedData, rightSidebarState } = action.payload;
 
-            // Update or add ingested entry (avoid duplicates)
-            let updatedIngestedFiles = state.fileQueue.ingestedFiles;
-            if (ingestedEntry) {
-                const existingIndex = updatedIngestedFiles.findIndex(
-                    f => f.ingestedId === ingestedEntry.ingestedId
-                );
-                if (existingIndex >= 0) {
-                    // Update existing
-                    updatedIngestedFiles = [
-                        ...updatedIngestedFiles.slice(0, existingIndex),
-                        ingestedEntry,
-                        ...updatedIngestedFiles.slice(existingIndex + 1),
-                    ];
-                } else {
-                    // Add new
-                    updatedIngestedFiles = [...updatedIngestedFiles, ingestedEntry];
-                }
-            }
-
             return {
                 ...state,
-                fileQueue: {
-                    ...state.fileQueue,
-                    ingestedFiles: updatedIngestedFiles,
-                    // Update selected to the ingested file ID
-                    selectedDocumentId: ingestedEntry?.ingestedId || state.fileQueue.selectedDocumentId,
-                },
-                document: {
-                    ...state.document,
-                    contentType: CONTENT_TYPE.EMBEDDING,
-                    storedEmbeddings: ingestedData,
-                },
-                preview: {
-                    ...state.preview,
-                    isPreviewMode: false,
-                    isLoadingPreview: false,
-                    embeddingPreview: null,
-                    previewConfig: { targetDb: '', strategy: '' },
-                    previewDocumentIds: new Set(),
-                },
-                ui: {
-                    ...state.ui,
-                    mode: UI_MODE.READONLY,
-                    isIngesting: false,
-                    ingestionProgress: 0,
-                    rightSidebarCollapsed: rightSidebarState,
-                },
+                fileQueue: state.fileQueue
+                    .addIngestedFile(ingestedEntry)
+                    .selectFile(ingestedEntry?.ingestedId),
+                document: state.document.setStoredEmbeddings(ingestedData),
+                preview: PreviewModel.empty(),
+                ui: state.ui
+                    .enterReadonlyMode()
+                    .setRightSidebarCollapsed(rightSidebarState),
             };
         }
 
         case ActionTypes.INGESTION_BATCH_COMPLETE: {
             const { ingestedEntries, rightSidebarState } = action.payload;
 
-            // Add all ingested entries (avoid duplicates)
-            let updatedIngestedFiles = [...state.fileQueue.ingestedFiles];
-            for (const entry of ingestedEntries) {
-                const existingIndex = updatedIngestedFiles.findIndex(
-                    f => f.ingestedId === entry.ingestedId
-                );
-                if (existingIndex >= 0) {
-                    // Update existing
-                    updatedIngestedFiles[existingIndex] = entry;
-                } else {
-                    // Add new
-                    updatedIngestedFiles.push(entry);
-                }
-            }
-
             // Select the first ingested file
             const firstEntry = ingestedEntries[0];
 
             return {
                 ...state,
-                fileQueue: {
-                    ...state.fileQueue,
-                    ingestedFiles: updatedIngestedFiles,
-                    selectedDocumentId: firstEntry?.ingestedId || state.fileQueue.selectedDocumentId,
-                },
-                document: {
-                    ...state.document,
-                    contentType: CONTENT_TYPE.EMBEDDING,
-                    storedEmbeddings: firstEntry?.embeddingPreview || null,
-                },
-                preview: {
-                    ...state.preview,
-                    isPreviewMode: false,
-                    isLoadingPreview: false,
-                    embeddingPreview: null,
-                    previewConfig: { targetDb: '', strategy: '' },
-                    previewDocumentIds: new Set(),
-                },
-                ui: {
-                    ...state.ui,
-                    mode: UI_MODE.READONLY,
-                    isIngesting: false,
-                    ingestionProgress: 0,
-                    rightSidebarCollapsed: rightSidebarState,
-                    multiSelectMode: false,
-                    checkedDocumentIds: new Set(),
-                },
+                fileQueue: state.fileQueue
+                    .addIngestedFiles(ingestedEntries)
+                    .selectFile(firstEntry?.ingestedId),
+                document: state.document.setStoredEmbeddings(firstEntry?.embeddingPreview || null),
+                preview: PreviewModel.empty(),
+                ui: state.ui.completeBatchIngestion(rightSidebarState),
             };
         }
 
         case ActionTypes.INGESTION_FAILED: {
             return {
                 ...state,
-                ui: {
-                    ...state.ui,
-                    isIngesting: false,
-                    ingestionProgress: 0,
-                },
+                ui: state.ui.failIngestion(),
             };
         }
 
@@ -607,60 +339,36 @@ export function ingestionReducer(state, action) {
         case ActionTypes.LEFT_SIDEBAR_TOGGLED: {
             return {
                 ...state,
-                ui: {
-                    ...state.ui,
-                    leftSidebarCollapsed: !state.ui.leftSidebarCollapsed,
-                },
+                ui: state.ui.toggleLeftSidebar(),
             };
         }
 
         case ActionTypes.RIGHT_SIDEBAR_TOGGLED: {
             return {
                 ...state,
-                ui: {
-                    ...state.ui,
-                    rightSidebarCollapsed: !state.ui.rightSidebarCollapsed,
-                },
+                ui: state.ui.toggleRightSidebar(),
             };
         }
 
         case ActionTypes.MULTI_SELECT_TOGGLED: {
-            const newMode = !state.ui.multiSelectMode;
             return {
                 ...state,
-                ui: {
-                    ...state.ui,
-                    multiSelectMode: newMode,
-                    // Clear checked documents when exiting multi-select
-                    checkedDocumentIds: newMode ? state.ui.checkedDocumentIds : new Set(),
-                },
+                ui: state.ui.toggleMultiSelect(),
             };
         }
 
         case ActionTypes.DOCUMENT_CHECKED: {
             const { documentId } = action.payload;
-            const newChecked = new Set(state.ui.checkedDocumentIds);
-            if (newChecked.has(documentId)) {
-                newChecked.delete(documentId);
-            } else {
-                newChecked.add(documentId);
-            }
             return {
                 ...state,
-                ui: {
-                    ...state.ui,
-                    checkedDocumentIds: newChecked,
-                },
+                ui: state.ui.toggleDocumentChecked(documentId),
             };
         }
 
         case ActionTypes.CHECKED_DOCUMENTS_CLEARED: {
             return {
                 ...state,
-                ui: {
-                    ...state.ui,
-                    checkedDocumentIds: new Set(),
-                },
+                ui: state.ui.clearCheckedDocuments(),
             };
         }
 
@@ -668,10 +376,7 @@ export function ingestionReducer(state, action) {
             const { isDragging } = action.payload;
             return {
                 ...state,
-                ui: {
-                    ...state.ui,
-                    isDragging,
-                },
+                ui: state.ui.setDragging(isDragging),
             };
         }
 
@@ -683,20 +388,14 @@ export function ingestionReducer(state, action) {
             const { modalType } = action.payload;
             return {
                 ...state,
-                ui: {
-                    ...state.ui,
-                    activeModal: modalType,
-                },
+                ui: state.ui.openModal(modalType),
             };
         }
 
         case ActionTypes.MODAL_CLOSED: {
             return {
                 ...state,
-                ui: {
-                    ...state.ui,
-                    activeModal: null,
-                },
+                ui: state.ui.closeModal(),
             };
         }
 
@@ -708,30 +407,21 @@ export function ingestionReducer(state, action) {
             const { helperId } = action.payload;
             return {
                 ...state,
-                ui: {
-                    ...state.ui,
-                    runningHelper: helperId,
-                },
+                ui: state.ui.startHelper(helperId),
             };
         }
 
         case ActionTypes.HELPER_COMPLETED: {
             return {
                 ...state,
-                ui: {
-                    ...state.ui,
-                    runningHelper: null,
-                },
+                ui: state.ui.completeHelper(),
             };
         }
 
         case ActionTypes.HELPER_FAILED: {
             return {
                 ...state,
-                ui: {
-                    ...state.ui,
-                    runningHelper: null,
-                },
+                ui: state.ui.failHelper(),
             };
         }
 
@@ -739,20 +429,14 @@ export function ingestionReducer(state, action) {
             const { helper } = action.payload;
             return {
                 ...state,
-                ui: {
-                    ...state.ui,
-                    pendingHelper: helper,
-                },
+                ui: state.ui.setPendingHelper(helper),
             };
         }
 
         case ActionTypes.PENDING_HELPER_CLEARED: {
             return {
                 ...state,
-                ui: {
-                    ...state.ui,
-                    pendingHelper: null,
-                },
+                ui: state.ui.clearPendingHelper(),
             };
         }
 

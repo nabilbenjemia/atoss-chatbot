@@ -13,7 +13,7 @@
  * @see doc/ingestion/REDUCER.md for state management documentation
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
@@ -110,10 +110,18 @@ function IngestionPageLayout() {
         checkedDocumentIds,
     } = useUI();
 
-    const { uploadQueue, selectedDocumentId, ingestedFiles } = useFileQueue();
-    const { documentState, currentPage, contentType, storedEmbeddings } = useDocument();
+    const { uploadQueue, selectedDocumentId } = useFileQueue();
+    const fileQueue = useFileQueue(); // Also get the model for method access
+    const { currentPage, contentType, storedEmbeddings } = useDocument();
     const { isPreviewMode, embeddingPreview, isLoadingPreview, previewDocumentIds, previewConfig } = usePreview();
     const actions = useIngestionActions();
+
+    // Memoized selector: only changes when the selected ingested file changes
+    // This avoids re-running effects when unrelated files are added/removed
+    const selectedIngestedFile = useMemo(
+        () => selectedDocumentId ? fileQueue.getIngestedFileById(selectedDocumentId) : null,
+        [fileQueue, selectedDocumentId]
+    );
 
     // Shared command history for undo/redo (used by ContentViewer and HelperPanel)
     const {
@@ -128,24 +136,18 @@ function IngestionPageLayout() {
         canRedo,
     } = useCommandHistory(null);
 
-    // Sync command history state with context
-    useEffect(() => {
-        if (commandDocumentState) {
-            actions.modifyDocument(commandDocumentState);
-        }
-    }, [commandDocumentState, actions]);
-
     // Auto-save document content and command history
     // Only save when the current command history belongs to the selected document
+    // Use commandDocumentState directly (source of truth for editing)
     useEffect(() => {
-        if (documentState && selectedDocumentId && commandHistoryDocIdRef.current === selectedDocumentId) {
-            saveFileContent(selectedDocumentId, documentState);
+        if (commandDocumentState && selectedDocumentId && commandHistoryDocIdRef.current === selectedDocumentId) {
+            saveFileContent(selectedDocumentId, commandDocumentState);
             // Save serialized command history for undo/redo persistence
             const fullState = getCommandFullState();
             saveFileHistory(selectedDocumentId, fullState);
-            updateUploadedFile(selectedDocumentId, { filename: documentState.filename });
+            updateUploadedFile(selectedDocumentId, { filename: commandDocumentState.filename });
         }
-    }, [documentState, selectedDocumentId, getCommandFullState]);
+    }, [commandDocumentState, selectedDocumentId, getCommandFullState]);
 
     // ===== Initialization Effects =====
 
@@ -195,16 +197,11 @@ function IngestionPageLayout() {
             return;
         }
 
-        // Check if this is an ingested file (by ingestedId only, not documentId)
-        // Ingested files have ingestedId format: documentId_strategy
-        const ingestedFile = ingestedFiles.find(
-            f => f.ingestedId === selectedDocumentId
-        );
-
-        if (ingestedFile) {
+        // Use the memoized selector - only re-runs when the specific ingested file changes
+        if (selectedIngestedFile) {
             // Load embeddings for ingested file - no command history for these
             commandHistoryDocIdRef.current = null;
-            const embeddings = getIngestedFileEmbeddings(ingestedFile.ingestedId);
+            const embeddings = getIngestedFileEmbeddings(selectedIngestedFile.ingestedId);
             if (embeddings) {
                 // This sets contentType to EMBEDDING and clears documentState
                 actions.setStoredEmbeddings(embeddings, selectedDocumentId);
@@ -234,7 +231,7 @@ function IngestionPageLayout() {
             commandHistoryDocIdRef.current = selectedDocumentId;
             actions.loadDocument(content, selectedDocumentId);
         }
-    }, [selectedDocumentId, ingestedFiles, actions, resetCommandDocument, restoreCommandDocument]);
+    }, [selectedDocumentId, selectedIngestedFile, actions, resetCommandDocument, restoreCommandDocument]);
 
     // ===== Modal Handlers =====
 
@@ -285,12 +282,12 @@ function IngestionPageLayout() {
     }, [multiSelectMode, checkedDocumentIds, selectedDocumentId, rightSidebarCollapsed, actions]);
 
     const handleRegexConfirm = useCallback((pattern) => {
-        if (!documentState) return;
+        if (!commandDocumentState) return;
 
         const regex = new RegExp(pattern, 'i');
         const matchingIds = [];
 
-        for (const page of documentState.pages) {
+        for (const page of commandDocumentState.pages) {
             for (const item of page.items) {
                 if (item.type === 'text' && !item.deleted && regex.test(item.content)) {
                     matchingIds.push(item.id);
@@ -305,7 +302,7 @@ function IngestionPageLayout() {
             toast.info('No items matched the pattern');
         }
         actions.closeModal();
-    }, [documentState, executeCommand, actions]);
+    }, [commandDocumentState, executeCommand, actions]);
 
     const handleHelperFileSelectConfirm = useCallback(async (selectedDocumentIds) => {
         actions.closeModal();
@@ -326,8 +323,10 @@ function IngestionPageLayout() {
                 const isCurrentDocument = docId === selectedDocumentId;
 
                 // Get document content
-                const docContent = isCurrentDocument && documentState
-                    ? documentState
+                // For current document, use commandDocumentState (source of truth)
+                // For other documents, load from cache
+                const docContent = isCurrentDocument && commandDocumentState
+                    ? commandDocumentState
                     : getFileContent(docId);
 
                 if (!docContent || !docContent.pages) {
@@ -486,11 +485,11 @@ function IngestionPageLayout() {
         }
 
         actions.clearPendingHelper();
-    }, [actions, pendingHelper, selectedDocumentId, documentState, executeCommand]);
+    }, [actions, pendingHelper, selectedDocumentId, commandDocumentState, executeCommand]);
 
     // Confirm and ingest (single file)
     const handleConfirmIngestion = useCallback(async () => {
-        if (!documentState || !previewConfig.targetDb) {
+        if (!commandDocumentState || !previewConfig.targetDb) {
             toast.error('Missing document or target database');
             return;
         }
@@ -501,7 +500,7 @@ function IngestionPageLayout() {
         try {
             const result = await startIngestion(
                 previewConfig.targetDb,
-                documentState,
+                commandDocumentState,
                 previewConfig.strategy
             );
 
@@ -511,7 +510,7 @@ function IngestionPageLayout() {
                     selectedDocumentId,
                     previewConfig.strategy,
                     embeddingPreview,
-                    { filename: documentState.filename, documentId: selectedDocumentId }
+                    { filename: commandDocumentState.filename, documentId: selectedDocumentId }
                 );
 
                 // Update state
@@ -531,7 +530,7 @@ function IngestionPageLayout() {
             toast.error(`Ingestion failed: ${error.message}`);
             actions.failIngestion();
         }
-    }, [documentState, selectedDocumentId, previewConfig, embeddingPreview, rightSidebarCollapsed, actions]);
+    }, [commandDocumentState, selectedDocumentId, previewConfig, embeddingPreview, rightSidebarCollapsed, actions]);
 
     // Confirm and ingest all files in preview
     const handleConfirmIngestionAll = useCallback(async () => {
@@ -654,7 +653,7 @@ function IngestionPageLayout() {
 
     // ===== Render =====
 
-    const totalPages = documentState?.pages?.length || 0;
+    const totalPages = commandDocumentState?.pages?.length || 0;
 
     return (
         <div className="flex h-screen bg-tum-blue-light-5 overflow-hidden font-display">
@@ -751,7 +750,7 @@ function IngestionPageLayout() {
                         {/* Title row */}
                         <div className="flex items-center justify-between mb-3">
                             <div className="flex-1">
-                                {documentState ? (
+                                {commandDocumentState ? (
                                     isEditingTitle ? (
                                         <input
                                             type="text"
@@ -759,8 +758,8 @@ function IngestionPageLayout() {
                                             onChange={(e) => setEditingTitleValue(e.target.value)}
                                             onBlur={() => {
                                                 const trimmed = editingTitleValue.trim();
-                                                if (trimmed && trimmed !== documentState.filename) {
-                                                    executeCommand(Commands.renameDocument(trimmed, documentState.filename));
+                                                if (trimmed && trimmed !== commandDocumentState.filename) {
+                                                    executeCommand(Commands.renameDocument(trimmed, commandDocumentState.filename));
                                                     actions.updateFilename(selectedDocumentId, trimmed);
                                                 }
                                                 setIsEditingTitle(false);
@@ -769,7 +768,7 @@ function IngestionPageLayout() {
                                                 if (e.key === 'Enter') {
                                                     e.target.blur();
                                                 } else if (e.key === 'Escape') {
-                                                    setEditingTitleValue(documentState.filename);
+                                                    setEditingTitleValue(commandDocumentState.filename);
                                                     setIsEditingTitle(false);
                                                 }
                                             }}
@@ -782,12 +781,12 @@ function IngestionPageLayout() {
                                             className="text-xl font-bold text-tum-black cursor-text hover:bg-tum-blue-light-5 
                                                 px-3 py-2 -mx-3 -my-2 transition-colors border border-transparent hover:border-tum-grey-7"
                                             onClick={() => {
-                                                setEditingTitleValue(documentState.filename);
+                                                setEditingTitleValue(commandDocumentState.filename);
                                                 setIsEditingTitle(true);
                                             }}
                                             title="Click to edit filename"
                                         >
-                                            {documentState.filename}
+                                            {commandDocumentState.filename}
                                         </h1>
                                     )
                                 ) : (
@@ -800,12 +799,12 @@ function IngestionPageLayout() {
 
                         {/* Actions row */}
                         <div className="flex items-center justify-between">
-                            {documentState && (
+                            {commandDocumentState && (
                                 <p className="text-sm text-tum-grey-4">
                                     Page {currentPage} of {totalPages}
                                 </p>
                             )}
-                            {!documentState && <div />}
+                            {!commandDocumentState && <div />}
 
                             <SaveBar
                                 canUndo={canUndo}
@@ -813,7 +812,7 @@ function IngestionPageLayout() {
                                 onUndo={undo}
                                 onRedo={redo}
                                 onIngest={() => actions.openModal(MODAL_TYPES.INGEST)}
-                                canIngest={!!documentState && !isIngesting && !isPreviewMode}
+                                canIngest={!!commandDocumentState && !isIngesting && !isPreviewMode}
                             />
                         </div>
                     </div>
@@ -877,7 +876,10 @@ function IngestionPageLayout() {
 
                     {/* Content: Helpers */}
                     {!rightSidebarCollapsed && (
-                        <ConnectedHelperPanel executeCommand={executeCommand} />
+                        <ConnectedHelperPanel
+                            commandState={commandDocumentState}
+                            executeCommand={executeCommand}
+                        />
                     )}
 
                     {/* Collapsed state icon */}
@@ -930,7 +932,7 @@ function IngestionPageLayout() {
                 files={uploadQueue.filter(f => f.status === DOC_STATUS.READY)}
                 helper={pendingHelper}
                 currentDocumentId={selectedDocumentId}
-                currentFilename={documentState?.filename}
+                currentFilename={commandDocumentState?.filename}
             />
         </div>
     );

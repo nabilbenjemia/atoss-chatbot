@@ -11,7 +11,6 @@ import { useCallback, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import {
     useUI,
-    useDocument,
     useFileQueue,
     useIngestionActions,
     MODAL_TYPES,
@@ -21,11 +20,13 @@ import { INGESTION_CONFIG } from '../../../config/ingestionConfig';
 import { generateImageDescriptions } from '../../../services/ingestionApi';
 import { Commands } from '../../../hooks/useCommandHistory';
 
-export default function ConnectedHelperPanel({ executeCommand }) {
+export default function ConnectedHelperPanel({ commandState, executeCommand }) {
     const { runningHelper, isIngesting } = useUI();
-    const { documentState } = useDocument();
     const { uploadQueue } = useFileQueue();
     const actions = useIngestionActions();
+
+    // Use commandState (from useCommandHistory) as the document state
+    const documentState = commandState;
 
     const disabled = !documentState || isIngesting;
     const localHelpers = useMemo(() => INGESTION_CONFIG.helpers.local || [], []);
