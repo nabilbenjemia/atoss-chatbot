@@ -72,7 +72,10 @@ export const updateUploadedFile = (documentId, updates) => {
 
 /**
  * Remove an uploaded file from cache
+ * Also removes any ingested versions of this file and their embedding caches
+ * 
  * @param {string} documentId - Document ID to remove
+ * @returns {string[]} - Array of removed ingested IDs (for callers that need to update state)
  */
 export const removeUploadedFile = (documentId) => {
     const files = getUploadedFiles();
@@ -84,6 +87,22 @@ export const removeUploadedFile = (documentId) => {
 
     // Also clear the command history for this file
     clearCache(`${INGESTION_CONFIG.storage.historyPrefix}${documentId}`);
+    
+    // Also remove any ingested versions of this file
+    const ingestedFiles = getIngestedFiles();
+    const relatedIngested = ingestedFiles.filter(f => f.documentId === documentId);
+    const removedIngestedIds = relatedIngested.map(f => f.ingestedId);
+    
+    // Remove from ingested files list
+    const filteredIngested = ingestedFiles.filter(f => f.documentId !== documentId);
+    saveIngestedFiles(filteredIngested);
+    
+    // Clear embedding caches for removed ingested files
+    removedIngestedIds.forEach(ingestedId => {
+        clearCache(`${INGESTION_CONFIG.storage.embeddingCachePrefix}${ingestedId}`);
+    });
+    
+    return removedIngestedIds;
 };
 
 /**
@@ -128,15 +147,16 @@ export const saveIngestedFiles = (files) => {
  * Create or update an ingested file entry
  * - Does NOT remove the uploaded file (user may want to re-ingest with different strategy)
  * - Creates ingested entry keyed by documentId + strategy
- * - If same documentId + strategy exists, updates it (same embedding preview)
- * - If different strategy, creates new entry (different embedding preview)
+ * - If same documentId + strategy exists, updates it (preserves ability to re-ingest)
+ * - If different strategy, creates new entry
  * 
  * @param {string} documentId - Original document ID
  * @param {string} strategy - Ingestion strategy used
  * @param {Object} embeddingData - Embedding preview data to cache
  * @param {Object} fileInfo - Optional file info (filename, etc.) - if not provided, will look up from uploaded files
+ * @param {string} [targetDb] - Target database (optional)
  */
-export const createIngestedFile = (documentId, strategy, embeddingData, fileInfo = null) => {
+export const createIngestedFile = (documentId, strategy, embeddingData, fileInfo = null, targetDb = null) => {
     // Get file info from uploaded files if not provided
     let file = fileInfo;
     if (!file) {
@@ -156,15 +176,23 @@ export const createIngestedFile = (documentId, strategy, embeddingData, fileInfo
     const ingestedFiles = getIngestedFiles();
     const existingIndex = ingestedFiles.findIndex(f => f.ingestedId === ingestedId);
 
+    // Calculate embedding count from the embedding data
+    const embeddingCount = embeddingData?.chunks?.length || 
+                           embeddingData?.embeddings?.length || 
+                           embeddingData?.count || 0;
+
     const ingestedEntry = {
         id: ingestedId,
         ingestedId,
         documentId,  // Keep reference to original document
         strategy,
+        targetDb: targetDb || 'default',
         filename: `${file.filename} (${strategy})`,
         originalFilename: file.filename,
+        timestamp: Date.now(),
         ingestedAt: new Date().toISOString(),
         status: 'ingested',
+        embeddingCount,
     };
 
     if (existingIndex >= 0) {
@@ -241,11 +269,15 @@ export const markFileAsIngested = (documentId, embeddingData) => {
 
 /**
  * Remove an ingested file from cache
+ * Only removes the ingested file entry and its embedding cache.
+ * Does NOT remove the uploaded file (user may want to re-ingest with different strategy).
+ * 
  * @param {string} ingestedId - Ingested file ID (documentId_strategy format) or legacy documentId
  */
 export const removeIngestedFile = (ingestedId) => {
     const files = getIngestedFiles();
-    // Support both new ingestedId format and legacy documentId format
+    
+    // Remove from ingested files list
     const filtered = files.filter(f =>
         f.ingestedId !== ingestedId && f.documentId !== ingestedId
     );

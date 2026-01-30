@@ -23,12 +23,12 @@ export default function ConnectedContentViewer({
     commandState,
     executeCommand,
 }) {
-    const { documentState, currentPage } = useDocument();
+    const { currentPage } = useDocument();
     const actions = useIngestionActions();
     const { config: backendConfig } = useBackendConfig();
 
-    // Use passed command state or fall back to document state
-    const doc = commandState || documentState;
+    // Use passed command state directly (source of truth for editing)
+    const doc = commandState;
     // Use availableImageClasses or imageClasses from backend config with fallback
     const availableClasses = backendConfig?.availableImageClasses
         || backendConfig?.imageClasses
