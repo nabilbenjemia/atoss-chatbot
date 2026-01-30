@@ -10,16 +10,14 @@ import ReactMarkdown from 'react-markdown';
 
 /**
  * @param {Object} props
- * @param {Object} props.item - Text item object { id, type, content, deleted }
+ * @param {Object} props.item - Text item object { id, type, content }
  * @param {Function} props.onEdit - Edit handler (itemId, newContent)
  * @param {Function} props.onDelete - Delete handler (itemId)
- * @param {Function} props.onRestore - Restore handler (itemId)
  */
 export default function TextItem({
     item,
     onEdit,
     onDelete,
-    onRestore,
 }) {
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(item.content);
@@ -60,29 +58,6 @@ export default function TextItem({
             handleSave();
         }
     }, [handleCancel, handleSave]);
-
-    // Deleted state
-    if (item.deleted) {
-        return (
-            <div className="bg-tum-blue-light-5 p-4 border border-tum-grey-7 opacity-60">
-                <div className="flex items-center justify-between">
-                    <span className="text-xs text-tum-orange font-bold uppercase">Deleted</span>
-                    {onRestore && (
-                        <button
-                            onClick={() => onRestore(item.id)}
-                            className="px-3 py-1 text-xs font-bold bg-white border border-tum-blue 
-                                text-tum-blue hover:bg-tum-blue hover:text-white transition-colors"
-                        >
-                            Restore
-                        </button>
-                    )}
-                </div>
-                <pre className="whitespace-pre-wrap font-sans text-sm text-tum-grey-4 line-through mt-2">
-                    {item.content.slice(0, 100)}...
-                </pre>
-            </div>
-        );
-    }
 
     return (
         <div

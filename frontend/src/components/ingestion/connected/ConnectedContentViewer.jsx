@@ -65,13 +65,6 @@ export default function ConnectedContentViewer({
         toast.info('Item deleted (can be undone)');
     }, [doc, executeCommand]);
 
-    // Restore item
-    const handleRestoreItem = useCallback((itemId) => {
-        if (!doc) return;
-        executeCommand(Commands.restoreItem(itemId));
-        toast.info('Item restored');
-    }, [doc, executeCommand]);
-
     // Change item classification
     const handleClassChange = useCallback((itemId, newClass) => {
         if (!doc) return;
@@ -124,7 +117,6 @@ export default function ConnectedContentViewer({
                         page={currentPageContent}
                         onEditItem={handleEditItem}
                         onDeleteItem={handleDeleteItem}
-                        onRestoreItem={handleRestoreItem}
                         onClassChange={handleClassChange}
                         availableClasses={availableClasses}
                     />
