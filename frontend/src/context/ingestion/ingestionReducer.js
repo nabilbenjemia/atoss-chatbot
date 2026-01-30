@@ -58,8 +58,6 @@ export const initialState = {
         isDragging: false,         // Drag state for upload zone
         multiSelectMode: false,
         checkedDocumentIds: new Set(),
-        isEditingTitle: false,
-        editingTitleValue: '',
         isIngesting: false,
         ingestionProgress: 0,
         runningHelper: null,       // Currently running helper ID
@@ -677,40 +675,6 @@ export function ingestionReducer(state, action) {
             };
         }
 
-        case ActionTypes.TITLE_EDITING_STARTED: {
-            const { value } = action.payload;
-            return {
-                ...state,
-                ui: {
-                    ...state.ui,
-                    isEditingTitle: true,
-                    editingTitleValue: value,
-                },
-            };
-        }
-
-        case ActionTypes.TITLE_EDITING_ENDED: {
-            return {
-                ...state,
-                ui: {
-                    ...state.ui,
-                    isEditingTitle: false,
-                    editingTitleValue: '',
-                },
-            };
-        }
-
-        case ActionTypes.UI_MODE_CHANGED: {
-            const { mode } = action.payload;
-            return {
-                ...state,
-                ui: {
-                    ...state.ui,
-                    mode,
-                },
-            };
-        }
-
         // ============================================
         // MODAL ACTIONS
         // ============================================
@@ -788,55 +752,6 @@ export function ingestionReducer(state, action) {
                 ui: {
                     ...state.ui,
                     pendingHelper: null,
-                },
-            };
-        }
-
-        // ============================================
-        // CACHE ACTIONS
-        // ============================================
-
-        case ActionTypes.CACHE_CLEARED: {
-            const { all, types } = action.payload;
-
-            let newFileQueue = state.fileQueue;
-            let newDocument = state.document;
-
-            // Clear upload queue if uploaded/content types cleared
-            if (all || types?.includes('uploaded') || types?.includes('content')) {
-                newFileQueue = {
-                    ...newFileQueue,
-                    uploadQueue: [],
-                    selectedDocumentId: null,
-                };
-            }
-
-            // Clear ingested files if embedding types cleared
-            if (all || types?.includes('embedding')) {
-                newFileQueue = {
-                    ...newFileQueue,
-                    ingestedFiles: [],
-                };
-            }
-
-            // Clear document state if editor state cleared
-            if (all || types?.includes('editor')) {
-                newDocument = {
-                    ...newDocument,
-                    documentState: null,
-                    storedEmbeddings: null,
-                    contentType: CONTENT_TYPE.EDITOR,
-                };
-            }
-
-            return {
-                ...state,
-                fileQueue: newFileQueue,
-                document: newDocument,
-                ui: {
-                    ...state.ui,
-                    checkedDocumentIds: new Set(),
-                    multiSelectMode: false,
                 },
             };
         }

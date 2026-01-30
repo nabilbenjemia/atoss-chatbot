@@ -272,20 +272,6 @@ export function useIngestionActions() {
             payload: { isDragging },
         }),
 
-        startTitleEditing: (value) => dispatch({
-            type: ActionTypes.TITLE_EDITING_STARTED,
-            payload: { value },
-        }),
-
-        endTitleEditing: () => dispatch({
-            type: ActionTypes.TITLE_EDITING_ENDED,
-        }),
-
-        setUIMode: (mode) => dispatch({
-            type: ActionTypes.UI_MODE_CHANGED,
-            payload: { mode },
-        }),
-
         // Modal Actions
         openModal: (modalType) => dispatch({
             type: ActionTypes.MODAL_OPENED,
@@ -294,21 +280,6 @@ export function useIngestionActions() {
 
         closeModal: () => dispatch({
             type: ActionTypes.MODAL_CLOSED,
-        }),
-
-        openIngestionModal: () => dispatch({
-            type: ActionTypes.MODAL_OPENED,
-            payload: { modalType: MODAL_TYPES.INGESTION },
-        }),
-
-        openRegexModal: () => dispatch({
-            type: ActionTypes.MODAL_OPENED,
-            payload: { modalType: MODAL_TYPES.REGEX },
-        }),
-
-        openCacheManagementModal: () => dispatch({
-            type: ActionTypes.MODAL_OPENED,
-            payload: { modalType: MODAL_TYPES.CACHE_MANAGEMENT },
         }),
 
         openHelperFileSelectModal: () => dispatch({
@@ -339,12 +310,6 @@ export function useIngestionActions() {
             type: ActionTypes.PENDING_HELPER_CLEARED,
         }),
 
-        // Cache Actions
-        clearCache: (all, types) => dispatch({
-            type: ActionTypes.CACHE_CLEARED,
-            payload: { all, types },
-        }),
-
         // Convenience Actions (composite/aliased)
 
         // Update filename is an alias for renameFile
@@ -364,83 +329,6 @@ export function useIngestionActions() {
             type: ActionTypes.PREVIEW_CANCELLED,
             payload: { rightSidebarState },
         }),
-
-        // Confirm ingestion (single file)
-        confirmIngestion: () => dispatch({
-            type: ActionTypes.INGESTION_STARTED,
-        }),
-
-        // Confirm ingestion for all files in preview
-        confirmIngestionAll: () => dispatch({
-            type: ActionTypes.INGESTION_STARTED,
-        }),
-
-        // Cancel ingestion
-        cancelIngestion: () => dispatch({
-            type: ActionTypes.INGESTION_FAILED,
-        }),
     }), [dispatch]);
 }
 
-// ============================================
-// SELECTOR HOOKS (for specific pieces of state)
-// ============================================
-
-/**
- * Get the selected document from the upload queue
- */
-export function useSelectedDocument() {
-    const { uploadQueue, selectedDocumentId } = useFileQueue();
-    return useMemo(
-        () => uploadQueue.find(f => f.documentId === selectedDocumentId),
-        [uploadQueue, selectedDocumentId]
-    );
-}
-
-/**
- * Check if a document is currently selected
- */
-export function useIsDocumentSelected(documentId) {
-    const { selectedDocumentId } = useFileQueue();
-    return selectedDocumentId === documentId;
-}
-
-/**
- * Get the total page count
- */
-export function useTotalPages() {
-    const { documentState } = useDocument();
-    return documentState?.pages?.length || 0;
-}
-
-/**
- * Check if we're in preview mode
- */
-export function useIsPreviewMode() {
-    const { isPreviewMode } = usePreview();
-    return isPreviewMode;
-}
-
-/**
- * Check if a document is in the preview set
- */
-export function useIsInPreviewSet(documentId) {
-    const { previewDocumentIds } = usePreview();
-    return previewDocumentIds.has(documentId);
-}
-
-/**
- * Get the active modal type
- */
-export function useActiveModal() {
-    const { activeModal } = useUI();
-    return activeModal;
-}
-
-/**
- * Check if a specific modal is open
- */
-export function useIsModalOpen(modalType) {
-    const { activeModal } = useUI();
-    return activeModal === modalType;
-}

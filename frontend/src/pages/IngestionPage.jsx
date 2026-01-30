@@ -33,7 +33,6 @@ import {
 // External hooks
 import useBackendConfig from '../hooks/useBackendConfig';
 import useCommandHistory, { Commands, serializeCommand } from '../hooks/useCommandHistory';
-import { loadFromCache, clearCache, hasCache } from '../hooks/useLocalCache';
 
 // Utility functions
 import { mockCurrentUser, shouldUseMockAuth } from '../mocks/ingestionMocks';
@@ -183,21 +182,7 @@ function IngestionPageLayout() {
         const cachedIngestedFiles = getIngestedFiles();
         actions.loadIngestedFiles(cachedIngestedFiles);
 
-        // Check for cached edit state
-        if (hasCache(INGESTION_CONFIG.storage.editStateKey)) {
-            const cached = loadFromCache(INGESTION_CONFIG.storage.editStateKey);
-            if (cached?.documentState) {
-                const resume = window.confirm(
-                    'You have unsaved work from a previous session. Would you like to resume?'
-                );
-                if (resume) {
-                    resetCommandDocument(cached.documentState);
-                    toast.info('Restored previous session');
-                } else {
-                    clearCache(INGESTION_CONFIG.storage.editStateKey);
-                }
-            }
-        }
+        // ...existing code...
     }, [actions, resetCommandDocument]);
 
     // Load document content when file is selected

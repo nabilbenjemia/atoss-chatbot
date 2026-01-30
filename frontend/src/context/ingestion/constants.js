@@ -36,7 +36,7 @@ export const UI_MODE = {
  * Modal types
  */
 export const MODAL_TYPES = {
-    INGESTION: 'ingestion',
+    INGEST: 'ingest',
     REGEX: 'regex',
     CACHE_MANAGEMENT: 'cache_management',
     HELPER_FILE_SELECT: 'helper_file_select',
