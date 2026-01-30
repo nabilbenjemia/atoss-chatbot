@@ -89,15 +89,15 @@ export default function ConnectedFileQueue() {
     const handleRemoveUploadedFile = useCallback((documentId) => {
         // removeUploadedFile returns the removed ingested IDs and cleans up all related caches
         const removedIngestedIds = removeUploadedFile(documentId);
-        
+
         // Remove from context state
         actions.removeFile(documentId);
-        
+
         // Also remove any related ingested files from context state
         removedIngestedIds.forEach(ingestedId => {
             actions.removeIngestedFile(ingestedId);
         });
-        
+
         toast.info('File removed');
     }, [actions]);
 

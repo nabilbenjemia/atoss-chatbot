@@ -87,21 +87,21 @@ export const removeUploadedFile = (documentId) => {
 
     // Also clear the command history for this file
     clearCache(`${INGESTION_CONFIG.storage.historyPrefix}${documentId}`);
-    
+
     // Also remove any ingested versions of this file
     const ingestedFiles = getIngestedFiles();
     const relatedIngested = ingestedFiles.filter(f => f.documentId === documentId);
     const removedIngestedIds = relatedIngested.map(f => f.ingestedId);
-    
+
     // Remove from ingested files list
     const filteredIngested = ingestedFiles.filter(f => f.documentId !== documentId);
     saveIngestedFiles(filteredIngested);
-    
+
     // Clear embedding caches for removed ingested files
     removedIngestedIds.forEach(ingestedId => {
         clearCache(`${INGESTION_CONFIG.storage.embeddingCachePrefix}${ingestedId}`);
     });
-    
+
     return removedIngestedIds;
 };
 
@@ -177,9 +177,9 @@ export const createIngestedFile = (documentId, strategy, embeddingData, fileInfo
     const existingIndex = ingestedFiles.findIndex(f => f.ingestedId === ingestedId);
 
     // Calculate embedding count from the embedding data
-    const embeddingCount = embeddingData?.chunks?.length || 
-                           embeddingData?.embeddings?.length || 
-                           embeddingData?.count || 0;
+    const embeddingCount = embeddingData?.chunks?.length ||
+        embeddingData?.embeddings?.length ||
+        embeddingData?.count || 0;
 
     const ingestedEntry = {
         id: ingestedId,
@@ -276,7 +276,7 @@ export const markFileAsIngested = (documentId, embeddingData) => {
  */
 export const removeIngestedFile = (ingestedId) => {
     const files = getIngestedFiles();
-    
+
     // Remove from ingested files list
     const filtered = files.filter(f =>
         f.ingestedId !== ingestedId && f.documentId !== ingestedId
