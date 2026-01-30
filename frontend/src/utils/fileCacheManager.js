@@ -21,6 +21,98 @@ import { loadFromCache, saveToCache, clearCache, getKeysWithPrefix } from '../ho
  * }
  */
 
+// ==================== CONTENT FINGERPRINT ====================
+
+/**
+ * Generate a lightweight content fingerprint for deduplication.
+ * 
+ * This creates a hash from the document content that changes when:
+ * - Text content is edited
+ * - Items are deleted/restored
+ * - Pages are modified
+ * 
+ * The fingerprint is used to detect if the SAME content has already been
+ * ingested with the same strategy to the same DB.
+ * 
+ * @param {Object} documentState - The document state with pages/items
+ * @returns {string} - A fingerprint string (not cryptographically secure, just for comparison)
+ */
+export const generateContentFingerprint = (documentState) => {
+    if (!documentState || !documentState.pages) {
+        return 'empty';
+    }
+
+    // Build a string representation of all active content
+    const contentParts = [];
+
+    for (const page of documentState.pages) {
+        const items = page.items || [];
+        for (const item of items) {
+            // Skip deleted items - they don't affect the final embedding
+            if (item.deleted) continue;
+
+            // Include item type and content
+            if (item.type === 'text' && item.content) {
+                contentParts.push(`t:${item.content}`);
+            } else if (item.type === 'image' || item.type === 'picture') {
+                // For images, use classification or imageUrl as identifier
+                contentParts.push(`i:${item.classification || item.imageUrl || item.id}`);
+            } else if (item.type === 'table') {
+                contentParts.push(`tb:${item.content || item.id}`);
+            }
+        }
+    }
+
+    // Simple hash function (djb2)
+    const str = contentParts.join('|');
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) + hash) + str.charCodeAt(i);
+        hash = hash & hash; // Convert to 32-bit integer
+    }
+
+    // Convert to base36 for shorter string
+    return Math.abs(hash).toString(36);
+};
+
+/**
+ * Generate a unique ingestion ID based on content, strategy, and target DB.
+ * 
+ * This ID uniquely identifies an ingestion attempt:
+ * - Same content + same strategy + same DB = same ID (duplicate)
+ * - Any difference = different ID (allow ingestion)
+ * 
+ * @param {Object} documentState - The document state
+ * @param {string} strategy - Ingestion strategy
+ * @param {string} targetDb - Target database/collection
+ * @returns {string} - Unique ingestion ID
+ */
+export const generateIngestionId = (documentState, strategy, targetDb) => {
+    const contentFingerprint = generateContentFingerprint(documentState);
+    return `${contentFingerprint}_${strategy}_${targetDb}`;
+};
+
+/**
+ * Check if content has already been ingested with same strategy to same DB.
+ * 
+ * @param {Object} documentState - The document state
+ * @param {string} strategy - Ingestion strategy
+ * @param {string} targetDb - Target database/collection
+ * @returns {{ isDuplicate: boolean, existingEntry: Object|null, ingestionId: string }}
+ */
+export const checkIngestionDuplicate = (documentState, strategy, targetDb) => {
+    const ingestionId = generateIngestionId(documentState, strategy, targetDb);
+    const ingestedFiles = getIngestedFiles();
+
+    const existingEntry = ingestedFiles.find(f => f.ingestionId === ingestionId);
+
+    return {
+        isDuplicate: !!existingEntry,
+        existingEntry,
+        ingestionId,
+    };
+};
+
 // ==================== UPLOADED FILES (Content Viewer) ====================
 
 /**
@@ -129,10 +221,27 @@ export const getFileContent = (documentId) => {
 
 /**
  * Get list of ingested file metadata
+ * Normalizes legacy entries that may be missing ingestedId
  * @returns {Array} - Array of ingested file metadata
  */
 export const getIngestedFiles = () => {
-    return loadFromCache(INGESTION_CONFIG.storage.ingestedFilesKey) || [];
+    const files = loadFromCache(INGESTION_CONFIG.storage.ingestedFilesKey) || [];
+
+    // Normalize legacy entries that don't have ingestedId
+    return files.map(file => {
+        if (!file.ingestedId) {
+            // Legacy format: generate ingestedId from documentId + strategy
+            const strategy = file.strategy || 'default';
+            const ingestedId = `${file.documentId}_${strategy}`;
+            return {
+                ...file,
+                id: ingestedId,
+                ingestedId,
+                strategy,
+            };
+        }
+        return file;
+    });
 };
 
 /**
@@ -149,14 +258,16 @@ export const saveIngestedFiles = (files) => {
  * - Creates ingested entry keyed by documentId + strategy
  * - If same documentId + strategy exists, updates it (preserves ability to re-ingest)
  * - If different strategy, creates new entry
+ * - Stores ingestionId for duplicate detection
  * 
  * @param {string} documentId - Original document ID
  * @param {string} strategy - Ingestion strategy used
  * @param {Object} embeddingData - Embedding preview data to cache
  * @param {Object} fileInfo - Optional file info (filename, etc.) - if not provided, will look up from uploaded files
  * @param {string} [targetDb] - Target database (optional)
+ * @param {string} [ingestionId] - Content-based ingestion ID for duplicate detection
  */
-export const createIngestedFile = (documentId, strategy, embeddingData, fileInfo = null, targetDb = null) => {
+export const createIngestedFile = (documentId, strategy, embeddingData, fileInfo = null, targetDb = null, ingestionId = null) => {
     // Get file info from uploaded files if not provided
     let file = fileInfo;
     if (!file) {
@@ -184,6 +295,7 @@ export const createIngestedFile = (documentId, strategy, embeddingData, fileInfo
     const ingestedEntry = {
         id: ingestedId,
         ingestedId,
+        ingestionId,  // Content-based ID for duplicate detection
         documentId,  // Keep reference to original document
         strategy,
         targetDb: targetDb || 'default',
