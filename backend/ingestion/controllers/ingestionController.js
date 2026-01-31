@@ -44,18 +44,18 @@ const createCollection = async (req, res) => {
         const { name, description } = req.body;
 
         if (!name || typeof name !== 'string' || !name.trim()) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Collection name is required' 
+            return res.status(400).json({
+                success: false,
+                error: 'Collection name is required'
             });
         }
 
         // Validate name format (alphanumeric, underscores, hyphens only)
         const cleanName = name.trim().toLowerCase().replace(/\s+/g, '_');
         if (!/^[a-z0-9_-]+$/.test(cleanName)) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Collection name can only contain letters, numbers, underscores, and hyphens' 
+            return res.status(400).json({
+                success: false,
+                error: 'Collection name can only contain letters, numbers, underscores, and hyphens'
             });
         }
 
@@ -64,10 +64,10 @@ const createCollection = async (req, res) => {
         res.json(result);
     } catch (error) {
         console.error('Create collection error:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Failed to create collection', 
-            details: error.message 
+        res.status(500).json({
+            success: false,
+            error: 'Failed to create collection',
+            details: error.message
         });
     }
 };

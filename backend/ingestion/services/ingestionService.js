@@ -251,7 +251,7 @@ const uploadForProcessing = async (fileBuffer, filename, mimeType) => {
 const ingestToVectorDb = async (targetDb, documents, strategy = 'embed_per_page', source = 'unknown') => {
     console.log(`[INGEST] Received ${documents.length} pre-transformed documents`);
     console.log(`[INGEST] Strategy: ${strategy}, Target: ${targetDb}, Source: ${source}`);
-    
+
     try {
         console.log(`[INGEST] Calling LLM service: ${LLM_SERVICE_URL}/api/ingestion/ingest`);
         const response = await axios.post(
@@ -263,7 +263,7 @@ const ingestToVectorDb = async (targetDb, documents, strategy = 'embed_per_page'
             },
             { timeout: 120000 } // 2 minute timeout for ingestion
         );
-        
+
         console.log(`[INGEST] LLM service response: success=${response.data?.success}`);
         return response.data;
     } catch (error) {

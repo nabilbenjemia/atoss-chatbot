@@ -265,7 +265,7 @@ export const previewEmbeddings = async (strategy, documentState) => {
 export const startIngestion = async (targetDb, documentsOrState, strategy = 'embed_per_page', options = {}) => {
     let documents;
     let source = options.source || 'unknown';
-    
+
     // Check if this is already a documents array (from preview) or raw documentState
     if (Array.isArray(documentsOrState)) {
         // Already transformed documents array
@@ -278,7 +278,7 @@ export const startIngestion = async (targetDb, documentsOrState, strategy = 'emb
     } else {
         throw new Error('Invalid input: expected documents array or documentState with pages');
     }
-    
+
     const response = await ingestionApi.post('/api/ingestion/ingest', {
         targetDb,
         documents,
