@@ -2,16 +2,28 @@
  * Ingestion Service
  * 
  * Page-level operations for the IngestionPage.
- * Handles document upload, configuration, and vector DB ingestion.
  * 
- * NOTE: Currently returns MOCK DATA. LLM service integration not yet implemented.
- * When LLM service is ready, uncomment the actual API calls.
+ * This service is a PROXY to LLM service + CONFIG PROVIDER:
+ * - Aggregates local config (strategies, helpers, picture classes) with remote config
+ * - Proxies requests to LLM service for document processing and ingestion
+ * - Local strategies and helpers are defined in config but executed in FRONTEND
  */
 
 const axios = require('axios');
 const FormData = require('form-data');
+const path = require('path');
+const fs = require('fs');
 
 const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL || 'http://localhost:8000';
+
+// Load local config files
+const CONFIG_DIR = path.join(__dirname, '..', 'config');
+const pictureClassificationsConfig = JSON.parse(
+    fs.readFileSync(path.join(CONFIG_DIR, 'pictureClassifications.json'), 'utf8')
+);
+const localConfig = JSON.parse(
+    fs.readFileSync(path.join(CONFIG_DIR, 'localConfig.json'), 'utf8')
+);
 
 // ============================================================================
 // CONFIGURATION
@@ -20,99 +32,95 @@ const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL || 'http://localhost:8000';
 /**
  * Get backend configuration
  * 
- * ADR-001: Returns metadata that controls frontend behavior.
- * Currently returns mock data. Will call LLM service when implemented.
+ * Fetches remote config from LLM service and merges with local config.
+ * Falls back to local-only config if LLM service is unavailable.
  * 
- * @returns {Promise<Object>} Configuration with strategies, helpers, collections
+ * @returns {Promise<Object>} Configuration with strategies, helpers, collections, imageClasses
  */
 const getConfig = async () => {
-    // TODO: When LLM service is ready, uncomment this:
-    // try {
-    //     const response = await axios.get(`${LLM_SERVICE_URL}/api/config`);
-    //     return response.data;
-    // } catch (error) {
-    //     console.error('LLM service config error:', error.message);
-    //     return getDefaultConfig();
-    // }
+    try {
+        // Fetch remote config from LLM service
+        console.log('[CONFIG] Fetching remote config from LLM service...');
+        const response = await axios.get(`${LLM_SERVICE_URL}/api/ingestion/config`, {
+            timeout: 5000,
+        });
+        const remoteConfig = response.data;
+        console.log('[CONFIG] Remote config fetched successfully');
 
-    // For now, return mock config directly
-    console.log('[MOCK] Returning mock configuration (LLM service not implemented)');
-    return getDefaultConfig();
+        return aggregateConfig(remoteConfig);
+    } catch (error) {
+        console.warn(`[CONFIG] LLM service unavailable: ${error.message}`);
+        console.log('[CONFIG] Falling back to local-only config');
+        return aggregateConfig(null);
+    }
 };
 
 /**
- * Default configuration when LLM service is unavailable
+ * Aggregate configuration from local and remote sources
  * 
- * ADR-001: Hybrid Approach - Backend provides metadata/control, frontend provides local execution code.
- * This config controls which strategies/helpers are visible and enabled in the frontend.
- * Local strategies/helpers have their implementation code in the frontend bundle.
- * Backend strategies/helpers call back to this service (which will proxy to LLM service).
+ * Combines:
+ * - pictureClassifications.json: Docling picture classes and categories (local)
+ * - localConfig.json: Local helpers and strategies (executed in frontend)
+ * - LLM service config: Remote helpers, strategies, collections, embedding models (remote)
+ * 
+ * @param {Object|null} remoteConfig - Config fetched from LLM service
+ * @returns {Object} Aggregated configuration for frontend
  */
-const getDefaultConfig = () => {
+const aggregateConfig = (remoteConfig) => {
+    const { strategies, helpers } = localConfig;
+    const { classes, categories, presets } = pictureClassificationsConfig;
+
+    // Local strategies and helpers (executed in frontend)
+    const localStrategies = strategies.localStrategies || [];
+    const localHelpers = helpers.localHelpers || [];
+
+    // Remote strategies, helpers, collections, embedding models (from LLM service)
+    const remoteStrategies = remoteConfig?.strategies || [];
+    const remoteHelpers = remoteConfig?.helpers || [];
+    const collections = remoteConfig?.collections || [];
+    const embeddingModels = remoteConfig?.embeddingModels || [];
+
+    // Combine local and remote
+    const allStrategies = [...localStrategies, ...remoteStrategies];
+    const allHelpers = [...localHelpers, ...remoteHelpers];
+
     return {
         // Embedding strategies - how to chunk documents for embedding
-        // Type 'local' = frontend executes, 'backend' = calls API
-        strategies: [
-            { id: 'embed_per_page', label: 'One Embedding per Page', type: 'local', enabled: true },
-            { id: 'chunked_fixed', label: 'Fixed-Size Chunks', type: 'local', enabled: true },
-            { id: 'semantic_sections', label: 'Semantic Sections (AI)', type: 'backend', enabled: false }, // Not implemented yet
-            { id: 'hierarchical', label: 'Hierarchical (AI)', type: 'backend', enabled: false }, // Not implemented yet
-        ],
+        strategies: allStrategies,
+
         // Helper functions - document manipulation
-        // Type 'local' = frontend executes, 'backend' = calls API
-        helpers: [
-            { id: 'remove_logos', label: 'Remove All Logos', type: 'local', enabled: true },
-            { id: 'remove_empty', label: 'Remove Empty Text', type: 'local', enabled: true },
-            { id: 'delete_regex', label: 'Delete by Regex', type: 'local', enabled: true, hasInput: true },
-            { id: 'ai_image_descriptions', label: 'AI Image Descriptions', type: 'backend', enabled: true }, // Mock data for now
-        ],
-        // Target vector databases (always from backend)
-        collections: [
-            { id: 'chroma_default', label: 'ChromaDB (Default)' },
-            { id: 'chroma_snowflake', label: 'ChromaDB (Snowflake Collection)' },
-        ],
-        // Image classification options
-        imageClasses: [
-            'logo',
-            'figure',
-            'chart',
-            'diagram',
-            'photo',
-            'screenshot',
-            'table_image',
-            'other',
-        ],
-        // Embedding models (for display/selection)
-        embeddingModels: [
-            { id: 'default', label: 'Snowflake Arctic Embed', disabled: false },
-            { id: 'openai', label: 'OpenAI Ada-002', disabled: true },
-        ],
+        helpers: allHelpers,
+
+        // Target vector databases (from LLM service)
+        collections: collections,
+
+        // Embedding models (from LLM service)
+        embeddingModels: embeddingModels,
+
+        // Picture classification - all 26 Docling classes (local)
+        imageClasses: classes,
+
+        // Picture categories for UI grouping (local)
+        imageCategories: categories,
+
+        // Picture presets for batch operations (local)
+        imagePresets: presets,
+
         // Legacy aliases for backward compatibility
-        availableTargetDbs: [
-            { id: 'chroma_default', label: 'ChromaDB (Default)' },
-            { id: 'chroma_snowflake', label: 'ChromaDB (Snowflake Collection)' },
-        ],
-        availableImageClasses: [
-            'logo',
-            'figure',
-            'chart',
-            'diagram',
-            'photo',
-            'screenshot',
-            'table_image',
-            'other',
-        ],
+        availableTargetDbs: collections,
+        availableImageClasses: classes,
     };
 };
 
 // ============================================================================
-// DOCUMENT UPLOAD
+// DOCUMENT UPLOAD (Proxy to LLM Service)
 // ============================================================================
 
 /**
  * Upload a file for processing (content extraction)
  * 
- * NOTE: Currently returns MOCK DATA. LLM service /api/docling/process not implemented.
+ * Proxies to LLM service /api/docling/process endpoint.
+ * Returns mock data if LLM service is unavailable.
  * 
  * @param {Buffer} fileBuffer - File content as buffer
  * @param {string} filename - Original filename
@@ -120,7 +128,7 @@ const getDefaultConfig = () => {
  * @returns {Promise<Object>} - Extracted content with pages/items
  */
 const uploadForProcessing = async (fileBuffer, filename, mimeType) => {
-    // TODO: When LLM service is ready, uncomment this:
+    // TODO: When LLM service /api/docling/process is ready, uncomment this:
     // const formData = new FormData();
     // formData.append('file', fileBuffer, {
     //     filename,
@@ -132,16 +140,14 @@ const uploadForProcessing = async (fileBuffer, filename, mimeType) => {
     //         `${LLM_SERVICE_URL}/api/docling/process`,
     //         formData,
     //         {
-    //             headers: {
-    //                 ...formData.getHeaders()
-    //             },
+    //             headers: { ...formData.getHeaders() },
     //             timeout: 60000 // 60 second timeout for processing
     //         }
     //     );
     //     return response.data;
     // } catch (error) {
     //     console.error('LLM service upload error:', error.message);
-    //     return generateMockContent(filename);
+    //     throw error;
     // }
 
     // For now, return mock content directly
@@ -150,25 +156,26 @@ const uploadForProcessing = async (fileBuffer, filename, mimeType) => {
 };
 
 // ============================================================================
-// VECTOR DB INGESTION
+// VECTOR DB INGESTION (Proxy to LLM Service)
 // ============================================================================
 
 /**
  * Ingest content into vector database
  * 
- * NOTE: Currently returns MOCK DATA. LLM service /api/ingest not implemented.
+ * Proxies to LLM service /api/ingestion/ingest endpoint.
+ * Returns mock data if LLM service is unavailable.
  * 
  * @param {string} targetDb - Target database ID
  * @param {Object} documentState - Document content to ingest
- * @param {string} strategy - Embedding strategy ('embed_per_page' | 'chunked_document')
+ * @param {string} strategy - Embedding strategy
  * @returns {Promise<Object>} - Ingestion result
  */
 const ingestToVectorDb = async (targetDb, documentState, strategy = 'embed_per_page') => {
-    // TODO: When LLM service is ready, uncomment this:
+    // TODO: When LLM service /api/ingestion/ingest is ready, uncomment this:
     // try {
     //     const response = await axios.post(
-    //         `${LLM_SERVICE_URL}/api/ingest`,
-    //         { targetDb, content: documentState, strategy },
+    //         `${LLM_SERVICE_URL}/api/ingestion/ingest`,
+    //         { targetDb, documentState, strategy },
     //         { timeout: 120000 } // 2 minute timeout for ingestion
     //     );
     //     return response.data;
@@ -178,135 +185,14 @@ const ingestToVectorDb = async (targetDb, documentState, strategy = 'embed_per_p
     // }
 
     // For now, return mock success
-    const preview = generateEmbeddingPreview(documentState, strategy);
-    console.log(`[MOCK] Mock ingestion to ${targetDb}: ${preview.total_embeddings} chunks (LLM service not implemented)`);
+    console.log(`[MOCK] Mock ingestion to ${targetDb} with strategy ${strategy} (LLM service not implemented)`);
 
     return {
         success: true,
         targetDb,
         strategy,
-        documentCount: preview.total_embeddings,
-        message: `[MOCK] Successfully ingested ${preview.total_embeddings} embeddings to ${targetDb}`,
-    };
-};
-
-/**
- * Generate embedding preview from document content
- * @param {Object} documentState - Current document state with pages
- * @param {string} strategy - Embedding strategy
- * @returns {Object} - Preview of what will be embedded
- */
-const generateEmbeddingPreview = (documentState, strategy) => {
-    const documents = [];
-
-    if (strategy === 'embed_per_page') {
-        // Page-based embedding: one embedding per page
-        (documentState.pages || []).forEach((page, idx) => {
-            const pageNum = page.pageNumber || idx + 1;
-            const activeItems = (page.items || []).filter(item => !item.deleted);
-
-            // Combine all text content from the page
-            const textContent = activeItems
-                .filter(item => item.type === 'text')
-                .map(item => item.content)
-                .join('\n\n');
-
-            // Gather image data
-            const images = activeItems
-                .filter(item => item.type === 'image')
-                .map(item => ({
-                    uuid: item.id,
-                    imageUrl: item.imageUrl,
-                    imageWidth: item.imageWidth,
-                    imageHeight: item.imageHeight,
-                    classification: item.classification || 'unknown',
-                    description: item.description,
-                }));
-
-            // Gather table data as markdown
-            const tableContent = activeItems
-                .filter(item => item.type === 'table')
-                .map(item => {
-                    if (!item.tableData) return '';
-                    const headers = item.tableData.headers?.join(' | ') || '';
-                    const separator = item.tableData.headers?.map(() => '---').join(' | ') || '';
-                    const rows = item.tableData.rows?.map(row => row.join(' | ')).join('\n| ') || '';
-                    return `| ${headers} |\n| ${separator} |\n| ${rows} |`;
-                })
-                .filter(Boolean)
-                .join('\n\n');
-
-            const tables = activeItems
-                .filter(item => item.type === 'table')
-                .map(item => ({
-                    id: item.id,
-                    tableData: item.tableData,
-                }));
-
-            const fullContent = [textContent, tableContent].filter(Boolean).join('\n\n');
-
-            if (fullContent.trim() || images.length > 0) {
-                documents.push({
-                    id: `page_${pageNum}`,
-                    content: fullContent,
-                    metadata: {
-                        page_num: pageNum,
-                        source: documentState.filename || 'unknown',
-                        document_type: 'pdf',
-                        image_count: images.length,
-                        images: images.length > 0 ? images : undefined,
-                        tables: tables.length > 0 ? tables : undefined,
-                        char_count: fullContent.length,
-                        word_count: fullContent.split(/\s+/).filter(Boolean).length,
-                    },
-                });
-            }
-        });
-    } else if (strategy === 'chunked_document') {
-        // Semantic chunking: merge all content and split into chunks
-        const allContent = (documentState.pages || []).flatMap(page =>
-            (page.items || [])
-                .filter(item => !item.deleted && item.type === 'text')
-                .map(item => item.content)
-        ).join('\n\n');
-
-        // Chunk with ~500 character chunks with overlap
-        const chunkSize = 500;
-        const overlap = 100;
-        let position = 0;
-        let chunkIndex = 1;
-
-        while (position < allContent.length) {
-            const end = Math.min(position + chunkSize, allContent.length);
-            const chunk = allContent.slice(position, end);
-
-            documents.push({
-                id: `chunk_${chunkIndex}`,
-                content: chunk,
-                metadata: {
-                    chunk_index: chunkIndex,
-                    source: documentState.filename || 'unknown',
-                    document_type: 'pdf',
-                    char_count: chunk.length,
-                    word_count: chunk.split(/\s+/).filter(Boolean).length,
-                    start_position: position,
-                    end_position: end,
-                },
-            });
-
-            position = end - overlap;
-            if (position >= allContent.length - overlap) break;
-            chunkIndex++;
-        }
-    }
-
-    return {
-        source: documentState.filename || 'unknown',
-        document_type: 'pdf',
-        page_count: documentState.totalPages || documentState.pages?.length || 0,
-        total_embeddings: documents.length,
-        strategy: strategy,
-        documents,
+        documentCount: documentState.pages?.length || 0,
+        message: `[MOCK] Successfully ingested to ${targetDb}`,
     };
 };
 
@@ -408,12 +294,9 @@ const generateMockContent = (filename) => {
 module.exports = {
     // Configuration
     getConfig,
-    getDefaultConfig,
-    // Upload
+    // Proxy to LLM Service
     uploadForProcessing,
-    // Ingestion
     ingestToVectorDb,
-    generateEmbeddingPreview,
     // Mock (for development)
     generateMockContent,
 };

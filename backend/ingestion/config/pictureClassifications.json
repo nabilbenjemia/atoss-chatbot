@@ -1,0 +1,135 @@
+{
+    "_comment": "Docling Picture Classification Classes - from docling-ibm-models DocumentFigureClassifier",
+    "_version": "2.x (January 2026)",
+    "_source": "docling_ibm_models.document_figure_classifier_model",
+    "classes": [
+        "bar_chart",
+        "bar_code",
+        "box_plot",
+        "calendar",
+        "chemistry_structure",
+        "crossword_puzzle",
+        "engineering_drawing",
+        "flow_chart",
+        "full_page_image",
+        "geographical_map",
+        "icon",
+        "line_chart",
+        "logo",
+        "music",
+        "other",
+        "page_thumbnail",
+        "photograph",
+        "pie_chart",
+        "qr_code",
+        "scatter_plot",
+        "screenshot_from_computer",
+        "screenshot_from_manual",
+        "signature",
+        "stamp",
+        "table",
+        "topographical_map"
+    ],
+    "categories": {
+        "charts": {
+            "label": "Charts & Graphs",
+            "classes": [
+                "bar_chart",
+                "line_chart",
+                "pie_chart",
+                "scatter_plot",
+                "box_plot"
+            ]
+        },
+        "diagrams": {
+            "label": "Diagrams",
+            "classes": [
+                "flow_chart",
+                "engineering_drawing",
+                "chemistry_structure"
+            ]
+        },
+        "maps": {
+            "label": "Maps",
+            "classes": [
+                "geographical_map",
+                "topographical_map"
+            ]
+        },
+        "codes": {
+            "label": "Barcodes & QR",
+            "classes": [
+                "bar_code",
+                "qr_code"
+            ]
+        },
+        "screenshots": {
+            "label": "Screenshots",
+            "classes": [
+                "screenshot_from_computer",
+                "screenshot_from_manual"
+            ]
+        },
+        "decorative": {
+            "label": "Decorative",
+            "classes": [
+                "logo",
+                "icon",
+                "stamp",
+                "signature"
+            ]
+        },
+        "photos": {
+            "label": "Photos & Images",
+            "classes": [
+                "photograph",
+                "full_page_image",
+                "page_thumbnail"
+            ]
+        },
+        "other": {
+            "label": "Other",
+            "classes": [
+                "calendar",
+                "crossword_puzzle",
+                "music",
+                "table",
+                "other"
+            ]
+        }
+    },
+    "presets": {
+        "decorative": {
+            "label": "Decorative (Noise)",
+            "description": "Classes typically considered noise that users may want to auto-remove",
+            "classes": [
+                "logo",
+                "icon",
+                "stamp",
+                "signature",
+                "bar_code",
+                "qr_code"
+            ]
+        },
+        "content": {
+            "label": "Content-Rich",
+            "description": "Classes that typically contain meaningful content for RAG",
+            "classes": [
+                "bar_chart",
+                "line_chart",
+                "pie_chart",
+                "scatter_plot",
+                "box_plot",
+                "flow_chart",
+                "engineering_drawing",
+                "chemistry_structure",
+                "geographical_map",
+                "topographical_map",
+                "screenshot_from_computer",
+                "screenshot_from_manual",
+                "photograph",
+                "table"
+            ]
+        }
+    }
+}

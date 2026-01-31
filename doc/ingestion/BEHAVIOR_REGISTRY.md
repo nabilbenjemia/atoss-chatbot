@@ -255,9 +255,306 @@ ingestionId = hash(content) + "_" + strategy + "_" + targetDb
 
 ---
 
+## Helper Function Types
+
+The ingestion system supports two types of helper functions that operate differently based on where processing occurs.
+
+### Local Helpers
+
+**Definition:** Helpers that execute entirely in the frontend browser, directly modifying content in the editor.
+
+**Characteristics:**
+- ✅ Instant feedback (no network latency)
+- ✅ Works offline
+- ✅ Changes applied directly to document state
+- ❌ Limited to client-side processing capabilities
+
+**Data Flow:**
+```
+User Action → Local Helper → Direct Content Modification → Editor Update
+```
+
+**Examples:**
+
+| Helper ID | Label | Description |
+|-----------|-------|-------------|
+| `remove_logos` | Remove All Logos | Finds all images with `classification: "logo"` and marks as `deleted: true` |
+| `remove_empty` | Remove Empty Text | Finds text items with empty/whitespace content and marks as deleted |
+| `delete_regex` | Delete by Regex | Prompts for regex pattern, marks matching text items as deleted |
+
+**Implementation Pattern:**
+```javascript
+// Local helper directly modifies document state
+const removeLogos = (documentState) => {
+    for (const page of documentState.pages) {
+        for (const item of page.items) {
+            if (item.type === 'image' && item.classification === 'logo') {
+                item.deleted = true;
+            }
+        }
+    }
+    return documentState; // Modified in place
+};
+```
+
+---
+
+### Remote Helpers (AI Helpers)
+
+**Definition:** Helpers that send data to the backend for AI processing, returning results that the frontend uses to update the editor.
+
+**Characteristics:**
+- ✅ Access to AI models (vision, LLM)
+- ✅ Complex processing capabilities
+- ❌ Requires network connection
+- ❌ Processing latency
+
+**Data Flow:**
+```
+User Action → Collect Data → POST to Backend → AI Processing → Return Results → Frontend Applies Changes → Editor Update
+```
+
+**Examples:**
+
+| Helper ID | Label | Description |
+|-----------|-------|-------------|
+| `ai_image_descriptions` | AI Image Descriptions | Sends images to vision model, returns descriptions to add to image metadata |
+
+**Implementation Pattern:**
+```javascript
+// Remote helper: Frontend collects data
+const images = collectImagesToProcess(documentState);
+
+// Send to backend
+const result = await generateImageDescriptions(documentId, images);
+// result.descriptions = [{ imageId, description }, ...]
+
+// Frontend applies returned data
+for (const desc of result.descriptions) {
+    const item = findItemById(documentState, desc.imageId);
+    if (item) {
+        item.description = desc.description;
+    }
+}
+```
+
+**Key Difference:** Remote helpers do NOT directly modify content. They:
+1. Receive specific data to process (e.g., images array)
+2. Process/generate new data (e.g., descriptions)
+3. Return the new data
+4. Frontend uses returned data to update editor content
+
+---
+
+## Ingestion Strategy Types
+
+Strategies define how document content is transformed into embeddings. They differ in where processing occurs and what data format is returned.
+
+### Local Strategies
+
+**Definition:** Strategies where embedding preparation happens entirely in the frontend, then sent to backend for vector storage.
+
+**Characteristics:**
+- ✅ Frontend controls chunking/aggregation logic
+- ✅ Immediate preview generation
+- ✅ No round-trip for preview
+- ❌ Limited to simple aggregation rules
+
+**Data Flow:**
+```
+Document State → Frontend Aggregation → Preview (local) → Ingest Request → Backend stores embeddings
+```
+
+**Examples:**
+
+| Strategy ID | Label | Description |
+|-------------|-------|-------------|
+| `embed_per_page` | One Embedding per Page | Aggregates all text items of one page into a single markdown text; all page metadata attached to this embedding |
+| `chunked_fixed` | Fixed-Size Chunks | Merges all content, splits into ~500 char chunks with overlap |
+
+**`embed_per_page` Detail:**
+```javascript
+// For each page:
+const pageEmbedding = {
+    id: `page_${pageNumber}`,
+    content: aggregatePageText(page.items),  // All text items → markdown
+    metadata: {
+        page_num: pageNumber,
+        source: filename,
+        document_type: 'pdf',
+        image_count: countImages(page.items),
+        images: extractImageMetadata(page.items),  // All page images
+        char_count: content.length,
+        word_count: countWords(content)
+    }
+};
+```
+
+**Preview Response (Local):**
+```json
+{
+    "preview": {
+        "strategy": "embed_per_page",
+        "total_embeddings": 3,
+        "documents": [
+            {
+                "id": "page_1",
+                "content": "# Chapter 1\n\nIntroduction text...",
+                "metadata": { "page_num": 1, "image_count": 2, ... }
+            }
+        ]
+    }
+}
+```
+
+---
+
+### Remote Strategies (AI Strategies)
+
+**Definition:** Strategies where the backend AI performs semantic analysis to determine optimal chunking.
+
+**Characteristics:**
+- ✅ AI-powered semantic understanding
+- ✅ Context-aware chunk boundaries
+- ❌ Requires network round-trip for preview
+- ❌ Processing latency
+
+**Data Flow:**
+```
+Document State → Send to Backend → AI Analysis → Return Chunks + Metadata → Preview (from backend) → Ingest (already processed)
+```
+
+**Examples:**
+
+| Strategy ID | Label | Description |
+|-------------|-------|-------------|
+| `semantic_sections` | Semantic Sections (AI) | AI identifies logical sections based on content meaning |
+| `hierarchical` | Hierarchical (AI) | AI builds multi-level chunk hierarchy for parent-child retrieval |
+
+**Key Difference:** Remote strategies return **complete, ready-to-use chunks** from the backend:
+1. Frontend sends full document content
+2. Backend AI analyzes and creates semantic chunks
+3. Backend returns chunks with all metadata
+4. Frontend displays preview directly (no local processing)
+5. Ingestion uses the same pre-computed chunks
+
+**Preview Response (Remote):**
+```json
+{
+    "preview": {
+        "strategy": "semantic_sections",
+        "total_embeddings": 5,
+        "documents": [
+            {
+                "id": "section_intro",
+                "content": "Introduction covering background and motivation...",
+                "metadata": {
+                    "section_type": "introduction",
+                    "semantic_topic": "project_background",
+                    "page_range": [1, 2],
+                    "confidence": 0.92
+                }
+            },
+            {
+                "id": "section_methods",
+                "content": "Methodology section describing the approach...",
+                "metadata": {
+                    "section_type": "methodology",
+                    "semantic_topic": "technical_approach",
+                    "page_range": [3, 5],
+                    "confidence": 0.88
+                }
+            }
+        ]
+    }
+}
+```
+
+---
+
+## Strategy vs Helper Comparison
+
+| Aspect | Local Helper | Remote Helper | Local Strategy | Remote Strategy |
+|--------|--------------|---------------|----------------|-----------------|
+| **Processing Location** | Frontend | Backend | Frontend | Backend |
+| **Purpose** | Clean/modify content | AI-generate metadata | Prepare embeddings | AI-chunk content |
+| **Output** | Modified document | Data to apply | Chunks for preview | Ready chunks |
+| **Network Required** | ❌ No | ✅ Yes | ❌ No (preview) | ✅ Yes |
+| **Example** | Remove logos | AI descriptions | Embed per page | Semantic sections |
+
+---
+
+## Backend Proxy Architecture
+
+The Ingestion Service (Node.js :4005) acts as a **pure proxy** for certain endpoints, forwarding requests to the LLM Service (FastAPI :8000) and returning results to the frontend.
+
+### Proxy Flow
+
+```
+Frontend (React)           Ingestion Service (Node:4005)        LLM Service (FastAPI:8000)
+      │                              │                                      │
+      │── POST /api/ingestion/X ────▶│                                      │
+      │                              │── POST /api/ingestion/X ────────────▶│
+      │                              │                                      │
+      │                              │◀─────────── Response ────────────────│
+      │◀───────── Response ──────────│                                      │
+```
+
+### Proxy Endpoints
+
+| Ingestion Service Endpoint | LLM Service Endpoint | Purpose |
+|---------------------------|---------------------|---------|
+| `POST /api/ingestion/convert` | `POST /api/ingestion/convert` | Document conversion via Docling |
+| `POST /api/ingestion/ingest` | `POST /api/ingestion/ingest` | Store embeddings in ChromaDB |
+| `GET /api/ingestion/collections` | `GET /api/ingestion/collections` | List available ChromaDB collections |
+| `POST /api/ingestion/collection` | `POST /api/ingestion/collection` | Create new ChromaDB collection |
+| `POST /api/ingestion/helper/:id` | `POST /api/ingestion/helper/:id` | Run remote AI helper |
+| `POST /api/ingestion/strategy/:id` | `POST /api/ingestion/strategy/:id` | Run remote AI strategy |
+
+### Why Proxy?
+
+1. **Single Entry Point**: Frontend only needs to know about one backend URL
+2. **Auth Middleware**: Ingestion service can add authentication headers
+3. **Logging/Monitoring**: Centralized request logging
+4. **Future Flexibility**: Can add caching, rate limiting, etc.
+
+### LLM Service Responsibilities
+
+The LLM Service (Python/FastAPI) owns:
+- **ChromaDB**: All collections, embeddings, vector operations
+- **Docling**: PDF/PPTX conversion and picture classification
+- **AI Helpers**: Vision models, LLM-based processing
+- **AI Strategies**: Semantic chunking, hierarchical chunking
+- **Configuration**: Available helpers, strategies, collections
+
+### Configuration Source
+
+```
+LLM Service owns the config:
+┌─────────────────────────────────────────────────────────────┐
+│  backend/llm/config/ingestion_config.json                   │
+│  - available_strategies (remote only)                       │
+│  - available_helpers (remote only)                          │
+│  - available_collections (from ChromaDB)                    │
+│  - embedding_models                                         │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Ingestion Service merges with local config:                │
+│  - pictureClassifications.json (Docling classes)            │
+│  - Adds local strategies/helpers                            │
+│  → Returns unified config to frontend                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Version History
 
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-01-31 | Initial behavior registry |
 | 1.1 | 2026-01-31 | Added BHV-009: Duplicate Ingestion Prevention |
+| 1.2 | 2026-01-31 | Added Helper Function Types and Strategy Types documentation |
+| 1.3 | 2026-01-31 | Added Backend Proxy Architecture documentation |

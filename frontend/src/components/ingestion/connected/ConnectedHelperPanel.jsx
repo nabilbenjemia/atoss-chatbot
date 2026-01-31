@@ -3,6 +3,7 @@
  * 
  * Helper panel that connects directly to ingestion context.
  * Handles helper execution logic internally.
+ * Uses backendConfig for dynamic helper list from backend.
  * 
  * @see doc/ingestion/COMPONENT_RESPONSIBILITIES.md
  */
@@ -16,7 +17,7 @@ import {
     MODAL_TYPES,
     DOC_STATUS,
 } from '../../../context/ingestion';
-import { INGESTION_CONFIG } from '../../../config/ingestionConfig';
+import useBackendConfig from '../../../hooks/useBackendConfig';
 import { generateImageDescriptions } from '../../../services/ingestionApi';
 import { Commands } from '../../../hooks/useCommandHistory';
 
@@ -24,13 +25,23 @@ export default function ConnectedHelperPanel({ commandState, executeCommand }) {
     const { runningHelper, isIngesting } = useUI();
     const { uploadQueue } = useFileQueue();
     const actions = useIngestionActions();
+    const { config: backendConfig } = useBackendConfig();
 
     // Use commandState (from useCommandHistory) as the document state
     const documentState = commandState;
 
     const disabled = !documentState || isIngesting;
-    const localHelpers = useMemo(() => INGESTION_CONFIG.helpers.local || [], []);
-    const backendHelpers = useMemo(() => INGESTION_CONFIG.helpers.backend || [], []);
+
+    // Get helpers from backend config, split by type and filter enabled only
+    const localHelpers = useMemo(() => {
+        const helpers = backendConfig?.helpers || [];
+        return helpers.filter(h => h.type === 'local' && h.enabled);
+    }, [backendConfig]);
+
+    const backendHelpers = useMemo(() => {
+        const helpers = backendConfig?.helpers || [];
+        return helpers.filter(h => h.type === 'backend' && h.enabled);
+    }, [backendConfig]);
 
     // Get all helpers as a flat array for lookup
     const allHelpers = useMemo(() => [...localHelpers, ...backendHelpers], [localHelpers, backendHelpers]);

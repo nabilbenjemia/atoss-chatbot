@@ -20,6 +20,7 @@ import uvicorn
 
 from config.settings import settings
 from routes.chat_routes import router as chat_router
+from routes.ingestion_routes import router as ingestion_router
 from services.startup_service import startup_service
 
 # Add the llm directory to the path for imports
@@ -104,6 +105,7 @@ if resources_path.exists():
 
 # Include routers
 app.include_router(chat_router)
+app.include_router(ingestion_router)
 
 
 @app.get("/")
@@ -114,10 +116,20 @@ async def root():
         "version": "1.0.0",
         "status": "running",
         "endpoints": {
-            "status": "/api/chat/status",
-            "generate": "/api/chat/generate",
-            "stream": "/api/chat/stream",
-            "health": "/api/chat/health"
+            "chat": {
+                "status": "/api/chat/status",
+                "generate": "/api/chat/generate",
+                "stream": "/api/chat/stream",
+                "health": "/api/chat/health",
+            },
+            "ingestion": {
+                "config": "/api/ingestion/config",
+                "collections": "/api/ingestion/collections",
+                "convert": "/api/ingestion/convert",
+                "ingest": "/api/ingestion/ingest",
+                "helpers": "/api/ingestion/helper/{helper_id}",
+                "strategies": "/api/ingestion/strategy/{strategy_id}",
+            },
         }
     }
 

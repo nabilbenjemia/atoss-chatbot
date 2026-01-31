@@ -5,8 +5,12 @@ const contentViewerService = require('../services/contentViewerService');
  * Ingestion Controller
  * 
  * Handles HTTP requests for document ingestion operations.
- * All document state is managed by the frontend (localStorage).
- * This controller only provides processing/AI functionality.
+ * 
+ * Architecture:
+ * - All document state is managed by frontend (localStorage)
+ * - Local strategies/helpers are executed in frontend
+ * - This controller proxies to LLM service for remote operations
+ * - Configuration is aggregated from local config + LLM service
  */
 
 // ============================================================================
@@ -15,7 +19,9 @@ const contentViewerService = require('../services/contentViewerService');
 
 /**
  * GET /api/ingestion/config
- * Get backend configuration (target DBs, image classes, etc.)
+ * Get backend configuration (strategies, helpers, collections, image classes)
+ * 
+ * Aggregates local config (localConfig.json) with remote config from LLM service.
  */
 const getConfig = async (req, res) => {
     try {
@@ -28,13 +34,14 @@ const getConfig = async (req, res) => {
 };
 
 // ============================================================================
-// DOCUMENT UPLOAD & PROCESSING
+// DOCUMENT UPLOAD & PROCESSING (Proxy to LLM Service)
 // ============================================================================
 
 /**
  * POST /api/ingestion/upload
  * Upload a document for content extraction
  * 
+ * Proxies to LLM service /api/docling/process.
  * Returns extracted content immediately (no server-side state).
  * Frontend caches the result in localStorage.
  */
@@ -75,7 +82,12 @@ const uploadDocument = async (req, res) => {
  * POST /api/ingestion/preview
  * Generate embedding preview from document content
  * 
- * Receives document state from frontend, returns preview of embeddings.
+ * NOTE: For local strategies (embed_per_page, chunked_fixed), this should be
+ * handled in the FRONTEND. This endpoint is kept for remote/AI strategies
+ * that require server-side processing.
+ * 
+ * TODO: Frontend should implement local preview generation and only call
+ * this endpoint for remote strategies.
  */
 const previewEmbeddings = async (req, res) => {
     try {
@@ -85,9 +97,20 @@ const previewEmbeddings = async (req, res) => {
             return res.status(400).json({ success: false, error: 'documentState is required' });
         }
 
-        // Generate preview based on strategy
-        const preview = ingestionService.generateEmbeddingPreview(documentState, strategy);
-        res.json({ success: true, preview });
+        // For now, return a message indicating frontend should handle local strategies
+        // TODO: Implement remote strategy preview via LLM service
+        res.json({
+            success: true,
+            message: 'Preview should be generated in frontend for local strategies',
+            preview: {
+                source: documentState.filename || 'unknown',
+                document_type: 'pdf',
+                page_count: documentState.pages?.length || 0,
+                total_embeddings: 0,
+                strategy: strategy,
+                documents: [],
+            }
+        });
     } catch (error) {
         console.error('Preview error:', error);
         res.status(500).json({ error: 'Failed to generate preview', details: error.message });
@@ -98,7 +121,8 @@ const previewEmbeddings = async (req, res) => {
  * POST /api/ingestion/ingest
  * Ingest content into vector database
  * 
- * Receives document state from frontend, ingests into target DB.
+ * Proxies to LLM service /api/ingestion/ingest.
+ * Receives pre-processed document state from frontend.
  */
 const startIngestion = async (req, res) => {
     try {
@@ -126,14 +150,15 @@ const startIngestion = async (req, res) => {
 };
 
 // ============================================================================
-// AI HELPERS (ContentViewer)
+// AI HELPERS (Proxy to LLM Service)
 // ============================================================================
 
 /**
  * POST /api/ingestion/helper
  * Run a backend AI helper function
  * 
- * Receives document content from frontend, processes with AI, returns results.
+ * NOTE: Local helpers (remove_logos, remove_decorative, etc.) are executed
+ * in the FRONTEND. This endpoint is for remote AI helpers only.
  */
 const runHelper = async (req, res) => {
     try {
@@ -147,7 +172,7 @@ const runHelper = async (req, res) => {
             return res.status(400).json({ error: 'content is required' });
         }
 
-        // Run helper via content viewer service
+        // Run helper via content viewer service (proxies to LLM service)
         const result = await contentViewerService.runAiHelper(helperId, content, params);
         res.json(result);
     } catch (error) {
@@ -160,7 +185,7 @@ const runHelper = async (req, res) => {
  * POST /api/ingestion/helper/image-descriptions
  * Generate AI descriptions for images
  * 
- * Receives documentId and array of images, returns descriptions for each image.
+ * Proxies to LLM service for AI vision processing.
  */
 const generateImageDescriptions = async (req, res) => {
     try {
@@ -174,7 +199,7 @@ const generateImageDescriptions = async (req, res) => {
             return res.status(400).json({ success: false, error: 'images array is required' });
         }
 
-        // Generate descriptions via content viewer service
+        // Generate descriptions via content viewer service (proxies to LLM service)
         const result = await contentViewerService.generateImageDescriptionsFromImages(documentId, images);
         res.json(result);
     } catch (error) {

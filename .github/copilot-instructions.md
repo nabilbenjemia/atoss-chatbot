@@ -1,5 +1,17 @@
 # ATOSS.GPT - Copilot Instructions
 
+## Current Development Focus
+
+**Task**: Implementing backend functionality to match frontend API contracts for the Ingestion Page.
+
+**Reference**: `doc/ingestion/API_CONTRACTS.md` defines all endpoints and expected request/response formats.
+
+**Status**: Frontend is complete with mock data. Backend needs real implementations for:
+- `POST /api/ingestion/convert` → Call LLM service `/api/docling/process`
+- `POST /api/ingestion/ingest` → Call LLM service `/api/ingest`
+- `POST /api/ingestion/collection` → Create new ChromaDB collection
+- `POST /api/ingestion/helper/image-descriptions` → Call LLM service for AI vision
+
 ## Architecture Overview
 
 This is a RAG-based chatbot with 5 microservices communicating via REST/SSE:
@@ -43,7 +55,38 @@ Upload → Process → Edit → Preview → Ingest: `IngestionPage.jsx` → `ing
 - File upload with multer, content extraction via LLM service
 - Command Pattern for undo/redo (memory efficient)
 - LocalStorage caching for session recovery
-- See `doc/FEATURE_INGESTION_PAGE.md` for complete documentation
+- See `doc/ingestion/API_CONTRACTS.md` for endpoint specifications
+- See `doc/ingestion/FEATURE_INGESTION_PAGE.md` for complete documentation
+
+### Ingestion API Endpoints (Port 4005 → Proxy to 8000)
+| Endpoint | Status | LLM Proxy Target |
+|----------|--------|------------------|
+| `GET /api/ingestion/config` | ✅ Implemented | Fetches from `/api/ingestion/config` + local config |
+| `POST /api/ingestion/convert` | ✅ Mock → TODO | `/api/ingestion/convert` |
+| `POST /api/ingestion/preview` | ⚠️ Partial | Local logic |
+| `POST /api/ingestion/ingest` | ✅ Mock → TODO | `/api/ingestion/ingest` |
+| `GET /api/ingestion/collections` | TODO | `/api/ingestion/collections` |
+| `POST /api/ingestion/collection` | TODO | `/api/ingestion/collection` |
+| `POST /api/ingestion/helper/:id` | ✅ Mock → TODO | `/api/ingestion/helper/:id` |
+| `POST /api/ingestion/strategy/:id` | TODO | `/api/ingestion/strategy/:id` |
+
+### LLM Service Ingestion Endpoints (Port 8000)
+| Endpoint | Status | Purpose |
+|----------|--------|---------|
+| `GET /api/ingestion/config` | ✅ Implemented | Remote strategies, helpers, collections |
+| `GET /api/ingestion/collections` | ✅ Mock | List ChromaDB collections |
+| `POST /api/ingestion/collection` | ✅ Mock | Create ChromaDB collection |
+| `POST /api/ingestion/convert` | ✅ Mock | Docling document conversion |
+| `POST /api/ingestion/ingest` | ✅ Mock | Store embeddings in ChromaDB |
+| `POST /api/ingestion/helper/:id` | ✅ Mock | Run remote AI helper |
+| `POST /api/ingestion/strategy/:id` | ✅ Mock | Run remote AI strategy |
+
+### Ingestion Config Files
+| File | Location | Purpose |
+|------|----------|---------|
+| `pictureClassifications.json` | `backend/ingestion/config/` | Docling's 26 picture classes, categories, presets |
+| `backendServices.json` | `backend/ingestion/config/` | Local strategies and helpers only |
+| `ingestion_config.json` | `backend/llm/config/` | Remote strategies, helpers, embedding models |
 
 ### Frontend State Management
 - Chat state in `ChatbotPage.jsx`: `conversationId`, `messages`, `isStreaming`, `streamingMessage`
@@ -81,9 +124,16 @@ Backend LLM settings in `backend/llm/config/settings.py` via `.env`:
 | React components | `frontend/src/components/` |
 | API service layer | `frontend/src/services/api.js`, `ingestionApi.js` |
 | Feature documentation | `doc/FEATURE_*.md`, `doc/FLOW_*.md` |
+| Ingestion API contracts | `doc/ingestion/API_CONTRACTS.md` |
 | Ingestion components | `frontend/src/components/ingestion/` |
 | Ingestion backend | `backend/ingestion/` |
 | LLM model managers | `backend/llm/models/` |
+
+## Backend Implementation Files
+When implementing real LLM service calls, edit these files:
+- `backend/ingestion/services/ingestionService.js` - Upload, ingest operations
+- `backend/ingestion/services/contentViewerService.js` - AI helpers (image descriptions)
+- `backend/ingestion/controllers/ingestionController.js` - Request handlers
 
 ## Testing
 - No test framework currently configured for backend services

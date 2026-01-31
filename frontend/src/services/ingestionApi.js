@@ -81,12 +81,153 @@ export const uploadDocument = async (file, config = {}) => {
 // ============================================================================
 
 /**
+ * LOCAL STRATEGIES - IDs that are handled in frontend
+ * These strategies do not require backend processing
+ */
+const LOCAL_STRATEGIES = ['embed_per_page', 'chunked_fixed', 'chunked_document'];
+
+/**
+ * Generate embedding preview locally (for local strategies)
+ * This is the frontend implementation of preview generation.
+ * 
+ * @param {string} strategy - The embedding strategy
+ * @param {Object} documentState - The document state with pages
+ * @returns {Object} - Preview of embeddings
+ */
+const generateLocalPreview = (strategy, documentState) => {
+    const documents = [];
+
+    if (strategy === 'embed_per_page') {
+        // Page-based embedding: one embedding per page
+        (documentState.pages || []).forEach((page, idx) => {
+            const pageNum = page.pageNumber || idx + 1;
+            const activeItems = (page.items || []).filter(item => !item.deleted);
+
+            // Combine all text content from the page
+            const textContent = activeItems
+                .filter(item => item.type === 'text')
+                .map(item => item.content)
+                .join('\n\n');
+
+            // Gather image data
+            const images = activeItems
+                .filter(item => item.type === 'image')
+                .map(item => ({
+                    uuid: item.id,
+                    imageUrl: item.imageUrl,
+                    imageWidth: item.imageWidth,
+                    imageHeight: item.imageHeight,
+                    classification: item.classification || 'unknown',
+                    description: item.description,
+                }));
+
+            // Gather table data as markdown
+            const tableContent = activeItems
+                .filter(item => item.type === 'table')
+                .map(item => {
+                    if (!item.tableData) return '';
+                    const headers = item.tableData.headers?.join(' | ') || '';
+                    const separator = item.tableData.headers?.map(() => '---').join(' | ') || '';
+                    const rows = item.tableData.rows?.map(row => row.join(' | ')).join('\n| ') || '';
+                    return `| ${headers} |\n| ${separator} |\n| ${rows} |`;
+                })
+                .filter(Boolean)
+                .join('\n\n');
+
+            const tables = activeItems
+                .filter(item => item.type === 'table')
+                .map(item => ({
+                    id: item.id,
+                    tableData: item.tableData,
+                }));
+
+            const fullContent = [textContent, tableContent].filter(Boolean).join('\n\n');
+
+            if (fullContent.trim() || images.length > 0) {
+                documents.push({
+                    id: `page_${pageNum}`,
+                    content: fullContent,
+                    metadata: {
+                        page_num: pageNum,
+                        source: documentState.filename || 'unknown',
+                        document_type: 'pdf',
+                        image_count: images.length,
+                        images: images.length > 0 ? images : undefined,
+                        tables: tables.length > 0 ? tables : undefined,
+                        char_count: fullContent.length,
+                        word_count: fullContent.split(/\s+/).filter(Boolean).length,
+                    },
+                });
+            }
+        });
+    } else if (strategy === 'chunked_fixed' || strategy === 'chunked_document') {
+        // Fixed-size chunking: merge all content and split into chunks with overlap
+        const allContent = (documentState.pages || []).flatMap(page =>
+            (page.items || [])
+                .filter(item => !item.deleted && item.type === 'text')
+                .map(item => item.content)
+        ).join('\n\n');
+
+        // Chunk with ~500 character chunks with overlap
+        const chunkSize = 500;
+        const overlap = 100;
+        let position = 0;
+        let chunkIndex = 1;
+
+        while (position < allContent.length) {
+            const end = Math.min(position + chunkSize, allContent.length);
+            const chunk = allContent.slice(position, end);
+
+            documents.push({
+                id: `chunk_${chunkIndex}`,
+                content: chunk,
+                metadata: {
+                    chunk_index: chunkIndex,
+                    source: documentState.filename || 'unknown',
+                    document_type: 'pdf',
+                    char_count: chunk.length,
+                    word_count: chunk.split(/\s+/).filter(Boolean).length,
+                    start_position: position,
+                    end_position: end,
+                },
+            });
+
+            position = end - overlap;
+            if (position >= allContent.length - overlap) break;
+            chunkIndex++;
+        }
+    }
+
+    return {
+        source: documentState.filename || 'unknown',
+        document_type: 'pdf',
+        page_count: documentState.totalPages || documentState.pages?.length || 0,
+        total_embeddings: documents.length,
+        strategy: strategy,
+        documents,
+    };
+};
+
+/**
  * Preview embeddings that will be created from a document
- * @param {string} strategy - The ingestion strategy (embed_per_page, chunked_document, etc.)
+ * 
+ * For LOCAL strategies (embed_per_page, chunked_fixed), preview is generated
+ * in the frontend without calling backend.
+ * For REMOTE strategies, calls backend API which proxies to LLM service.
+ * 
+ * @param {string} strategy - The ingestion strategy
  * @param {Object} documentState - The current document state with pages
  * @returns {Promise<Object>} - Preview of embeddings to be created
  */
 export const previewEmbeddings = async (strategy, documentState) => {
+    // Check if this is a local strategy
+    if (LOCAL_STRATEGIES.includes(strategy)) {
+        // Generate preview locally
+        const preview = generateLocalPreview(strategy, documentState);
+        return { success: true, preview };
+    }
+
+    // For remote strategies, call backend API
     const response = await ingestionApi.post('/api/ingestion/preview', {
         strategy,
         documentState,

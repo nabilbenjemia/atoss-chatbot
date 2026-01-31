@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     EMBEDDING_DEVICE: str = "auto"
 
     # ChromaDB Configuration
-    CHROMA_PERSIST_DIRECTORY: str = "./chroma_db_merged"
+    CHROMA_DB_DIRECTORY: str = "./resources/chroma_db"  # Parent directory containing all collections
+    CHROMA_PERSIST_DIRECTORY: str = "./resources/chroma_db/chroma_db_merged"  # Default collection
     CHROMA_COLLECTION_NAME: str = "tum_docs"
 
     # RAG Configuration

@@ -46,6 +46,10 @@ Token is read from `localStorage.getItem('auth_token')`.
 
 Get backend configuration (target DBs, image classes, strategies, helpers).
 
+Configuration is aggregated from two JSON files:
+- `config/pictureClassifications.json` - Docling picture classes and categories
+- `config/backendServices.json` - Remote/local helpers and strategies
+
 #### Request
 ```http
 GET /api/ingestion/config
@@ -63,54 +67,96 @@ Authorization: Bearer <token>
   ],
   "helpers": [
     { "id": "remove_logos", "label": "Remove All Logos", "type": "local", "enabled": true },
+    { "id": "remove_decorative", "label": "Remove Decorative Images", "type": "local", "enabled": true },
     { "id": "remove_empty", "label": "Remove Empty Text", "type": "local", "enabled": true },
     { "id": "delete_regex", "label": "Delete by Regex", "type": "local", "enabled": true, "hasInput": true },
     { "id": "ai_image_descriptions", "label": "AI Image Descriptions", "type": "backend", "enabled": true }
   ],
   "collections": [
-    { "id": "chroma_default", "label": "ChromaDB (Default)" },
-    { "id": "chroma_snowflake", "label": "ChromaDB (Snowflake Collection)" }
-  ],
-  "imageClasses": [
-    "logo", "figure", "chart", "diagram", "photo", "screenshot", "table_image", "other"
+    { "id": "chroma_default", "label": "ChromaDB (Default)", "type": "chroma", "isDefault": true },
+    { "id": "chroma_snowflake", "label": "ChromaDB (Snowflake Collection)", "type": "chroma" }
   ],
   "embeddingModels": [
-    { "id": "default", "label": "Snowflake Arctic Embed", "disabled": false },
-    { "id": "openai", "label": "OpenAI Ada-002", "disabled": true }
+    { "id": "snowflake", "label": "Snowflake Arctic Embed", "enabled": true, "isDefault": true },
+    { "id": "openai", "label": "OpenAI Ada-002", "enabled": false, "requiresApiKey": true }
   ],
+  "imageClasses": [
+    "bar_chart", "bar_code", "box_plot", "calendar", "chemistry_structure",
+    "crossword_puzzle", "engineering_drawing", "flow_chart", "full_page_image",
+    "geographical_map", "icon", "line_chart", "logo", "music", "other",
+    "page_thumbnail", "photograph", "pie_chart", "qr_code", "scatter_plot",
+    "screenshot_from_computer", "screenshot_from_manual", "signature", "stamp",
+    "table", "topographical_map"
+  ],
+  "imageCategories": {
+    "charts": { "label": "Charts & Graphs", "classes": ["bar_chart", "line_chart", "pie_chart", "scatter_plot", "box_plot"] },
+    "diagrams": { "label": "Diagrams", "classes": ["flow_chart", "engineering_drawing", "chemistry_structure"] },
+    "maps": { "label": "Maps", "classes": ["geographical_map", "topographical_map"] },
+    "codes": { "label": "Barcodes & QR", "classes": ["bar_code", "qr_code"] },
+    "screenshots": { "label": "Screenshots", "classes": ["screenshot_from_computer", "screenshot_from_manual"] },
+    "decorative": { "label": "Decorative", "classes": ["logo", "icon", "stamp", "signature"] },
+    "photos": { "label": "Photos & Images", "classes": ["photograph", "full_page_image", "page_thumbnail"] },
+    "other": { "label": "Other", "classes": ["calendar", "crossword_puzzle", "music", "table", "other"] }
+  },
+  "imagePresets": {
+    "decorative": {
+      "label": "Decorative (Noise)",
+      "description": "Classes typically considered noise that users may want to auto-remove",
+      "classes": ["logo", "icon", "stamp", "signature", "bar_code", "qr_code"]
+    },
+    "content": {
+      "label": "Content-Rich",
+      "description": "Classes that typically contain meaningful content for RAG",
+      "classes": ["bar_chart", "line_chart", "pie_chart", "scatter_plot", "box_plot", "..."]
+    }
+  },
   "availableTargetDbs": [...],
   "availableImageClasses": [...]
 }
 ```
 
+#### Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `config/pictureClassifications.json` | Docling's 26 picture classes, categories, and presets |
+| `config/backendServices.json` | Strategies, helpers, collections, embedding models |
+
 #### Frontend Usage
 ```javascript
 import { getBackendConfig } from '../services/ingestionApi';
 const config = await getBackendConfig();
+
+// Access image categories for UI grouping
+const { imageCategories } = config;
+// imageCategories.charts.classes = ["bar_chart", "line_chart", ...]
+
+// Access presets for batch operations
+const decorativeClasses = config.imagePresets.decorative.classes;
 ```
 
-#### Mock Status
-✅ **MOCK** - Returns hardcoded configuration from `getDefaultConfig()`.
+#### Implementation Status
+✅ **IMPLEMENTED** - Loads and aggregates configuration from JSON files.
 
 ---
 
-### 2. POST `/api/ingestion/upload`
+### 2. POST `/api/ingestion/convert`
 
-Upload a PDF document for content extraction.
+Convert a PDF/PPTX document for content extraction via Docling.
 
 #### Request
 ```http
-POST /api/ingestion/upload
+POST /api/ingestion/convert
 Content-Type: multipart/form-data
 Authorization: Bearer <token>
 
-file: <PDF file>
+file: <PDF or PPTX file>
 config: <optional JSON configuration>
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `file` | File | ✅ | PDF file (max 10MB) |
+| `file` | File | ✅ | PDF or PPTX file (max 10MB) |
 | `config` | JSON string | ❌ | Optional processing config |
 
 #### Response (Success)
@@ -163,7 +209,7 @@ config: <optional JSON configuration>
 #### Response (Error)
 ```json
 {
-  "error": "Only PDF files are allowed"
+  "error": "Only PDF and PPTX files are allowed"
 }
 ```
 ```json
@@ -183,8 +229,8 @@ config: <optional JSON configuration>
 
 #### Frontend Usage
 ```javascript
-import { uploadDocument } from '../services/ingestionApi';
-const result = await uploadDocument(file);
+import { convertDocument } from '../services/ingestionApi';
+const result = await convertDocument(file);
 // result.content is cached in localStorage
 ```
 
@@ -193,7 +239,65 @@ const result = await uploadDocument(file);
 
 ---
 
-### 3. POST `/api/ingestion/preview`
+### 3. POST `/api/ingestion/collection`
+
+Create a new ChromaDB collection for document storage.
+
+#### Request
+```http
+POST /api/ingestion/collection
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "name": "my_collection",
+  "description": "Optional collection description"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | ✅ | Collection name (alphanumeric + underscores) |
+| `description` | string | ❌ | Optional description |
+
+#### Response (Success)
+```json
+{
+  "success": true,
+  "collection": {
+    "id": "my_collection",
+    "name": "my_collection",
+    "description": "Optional collection description",
+    "createdAt": "2026-01-31T12:00:00.000Z"
+  },
+  "message": "Collection 'my_collection' created successfully"
+}
+```
+
+#### Response (Error)
+```json
+{
+  "error": "Collection name is required"
+}
+```
+```json
+{
+  "error": "Collection 'my_collection' already exists"
+}
+```
+
+#### Frontend Usage
+```javascript
+import { createCollection } from '../services/ingestionApi';
+const result = await createCollection('my_collection', 'Optional description');
+```
+
+#### Mock Status
+✅ **TODO** - Needs to call LLM service to create ChromaDB collection.
+
+---
+
+### 4. POST `/api/ingestion/preview`
 
 Generate embedding preview from document state.
 
@@ -272,7 +376,7 @@ const result = await previewEmbeddings('embed_per_page', documentState);
 
 ---
 
-### 4. POST `/api/ingestion/ingest`
+### 5. POST `/api/ingestion/ingest`
 
 Ingest document content into vector database.
 
@@ -324,7 +428,7 @@ const result = await startIngestion('chroma_default', documentState, 'embed_per_
 
 ---
 
-### 5. POST `/api/ingestion/helper`
+### 6. POST `/api/ingestion/helper`
 
 Run a generic backend AI helper function.
 
@@ -369,7 +473,7 @@ const result = await runBackendHelper('ai_image_descriptions', documentState);
 
 ---
 
-### 6. POST `/api/ingestion/helper/image-descriptions`
+### 7. POST `/api/ingestion/helper/image-descriptions`
 
 Generate AI descriptions for specific images (preferred endpoint).
 
@@ -523,7 +627,8 @@ Expected LLM service endpoints:
 | Endpoint | Method | Mock? | Purpose |
 |----------|--------|-------|---------|
 | `/api/ingestion/config` | GET | ✅ | Get backend configuration |
-| `/api/ingestion/upload` | POST | ✅ | Upload PDF for extraction |
+| `/api/ingestion/convert` | POST | ✅ | Convert PDF/PPTX for extraction |
+| `/api/ingestion/collection` | POST | TODO | Create ChromaDB collection |
 | `/api/ingestion/preview` | POST | ⚠️ | Generate embedding preview |
 | `/api/ingestion/ingest` | POST | ✅ | Ingest to vector DB |
 | `/api/ingestion/helper` | POST | ✅ | Run generic AI helper |
@@ -540,7 +645,10 @@ All API calls are centralized in `frontend/src/services/ingestionApi.js`:
 export const getBackendConfig = async () => {...}
 
 // Document Processing
-export const uploadDocument = async (file, config = {}) => {...}
+export const convertDocument = async (file, config = {}) => {...}
+
+// Collections
+export const createCollection = async (name, description) => {...}
 
 // Embedding & Ingestion
 export const previewEmbeddings = async (strategy, documentState) => {...}

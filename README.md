@@ -183,7 +183,7 @@ EMBEDDING_MODEL=Snowflake/snowflake-arctic-embed-l-v2.0
 EMBEDDING_DEVICE=auto
 
 # ChromaDB Configuration
-CHROMA_PERSIST_DIRECTORY=./chroma_db_merged
+CHROMA_PERSIST_DIRECTORY=./resources/chroma_db/chroma_db_merged
 CHROMA_COLLECTION_NAME=tum_docs
 CHUNK_SIZE=600
 CHUNK_OVERLAP=300
