@@ -9,10 +9,13 @@ Handles business logic for:
 - Vector embedding and storage
 """
 import logging
+import tempfile
+import time
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 from config.settings import settings
+from services.docling_service import DoclingService
 
 logger = logging.getLogger(__name__)
 
@@ -24,26 +27,6 @@ class IngestionController:
     All methods return data directly (no HTTP responses).
     Routes handle HTTP concerns.
     """
-    
-    def __init__(self):
-        self._vectorstore_manager = None
-        self._embedding_manager = None
-    
-    @property
-    def vectorstore_manager(self):
-        """Lazy load vectorstore manager"""
-        if self._vectorstore_manager is None:
-            from models.vectorstore_manager import vectorstore_manager
-            self._vectorstore_manager = vectorstore_manager
-        return self._vectorstore_manager
-    
-    @property
-    def embedding_manager(self):
-        """Lazy load embedding manager"""
-        if self._embedding_manager is None:
-            from models.embedding_manager import embedding_manager
-            self._embedding_manager = embedding_manager
-        return self._embedding_manager
     
     # =========================================================================
     # Collection Management
@@ -112,20 +95,7 @@ class IngestionController:
             logger.error(f"Failed to create collection: {e}")
             raise
     
-    async def delete_collection(self, collection_id: str) -> Dict[str, Any]:
-        """
-        Delete a ChromaDB collection.
-        """
-        try:
-            # TODO: Implement actual ChromaDB collection deletion
-            logger.info(f"[MOCK] Deleting collection: {collection_id}")
-            return {
-                "success": True,
-                "message": f"Collection '{collection_id}' deleted successfully",
-            }
-        except Exception as e:
-            logger.error(f"Failed to delete collection: {e}")
-            raise
+   
     
     # =========================================================================
     # Document Conversion
@@ -141,73 +111,118 @@ class IngestionController:
         """
         Convert a document using Docling.
         
-        Returns extracted content with pages, text items, images, tables.
+        Workflow:
+        1. Save uploaded file to temp location
+        2. Call DoclingService.convert_pdf() to get raw Docling JSON
+        3. Call DoclingService.parse_to_ingestion_page() to transform to frontend format
+        4. Clean up temp file
+        5. Return frontend-ready content
+        
+        Args:
+            file_content: Raw bytes of the uploaded file
+            filename: Original filename
+            content_type: MIME type (e.g., "application/pdf")
+            config: Optional conversion configuration
+            
+        Returns:
+            {
+                "success": True,
+                "filename": "document.pdf",
+                "content": {
+                    "documentId": "doc_xxx",
+                    "filename": "document.pdf",
+                    "totalPages": 10,
+                    "pages": [...]
+                }
+            }
         """
+        temp_file_path = None
+        
         try:
-            # TODO: Implement actual Docling conversion
-            # For now, return mock data
-            logger.info(f"[MOCK] Converting document: {filename}")
+            start_time = time.time()
+            logger.info(f"[DoclingConversion] Starting conversion: {filename} ({len(file_content)} bytes)")
+            
+            # Validate content type
+            supported_types = ["application/pdf", "application/vnd.openxmlformats-officedocument.presentationml.presentation"]
+            if content_type not in supported_types:
+                raise ValueError(f"Unsupported content type: {content_type}. Supported: {supported_types}")
+            
+            # Determine file extension from content type
+            ext_map = {
+                "application/pdf": ".pdf",
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+            }
+            extension = ext_map.get(content_type, ".pdf")
+            
+            # Save to temp file (Docling requires file path)
+            temp_dir = Path(tempfile.gettempdir()) / "docling_uploads"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            
+            temp_file_path = temp_dir / f"upload_{int(time.time() * 1000)}{extension}"
+            temp_file_path.write_bytes(file_content)
+            logger.info(f"[DoclingConversion] Saved temp file: {temp_file_path}")
+            
+            # Step 1: Convert PDF to Docling JSON (raw format)
+            docling_service = DoclingService()
+            docling_json = docling_service.convert_pdf(temp_file_path, verbose=True)
+            
+            conversion_time = time.time() - start_time
+            logger.info(f"[DoclingConversion] Docling conversion completed in {conversion_time:.2f}s")
+            
+            # Generate document ID for this conversion
+            import uuid
+            document_id = f"doc_{uuid.uuid4().hex[:8]}"
+            
+            # Step 2: Transform to frontend ingestion page format
+            # Images are saved to static/images/{document_id}/ and URLs returned
+            parse_start = time.time()
+            include_furniture = config.get("includeFurniture", False) if config else False
+            save_images_to_disk = config.get("saveImagesToDisk", True) if config else True
+            
+            frontend_content = docling_service.parse_to_ingestion_page(
+                docling_json, 
+                include_furniture=include_furniture,
+                document_id=document_id,
+                save_images_to_disk=save_images_to_disk
+            )
+            
+            # Override filename with original upload name
+            frontend_content["filename"] = filename
+            
+            parse_time = time.time() - parse_start
+            total_time = time.time() - start_time
+            
+            logger.info(
+                f"[DoclingConversion] Complete: {filename} | "
+                f"Pages: {frontend_content['totalPages']} | "
+                f"Conversion: {conversion_time:.2f}s | "
+                f"Parse: {parse_time:.2f}s | "
+                f"Total: {total_time:.2f}s"
+            )
             
             return {
                 "success": True,
                 "filename": filename,
-                "content": {
-                    "documentId": f"doc_{int(__import__('time').time() * 1000)}",
-                    "filename": filename,
-                    "totalPages": 3,
-                    "pages": self._generate_mock_pages(filename),
-                },
+                "content": frontend_content,
+                "timing": {
+                    "conversionSeconds": round(conversion_time, 2),
+                    "parseSeconds": round(parse_time, 2),
+                    "totalSeconds": round(total_time, 2),
+                }
             }
+            
         except Exception as e:
-            logger.error(f"Failed to convert document: {e}")
+            logger.error(f"[DoclingConversion] Failed to convert document: {e}", exc_info=True)
             raise
-    
-    def _generate_mock_pages(self, filename: str) -> List[Dict]:
-        """Generate mock page content for testing"""
-        return [
-            {
-                "pageNumber": 1,
-                "items": [
-                    {
-                        "id": "t1",
-                        "type": "text",
-                        "content": f"# {filename}\n\nThis is a mock document for testing.",
-                        "deleted": False,
-                    },
-                    {
-                        "id": "i1",
-                        "type": "image",
-                        "imageUrl": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjUwIj48L3N2Zz4=",
-                        "imageWidth": 100,
-                        "imageHeight": 50,
-                        "classification": "logo",
-                        "deleted": False,
-                    },
-                ],
-            },
-            {
-                "pageNumber": 2,
-                "items": [
-                    {
-                        "id": "t2",
-                        "type": "text",
-                        "content": "## Chapter 1\n\nContent for chapter 1.",
-                        "deleted": False,
-                    },
-                ],
-            },
-            {
-                "pageNumber": 3,
-                "items": [
-                    {
-                        "id": "t3",
-                        "type": "text",
-                        "content": "## Chapter 2\n\nContent for chapter 2.",
-                        "deleted": False,
-                    },
-                ],
-            },
-        ]
+            
+        finally:
+            # Clean up temp file
+            if temp_file_path and temp_file_path.exists():
+                try:
+                    temp_file_path.unlink()
+                    logger.debug(f"[DoclingConversion] Cleaned up temp file: {temp_file_path}")
+                except Exception as cleanup_error:
+                    logger.warning(f"[DoclingConversion] Failed to clean up temp file: {cleanup_error}")
     
     # =========================================================================
     # Ingestion

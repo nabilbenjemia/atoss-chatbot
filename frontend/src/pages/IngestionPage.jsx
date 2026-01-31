@@ -190,8 +190,11 @@ function IngestionPageLayout() {
 
     // Load document content when file is selected
     useEffect(() => {
+        console.log('[IngestionPage] useEffect triggered, selectedDocumentId:', selectedDocumentId);
+
         if (!selectedDocumentId) {
             // No file selected - reset document state and clear ref
+            console.log('[IngestionPage] No document selected, resetting');
             commandHistoryDocIdRef.current = null;
             resetCommandDocument(null);
             actions.resetDocument();
@@ -201,6 +204,7 @@ function IngestionPageLayout() {
         // Use the memoized selector - only re-runs when the specific ingested file changes
         if (selectedIngestedFile) {
             // Load embeddings for ingested file - no command history for these
+            console.log('[IngestionPage] Loading ingested file:', selectedIngestedFile.ingestedId);
             commandHistoryDocIdRef.current = null;
             const embeddings = getIngestedFileEmbeddings(selectedIngestedFile.ingestedId);
             if (embeddings) {
@@ -213,11 +217,14 @@ function IngestionPageLayout() {
 
         // Load document content from cache (uploaded file)
         const content = getFileContent(selectedDocumentId);
+        console.log('[IngestionPage] Loading content for:', selectedDocumentId, 'found:', !!content, 'pages:', content?.pages?.length);
+
         if (content) {
             // Try to restore command history (undo/redo) for this file
             const savedHistory = getFileHistory(selectedDocumentId);
             if (savedHistory && (savedHistory.past?.length > 0 || savedHistory.future?.length > 0)) {
                 // Restore full state with history
+                console.log('[IngestionPage] Restoring with history');
                 restoreCommandDocument({
                     past: savedHistory.past || [],
                     present: content,
@@ -225,12 +232,15 @@ function IngestionPageLayout() {
                 });
             } else {
                 // No history - start fresh
+                console.log('[IngestionPage] Resetting with fresh content');
                 resetCommandDocument(content);
             }
             // Mark this document as the one owning the current command history
             // This prevents auto-save from saving to wrong file during transitions
             commandHistoryDocIdRef.current = selectedDocumentId;
             actions.loadDocument(content, selectedDocumentId);
+        } else {
+            console.warn('[IngestionPage] No content found in cache for:', selectedDocumentId);
         }
     }, [selectedDocumentId, selectedIngestedFile, actions, resetCommandDocument, restoreCommandDocument]);
 

@@ -103,6 +103,12 @@ if resources_path.exists():
     app.mount("/resources", StaticFiles(directory=str(resources_path)), name="resources")
     logger.info(f"Serving static images from: {resources_path}")
 
+# Mount static files for extracted document images
+static_images_path = Path(__file__).parent / "static" / "images"
+static_images_path.mkdir(parents=True, exist_ok=True)
+app.mount("/static/images", StaticFiles(directory=str(static_images_path)), name="static_images")
+logger.info(f"Serving document images from: {static_images_path}")
+
 # Include routers
 app.include_router(chat_router)
 app.include_router(ingestion_router)

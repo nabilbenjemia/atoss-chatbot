@@ -13,6 +13,28 @@
 import { useState, useCallback, useEffect } from 'react';
 import PageNavigation from './PageNavigation';
 
+// LLM service base URL for static images
+const LLM_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL || 'http://localhost:8000';
+
+/**
+ * Resolve image URL - handle data URLs, full URLs, and static paths
+ * @param {string} url - The image URL from the backend
+ * @returns {string} - Resolved URL
+ */
+function resolveImageUrl(url) {
+    if (!url) return '';
+    // Data URLs and full URLs - use as-is
+    if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) {
+        return url;
+    }
+    // Static paths from LLM service - prefix with base URL
+    if (url.startsWith('/static/')) {
+        return `${LLM_BASE_URL}${url}`;
+    }
+    // Other relative paths - also prefix with base URL
+    return `${LLM_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
 /**
  * Single Embedding Display
  */
@@ -73,7 +95,7 @@ function EmbeddingCard({ embedding, embeddingNumber }) {
                                     {img.imageUrl && (
                                         <div className="flex items-center justify-center p-2 bg-white">
                                             <img
-                                                src={img.imageUrl}
+                                                src={resolveImageUrl(img.imageUrl)}
                                                 alt={img.description || `Image ${idx + 1}`}
                                                 className="max-h-40 object-contain"
                                                 style={{

@@ -167,19 +167,6 @@ async def create_collection(request: CollectionCreateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/collection/{collection_id}")
-async def delete_collection(collection_id: str):
-    """
-    Delete a ChromaDB collection.
-    """
-    try:
-        result = await ingestion_controller.delete_collection(collection_id)
-        return result
-    except Exception as e:
-        logger.error(f"Failed to delete collection: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 # =============================================================================
 # Document Conversion Endpoints
 # =============================================================================
@@ -198,10 +185,16 @@ async def convert_document(
     try:
         # Parse optional config
         config_dict = json.loads(config) if config else {}
-        
+
         # Read file content
         file_content = await file.read()
-        
+
+        # Validate required fields
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Filename is required")
+        if not file.content_type:
+            raise HTTPException(status_code=400, detail="Content-Type is required")
+
         result = await ingestion_controller.convert_document(
             file_content=file_content,
             filename=file.filename,

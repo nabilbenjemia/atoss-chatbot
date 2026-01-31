@@ -119,8 +119,8 @@ const aggregateConfig = (remoteConfig) => {
 /**
  * Upload a file for processing (content extraction)
  * 
- * Proxies to LLM service /api/docling/process endpoint.
- * Returns mock data if LLM service is unavailable.
+ * Proxies to LLM service /api/ingestion/convert endpoint.
+ * Returns extracted content with pages, text items, images, and tables.
  * 
  * @param {Buffer} fileBuffer - File content as buffer
  * @param {string} filename - Original filename
@@ -128,31 +128,56 @@ const aggregateConfig = (remoteConfig) => {
  * @returns {Promise<Object>} - Extracted content with pages/items
  */
 const uploadForProcessing = async (fileBuffer, filename, mimeType) => {
-    // TODO: When LLM service /api/docling/process is ready, uncomment this:
-    // const formData = new FormData();
-    // formData.append('file', fileBuffer, {
-    //     filename,
-    //     contentType: mimeType
-    // });
-    // 
-    // try {
-    //     const response = await axios.post(
-    //         `${LLM_SERVICE_URL}/api/docling/process`,
-    //         formData,
-    //         {
-    //             headers: { ...formData.getHeaders() },
-    //             timeout: 60000 // 60 second timeout for processing
-    //         }
-    //     );
-    //     return response.data;
-    // } catch (error) {
-    //     console.error('LLM service upload error:', error.message);
-    //     throw error;
-    // }
+    console.log(`[UPLOAD] Processing document: ${filename} (${mimeType}, ${fileBuffer.length} bytes)`);
 
-    // For now, return mock content directly
-    console.log(`[MOCK] Returning mock content for: ${filename} (LLM service not implemented)`);
-    return generateMockContent(filename);
+    const formData = new FormData();
+    formData.append('file', fileBuffer, {
+        filename,
+        contentType: mimeType
+    });
+
+    try {
+        console.log(`[UPLOAD] Calling LLM service: ${LLM_SERVICE_URL}/api/ingestion/convert`);
+        const response = await axios.post(
+            `${LLM_SERVICE_URL}/api/ingestion/convert`,
+            formData,
+            {
+                headers: { ...formData.getHeaders() },
+                timeout: 120000, // 2 minute timeout for PDF processing
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity,
+            }
+        );
+
+        console.log(`[UPLOAD] LLM service response received: success=${response.data?.success}`);
+
+        // Validate response structure
+        if (!response.data?.success) {
+            throw new Error(response.data?.error || 'LLM service returned unsuccessful response');
+        }
+
+        if (!response.data?.content) {
+            throw new Error('LLM service response missing content field');
+        }
+
+        // Return the content from LLM service
+        return response.data.content;
+
+    } catch (error) {
+        if (error.code === 'ECONNREFUSED') {
+            console.error(`[UPLOAD] LLM service unavailable at ${LLM_SERVICE_URL}`);
+            throw new Error(`LLM service unavailable. Please ensure it is running at ${LLM_SERVICE_URL}`);
+        }
+
+        if (error.response) {
+            // LLM service returned an error response
+            console.error(`[UPLOAD] LLM service error: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
+            throw new Error(error.response.data?.detail || error.response.data?.error || 'LLM service processing failed');
+        }
+
+        console.error(`[UPLOAD] Upload error: ${error.message}`);
+        throw error;
+    }
 };
 
 // ============================================================================

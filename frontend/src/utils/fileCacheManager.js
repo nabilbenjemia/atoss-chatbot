@@ -487,3 +487,96 @@ export const clearFileHistory = (documentId) => {
     const key = `${INGESTION_CONFIG.storage.historyPrefix}${documentId}`;
     clearCache(key);
 };
+
+// ==================== STORAGE MANAGEMENT ====================
+
+/**
+ * Clear all ingestion-related content from localStorage
+ * Used when storage quota is exceeded
+ * 
+ * Clears:
+ * - All file content (ingestion_content_*)
+ * - All file history (ingestion_history_*)
+ * - All embedding data (ingestion_embeddings_*)
+ * 
+ * Does NOT clear:
+ * - Uploaded files list (metadata only, small)
+ * - Ingested files list (metadata only, small)
+ */
+export const clearAllIngestionContent = () => {
+    console.log('[FileCacheManager] Clearing all ingestion content...');
+
+    const prefixesToClear = [
+        INGESTION_CONFIG.storage.contentFilesPrefix,  // ingestion_content_
+        INGESTION_CONFIG.storage.historyPrefix,       // ingestion_history_
+        'ingestion_embeddings_',                      // embeddings data
+    ];
+
+    let clearedCount = 0;
+
+    try {
+        const keysToRemove = [];
+
+        // Collect keys to remove
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && prefixesToClear.some(prefix => key.startsWith(prefix))) {
+                keysToRemove.push(key);
+            }
+        }
+
+        // Remove collected keys
+        for (const key of keysToRemove) {
+            localStorage.removeItem(key);
+            clearedCount++;
+        }
+
+        console.log(`[FileCacheManager] Cleared ${clearedCount} cached items`);
+    } catch (error) {
+        console.error('[FileCacheManager] Error clearing cache:', error);
+    }
+
+    return clearedCount;
+};
+
+/**
+ * Get localStorage usage statistics
+ * @returns {Object} - { used, total, percentage, itemCount }
+ */
+export const getStorageStats = () => {
+    let totalSize = 0;
+    let ingestionSize = 0;
+    let itemCount = 0;
+
+    try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+                const value = localStorage.getItem(key);
+                const size = (key.length + (value?.length || 0)) * 2; // UTF-16
+                totalSize += size;
+
+                if (key.startsWith('ingestion_')) {
+                    ingestionSize += size;
+                    itemCount++;
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error calculating storage stats:', error);
+    }
+
+    // Typical localStorage limit is 5MB
+    const limit = 5 * 1024 * 1024;
+
+    return {
+        used: totalSize,
+        usedMB: (totalSize / (1024 * 1024)).toFixed(2),
+        ingestionUsed: ingestionSize,
+        ingestionUsedMB: (ingestionSize / (1024 * 1024)).toFixed(2),
+        limit,
+        limitMB: (limit / (1024 * 1024)).toFixed(2),
+        percentage: ((totalSize / limit) * 100).toFixed(1),
+        itemCount,
+    };
+};

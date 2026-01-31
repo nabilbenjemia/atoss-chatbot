@@ -17,7 +17,7 @@ import {
     DOC_STATUS, //constants
 } from '../../../context/ingestion';
 import { uploadDocument } from '../../../services/ingestionApi';
-import { saveFileContent, addUploadedFile } from '../../../utils/fileCacheManager';
+import { saveFileContent, addUploadedFile, getFileContent, clearAllIngestionContent } from '../../../utils/fileCacheManager';
 import {
     isValidFileType,
     isValidFileSize,
@@ -64,14 +64,39 @@ export default function ConnectedUploadZone() {
 
             try {
                 const result = await uploadDocument(file);
+                console.log('[Upload] API response:', result);
+
                 if (!result.success || !result.content) {
                     throw new Error(result.error || 'Failed to process document');
                 }
 
                 const documentId = result.content.documentId;
+                console.log('[Upload] Document ID:', documentId);
+                console.log('[Upload] Content pages:', result.content.pages?.length);
 
                 // Cache the content
-                saveFileContent(documentId, result.content);
+                const saved = saveFileContent(documentId, result.content);
+
+                // Verify content was saved
+                const verify = getFileContent(documentId);
+                console.log('[Upload] Verification - content saved:', !!verify, 'pages:', verify?.pages?.length);
+
+                if (!verify) {
+                    // Storage failed - likely quota exceeded
+                    // Try to clear old content and retry
+                    console.warn('[Upload] Storage failed, attempting to clear old content...');
+                    clearAllIngestionContent();
+
+                    // Retry save
+                    saveFileContent(documentId, result.content);
+                    const retryVerify = getFileContent(documentId);
+
+                    if (!retryVerify) {
+                        throw new Error('Document too large for browser storage. Please clear browser data or use a smaller document.');
+                    }
+
+                    toast.warning('Cleared old cached content to make room');
+                }
 
                 // Complete upload in state
                 actions.completeFileUpload(uploadId, documentId);
@@ -86,17 +111,16 @@ export default function ConnectedUploadZone() {
 
                 toast.success(`Document ready: ${file.name}`);
 
-                // Auto-select if no document selected
-                if (!selectedDocumentId) {
-                    actions.selectFile(documentId);
-                }
+                // Always select the newly uploaded file
+                // This ensures the user sees the uploaded content immediately
+                actions.selectFile(documentId);
             } catch (error) {
                 console.error('Upload failed:', error);
                 actions.failFileUpload(uploadId, error.message);
                 toast.error(`Upload failed: ${file.name}`);
             }
         }
-    }, [validateFiles, actions, selectedDocumentId]);
+    }, [validateFiles, actions]);
 
     // Handle file input change
     const handleFileInputChange = useCallback((e) => {

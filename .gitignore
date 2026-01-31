@@ -100,6 +100,9 @@ frontend/tests/
 pyrightconfig.json
 backend/llm/docling/
 
+# LLM static images (generated at runtime)
+backend/llm/static/images/
+
 
 # Speckit - AI spec generation
 .specify/

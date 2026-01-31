@@ -12,6 +12,7 @@ from models.vectorstore import vectorstore_manager
 from models.llm_model import llm_manager
 from models.reranker_model import reranker_manager
 from services.rag_chain_service import rag_chain_service
+from services.docling_service import DoclingService
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ class StartupService:
     def __init__(self):
         self._is_loaded = False
         self._loading_progress: List[str] = []
+        self._docling_service: Optional[DoclingService] = None
 
     async def initialize_all(
         self, progress_callback: Optional[Callable[[str, int], None]] = None
@@ -36,7 +38,8 @@ class StartupService:
             bool: True if all components loaded successfully
         """
         steps = [
-            ("Loading embedding model...", self._load_embeddings, 25),
+            ("Loading Docling PDF converter...", self._load_docling, 10),
+            ("Loading embedding model...", self._load_embeddings, 30),
             ("Loading vector store...", self._load_vectorstore, 50),
             ("Loading LLM (Ollama)...", self._load_llm, 75),
             ("Loading reranker (optional)...", self._load_reranker, 85),
@@ -61,6 +64,12 @@ class StartupService:
             logger.error("Failed to initialize LLM components: %s", e)
             self._is_loaded = False
             raise
+
+    async def _load_docling(self):
+        """Load the Docling PDF converter (initializes models on first use)"""
+        # DoclingService is a singleton - instantiating it triggers model loading
+        self._docling_service = await asyncio.to_thread(DoclingService)
+        logger.info("Docling PDF converter initialized")
 
     async def _load_embeddings(self):
         """Load the embedding model"""
@@ -89,6 +98,7 @@ class StartupService:
         return {
             "is_loaded": self._is_loaded,
             "components": {
+                "docling": self._docling_service is not None,
                 "embedding_model": embedding_manager.is_loaded,
                 "vectorstore": vectorstore_manager.is_loaded,
                 "llm": llm_manager.is_loaded,

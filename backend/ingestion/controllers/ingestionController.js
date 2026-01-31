@@ -41,36 +41,80 @@ const getConfig = async (req, res) => {
  * POST /api/ingestion/upload
  * Upload a document for content extraction
  * 
- * Proxies to LLM service /api/docling/process.
+ * Proxies to LLM service /api/ingestion/convert.
  * Returns extracted content immediately (no server-side state).
  * Frontend caches the result in localStorage.
+ * 
+ * Response format:
+ * {
+ *   success: true,
+ *   filename: "document.pdf",
+ *   content: {
+ *     documentId: "doc_xxx",
+ *     filename: "document.pdf",
+ *     totalPages: 10,
+ *     pages: [{ pageNumber: 1, items: [...] }, ...]
+ *   },
+ *   timing: { conversionSeconds, parseSeconds, totalSeconds }
+ * }
  */
 const uploadDocument = async (req, res) => {
     try {
+        // Validate file was uploaded
         if (!req.file) {
-            return res.status(400).json({ error: 'No file provided' });
+            return res.status(400).json({
+                success: false,
+                error: 'No file provided'
+            });
         }
 
         const { originalname, mimetype, buffer } = req.file;
 
+        // Validate file type
+        const supportedTypes = ['application/pdf'];
+        if (!supportedTypes.includes(mimetype)) {
+            return res.status(400).json({
+                success: false,
+                error: `Unsupported file type: ${mimetype}. Supported: ${supportedTypes.join(', ')}`
+            });
+        }
+
+        console.log(`[UPLOAD] Processing: ${originalname} (${mimetype}, ${buffer.length} bytes)`);
+
         // Process document through LLM service
+        // Returns: { documentId, filename, totalPages, pages }
         const content = await ingestionService.uploadForProcessing(buffer, originalname, mimetype);
 
-        // Return extracted content directly
+        // Validate response has required fields
+        if (!content.pages || !Array.isArray(content.pages)) {
+            console.error('[UPLOAD] Invalid response from LLM service: missing pages array');
+            return res.status(500).json({
+                success: false,
+                error: 'Invalid response from document processor'
+            });
+        }
+
+        console.log(`[UPLOAD] Success: ${content.totalPages} pages, ${content.pages.reduce((sum, p) => sum + (p.items?.length || 0), 0)} items`);
+
+        // Return extracted content
         // Frontend will cache this in localStorage
         res.status(200).json({
             success: true,
             filename: originalname,
             content: {
-                documentId: `doc_${Date.now()}`, // Generate a client-side ID
+                documentId: content.documentId || `doc_${Date.now()}`,
                 filename: content.filename || originalname,
-                totalPages: content.totalPages || content.pages?.length || 0,
-                pages: content.pages || []
+                totalPages: content.totalPages || content.pages.length,
+                pages: content.pages
             }
         });
     } catch (error) {
-        console.error('Upload error:', error);
-        res.status(500).json({ error: 'Failed to process document', details: error.message });
+        console.error('[UPLOAD] Error:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to process document',
+            details: error.message
+        });
     }
 };
 

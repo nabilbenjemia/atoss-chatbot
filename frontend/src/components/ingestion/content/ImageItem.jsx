@@ -5,8 +5,30 @@
  * Supports delete, classification change, and lightbox expand.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { INGESTION_CONFIG } from '../../../config/ingestionConfig';
+
+// LLM service base URL for static images
+const LLM_BASE_URL = import.meta.env.VITE_IMAGE_BASE_URL || 'http://localhost:8000';
+
+/**
+ * Resolve image URL - handle data URLs, full URLs, and static paths
+ * @param {string} url - The image URL from the backend
+ * @returns {string} - Resolved URL
+ */
+function resolveImageUrl(url) {
+    if (!url) return '';
+    // Data URLs and full URLs - use as-is
+    if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) {
+        return url;
+    }
+    // Static paths from LLM service - prefix with base URL
+    if (url.startsWith('/static/')) {
+        return `${LLM_BASE_URL}${url}`;
+    }
+    // Other relative paths - also prefix with base URL
+    return `${LLM_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+}
 
 /**
  * @param {Object} props
@@ -29,6 +51,9 @@ export default function ImageItem({
         item.imageWidth > INGESTION_CONFIG.image.maxDisplayWidth ||
         item.imageHeight > INGESTION_CONFIG.image.maxDisplayHeight;
 
+    // Resolve the image URL (handle static paths from LLM service)
+    const resolvedImageUrl = useMemo(() => resolveImageUrl(item.imageUrl), [item.imageUrl]);
+
     // Handle classification change
     const handleClassChange = useCallback((newClass) => {
         if (onClassChange) {
@@ -43,7 +68,7 @@ export default function ImageItem({
                 <div className="relative">
                     {/* Image */}
                     <img
-                        src={item.imageUrl}
+                        src={resolvedImageUrl}
                         alt="Document image"
                         className={`cursor-pointer ${needsResize ? 'max-w-full h-auto' : ''}`}
                         style={{
@@ -119,7 +144,7 @@ export default function ImageItem({
                 >
                     <div className="relative max-w-full max-h-full overflow-auto">
                         <img
-                            src={item.imageUrl}
+                            src={resolvedImageUrl}
                             alt="Document image (full size)"
                             className="max-w-none shadow-2xl rounded-sm"
                             onClick={(e) => e.stopPropagation()}
