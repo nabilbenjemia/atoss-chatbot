@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { tum_klinikum_logo, tum_logo_darkmode, new_chat_logo, search_logo, minimize_logo, maximize_logo, profile_photo_mock, expand_down_logo,  expand_up_logo, delete_logo } from '../assets';
+import * as assets from '../assets';
 import { authAPI, getCurrentUser, userAPI } from '../services/api';
 
 export default function Sidebar({ conversationTitles, setConversationTitles, setConversationId, conversationId, userId, onNewChat, isDarkMode = false }) {
@@ -167,20 +167,23 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
   };
 
   return ( 
-    <div className={`${isDarkMode ? 'bg-[#1f1f1f]' : 'bg-tum-blue-light-4'} ${isMinimized ? 'w-12' : 'w-64'} ${isDarkMode ? 'text-gray-200' : 'text-black'} h-screen p-2 rounded-r-2xl flex flex-col transition-all duration-300`}>
+    <div className={`${isDarkMode ? 'bg-[#1f1f1f]' : 'bg-tum-blue-light-4'} ${isMinimized ? 'w-12' : 'w-64'} ${isDarkMode ? 'text-gray-200' : 'text-black'} h-full p-2 rounded-r-2xl flex flex-col transition-all duration-300 overflow-hidden`}>
       <div className={`flex ${isMinimized ? 'justify-center' : (isDarkMode ? 'justify-between' : 'justify-between')} items-start mb-1`}>
-        {!isMinimized && (
+        {/*!isMinimized && (
           <img 
             src={isDarkMode ? tum_logo_darkmode : tum_klinikum_logo} 
             alt="TUM Klinikum Logo" 
             className={isDarkMode ? "h-12 w-auto rounded-lg" : "h-16 w-auto -ml-5 -my-2"} 
           />
-        )}
+        )*/}
         <button 
           onClick={() => setIsMinimized(!isMinimized)}
-          className={`p-2 rounded w-10 h-10 flex items-center justify-center focus:outline-none border-0 ${isDarkMode ? 'bg-[#1f1f1f] hover:bg-[#2f2f2f]' : 'bg-tum-blue-light-4'}`}
+          className={`p-2 rounded w-10 h-10 flex items-center ml-auto justify-center focus:outline-none border-0 ${isDarkMode ? 'bg-[#1f1f1f] hover:bg-[#2f2f2f]' : 'bg-tum-blue-light-4'}`}
         >
-          {isMinimized ? <img src={maximize_logo} alt="Maximize" className="h-4" /> : <img src={minimize_logo} alt="Minimize" className="h-4" />}
+          {isMinimized
+            ? <img src={isDarkMode ? assets.maximize_logo_white : assets.maximize_logo} alt="Maximize" className="h-4" />
+            : <img src={isDarkMode ? assets.minimize_logo_white : assets.minimize_logo} alt="Minimize" className="h-4" />
+          }
         </button>
       </div>
 
@@ -189,7 +192,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
           <ul>
               <li className={`flex items-center p-0 cursor-pointer rounded ${isDarkMode ? 'hover:bg-[#2f2f2f]' : 'hover:bg-tum-blue-light-2'}`} 
                 onClick={() => handleCreateNewConversation()}>
-                <img src={new_chat_logo} alt="New Chat Logo" className="h-4 text-sm" />
+                <img src={isDarkMode ? assets.new_chat_logo_white : assets.new_chat_logo} alt="New Chat Logo" className="h-4 text-sm" />
                 <span className="ml-3">{t.newChat}</span>
               </li>
               
@@ -198,12 +201,12 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
                   className={`flex items-center p-0 cursor-pointer rounded ${isDarkMode ? 'hover:bg-[#2f2f2f]' : 'hover:bg-tum-blue-light-2'}`}
                   onClick={() => setIsSearching(true)}
                 >
-                  <img src={search_logo} alt="Search Logo" className="h-4" />
+                  <img src={isDarkMode? assets.search_logo_white : assets.search_logo} alt="Search Logo" className="h-4" />
                   <span className="ml-3">{t.searchChats}</span>
                 </li>
               ) : (
                 <li className="flex items-center p-0">
-                  <img src={search_logo} alt="Search Logo" className="h-4" />
+                  <img src={isDarkMode? assets.search_logo_white : assets.search_logo} alt="Search Logo" className="h-4" />
                   <div className="relative flex-1 ml-3">
                     <input
                       type="text"
@@ -227,7 +230,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
           <div className={`border-t m-2 ${isDarkMode ? 'border-gray-700' : 'border-tum-gray'}`}></div>
 
           <button className={`text-left font-medium w-14 h-8 flex items-center justify-center font-medium focus:outline-none border-0 ${isDarkMode ? 'bg-[#1f1f1f] hover:bg-[#2f2f2f]' : 'bg-tum-blue-light-4'}`} onClick={() => setIsHistoryVisible(!isHistoryVisible)}>
-            {t.chats} {isHistoryVisible ? <img src={expand_up_logo} alt="Collapse" className="w-3 h-3 ml-1 mt-1" /> : <img src={expand_down_logo} alt="Expand" className="w-3 h-3 ml-1 mt-1" />}
+            {t.chats} {isHistoryVisible ? <img src={isDarkMode ? assets.expand_up_logo_white : assets.expand_up_logo} alt="Collapse" className="w-3 h-3 ml-1 mt-1" /> : <img src={isDarkMode ? assets.expand_down_logo_white : assets.expand_down_logo} alt="Expand" className="w-3 h-3 ml-1 mt-1" />}
           </button>
 
           {isHistoryVisible && (
@@ -273,7 +276,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
                           </button>
                         ) : (
                           <img 
-                            src={delete_logo} 
+                            src={isDarkMode ? assets.delete_logo_white : assets.delete_logo} 
                             alt="Delete" 
                             className="w-4 h-4 cursor-pointer"
                             onClick={(e) => {
@@ -308,7 +311,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
                   />
                 ) : (
                   <img
-                    src={profile_photo_mock}
+                    src={assets.profile_photo_mock}
                     alt="User Avatar"
                     className="w-full h-full object-cover"
                   />
@@ -329,7 +332,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
             {/* Logout dropdown */}
             {showLogoutDropdown && (
               <div className={`absolute bottom-full left-0 right-0 mb-2 border rounded-lg shadow-lg z-10 ${isDarkMode ? 'bg-[#2f2f2f] border-gray-700' : 'bg-tum-white border-tum-grey-7'}`}>
-                <button
+                {/*<button
                   onClick={() => {
                     setShowLogoutDropdown(false);
                     navigate('/profile');
@@ -337,8 +340,8 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
                   className={`w-full text-left px-4 py-2 text-sm rounded-lg transition-colors border-b ${isDarkMode ? 'text-gray-200 bg-[#2f2f2f] hover:bg-[#3f3f3f] border-gray-700' : 'text-tum-black bg-tum-white hover:bg-tum-blue-light-2 border-tum-grey-7'}`}
                 >
                   {t.profile}
-                </button>
-                {currentUser?.role === 'Admin' && (
+                </button>*/}
+                {/*currentUser?.role === 'Admin' && (
                   <button
                     onClick={() => {
                       setShowLogoutDropdown(false);
@@ -348,7 +351,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
                   >
                     Analytics
                   </button>
-                )}
+                )*/}
                 <button
                   onClick={handleLogout}
                   className={`w-full text-left px-4 py-2 text-sm rounded-lg transition-colors ${isDarkMode ? 'text-gray-200 bg-[#2f2f2f] hover:bg-[#3f3f3f]' : 'text-tum-black bg-tum-white hover:bg-tum-blue-light-2'}`}
@@ -368,10 +371,10 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
                   <li className={`flex items-center p-2 cursor-pointer rounded justify-center ${isDarkMode ? 'hover:bg-[#2f2f2f]' : 'hover:bg-tum-blue-light-2'}`} 
                     onClick={() => {console.log("New chat clicked");
                                     handleCreateNewConversation();}}>
-                    <img src={new_chat_logo} alt="New Chat Logo" className="h-4" />
+                    <img src={isDarkMode ? assets.new_chat_logo_white : assets.new_chat_logo} alt="New Chat Logo" className="h-4" />
                   </li>
                   <li className={`flex items-center p-2 cursor-pointer rounded justify-center ${isDarkMode ? 'hover:bg-[#2f2f2f]' : 'hover:bg-tum-blue-light-2'}`}>
-                    <img src={search_logo} alt="Search Logo" className="h-4" />
+                    <img src={isDarkMode? assets.search_logo_white : assets.search_logo} alt="Search Logo" className="h-4" />
                   </li>
               </ul>
           </nav>
@@ -389,7 +392,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
                 />
               ) : (
                 <img
-                  src={profile_photo_mock}
+                  src={assets.profile_photo_mock}
                   alt="User Avatar"
                   className="w-full h-full object-cover"
                 />

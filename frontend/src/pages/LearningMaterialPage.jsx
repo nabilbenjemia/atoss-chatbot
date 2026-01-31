@@ -5,6 +5,7 @@ import AdminVideoCard from '../components/AdminVideoCard';
 import UploadVideoCard from '../components/UploadVideoCard';
 import VideoPlayerModal from '../components/VideoPlayerModal';
 import VideoUploadModal from '../components/VideoUploadModal';
+import Header from '../components/Header';
 import { getCurrentUser } from '../services/api';
 
 const LearningMaterialPage = () => {
@@ -144,8 +145,11 @@ const LearningMaterialPage = () => {
         );
     }
 
+    const isDarkMode = false; // TODO remove this
     return (
-        <div className="container mx-auto px-4 py-8">
+    <div className={`min-h-screen py-8 ${isDarkMode ? 'bg-[#212121]' : 'bg-gray-50'}`}>
+        <Header role={role} isDarkMode={isDarkMode} />
+        <div className="container mx-auto px-4 py-8 pt-10">
             <h1 className="text-3xl font-bold mb-6">Learning Materials</h1>
 
             {/* Filters */}
@@ -266,6 +270,7 @@ const LearningMaterialPage = () => {
                 </div>
             )}
         </div>
+    </div>
     );
 };
 
