@@ -112,6 +112,58 @@ const aggregateConfig = (remoteConfig) => {
     };
 };
 
+/**
+ * Create a new ChromaDB collection
+ * 
+ * Proxies to LLM service /api/ingestion/collection endpoint.
+ * 
+ * @param {string} name - Collection name (sanitized)
+ * @param {string} [description] - Optional description
+ * @returns {Promise<Object>} - Result with success status and collection info
+ */
+const createCollection = async (name, description) => {
+    console.log(`[COLLECTION] Creating collection: ${name}`);
+
+    try {
+        const response = await axios.post(
+            `${LLM_SERVICE_URL}/api/ingestion/collection`,
+            { name, description },
+            {
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 30000, // 30 second timeout
+            }
+        );
+
+        console.log(`[COLLECTION] LLM service response: success=${response.data?.success}`);
+        return response.data;
+    } catch (error) {
+        console.error(`[COLLECTION] Error creating collection:`, error.message);
+
+        // Check if it's a response error (e.g., 409 conflict for existing collection)
+        if (error.response) {
+            const status = error.response.status;
+            const data = error.response.data;
+
+            if (status === 409) {
+                return {
+                    success: false,
+                    error: 'Collection already exists',
+                    details: data?.details || `A collection with name "${name}" already exists`,
+                };
+            }
+
+            return {
+                success: false,
+                error: data?.error || `LLM service error (${status})`,
+                details: data?.details || error.message,
+            };
+        }
+
+        // Network error or timeout
+        throw new Error(`Failed to connect to LLM service: ${error.message}`);
+    }
+};
+
 // ============================================================================
 // DOCUMENT UPLOAD (Proxy to LLM Service)
 // ============================================================================
@@ -185,40 +237,57 @@ const uploadForProcessing = async (fileBuffer, filename, mimeType) => {
 // ============================================================================
 
 /**
- * Ingest content into vector database
+ * Ingest pre-transformed documents into vector database
  * 
- * Proxies to LLM service /api/ingestion/ingest endpoint.
- * Returns mock data if LLM service is unavailable.
+ * Receives documents array directly from frontend (already transformed by preview).
+ * Simply proxies to LLM service.
  * 
- * @param {string} targetDb - Target database ID
- * @param {Object} documentState - Document content to ingest
- * @param {string} strategy - Embedding strategy
+ * @param {string} targetDb - Target database ID (collection ID)
+ * @param {Array} documents - Pre-transformed documents array with id, content, metadata
+ * @param {string} strategy - Embedding strategy used
+ * @param {string} source - Source filename for logging
  * @returns {Promise<Object>} - Ingestion result
  */
-const ingestToVectorDb = async (targetDb, documentState, strategy = 'embed_per_page') => {
-    // TODO: When LLM service /api/ingestion/ingest is ready, uncomment this:
-    // try {
-    //     const response = await axios.post(
-    //         `${LLM_SERVICE_URL}/api/ingestion/ingest`,
-    //         { targetDb, documentState, strategy },
-    //         { timeout: 120000 } // 2 minute timeout for ingestion
-    //     );
-    //     return response.data;
-    // } catch (error) {
-    //     console.error('LLM service ingest error:', error.message);
-    //     throw error;
-    // }
+const ingestToVectorDb = async (targetDb, documents, strategy = 'embed_per_page', source = 'unknown') => {
+    console.log(`[INGEST] Received ${documents.length} pre-transformed documents`);
+    console.log(`[INGEST] Strategy: ${strategy}, Target: ${targetDb}, Source: ${source}`);
+    
+    try {
+        console.log(`[INGEST] Calling LLM service: ${LLM_SERVICE_URL}/api/ingestion/ingest`);
+        const response = await axios.post(
+            `${LLM_SERVICE_URL}/api/ingestion/ingest`,
+            {
+                collectionId: targetDb,
+                documents: documents,
+                strategy: strategy,
+            },
+            { timeout: 120000 } // 2 minute timeout for ingestion
+        );
+        
+        console.log(`[INGEST] LLM service response: success=${response.data?.success}`);
+        return response.data;
+    } catch (error) {
+        if (error.code === 'ECONNREFUSED') {
+            console.error(`[INGEST] LLM service unavailable at ${LLM_SERVICE_URL}`);
+            // Fall back to mock for development
+            console.log(`[INGEST] Falling back to mock response`);
+            return {
+                success: true,
+                collectionId: targetDb,
+                strategy,
+                documentCount: documents.length,
+                message: `[MOCK] Successfully ingested ${documents.length} documents to ${targetDb} (LLM service unavailable)`,
+            };
+        }
 
-    // For now, return mock success
-    console.log(`[MOCK] Mock ingestion to ${targetDb} with strategy ${strategy} (LLM service not implemented)`);
+        if (error.response) {
+            console.error(`[INGEST] LLM service error: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
+            throw new Error(error.response.data?.detail || error.response.data?.error || 'LLM service ingestion failed');
+        }
 
-    return {
-        success: true,
-        targetDb,
-        strategy,
-        documentCount: documentState.pages?.length || 0,
-        message: `[MOCK] Successfully ingested to ${targetDb}`,
-    };
+        console.error(`[INGEST] Ingestion error: ${error.message}`);
+        throw error;
+    }
 };
 
 // ============================================================================
@@ -319,6 +388,7 @@ const generateMockContent = (filename) => {
 module.exports = {
     // Configuration
     getConfig,
+    createCollection,
     // Proxy to LLM Service
     uploadForProcessing,
     ingestToVectorDb,

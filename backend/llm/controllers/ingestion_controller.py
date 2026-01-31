@@ -34,37 +34,15 @@ class IngestionController:
     
     async def get_collections(self) -> List[Dict[str, Any]]:
         """
-        Get all available ChromaDB collections from resources/chroma_db directory.
+        Get all available ChromaDB collections.
         
-        Scans the chroma_db directory for subdirectories (each is a collection).
-        Returns list of collection metadata.
+        Delegates to VectorStoreManager.list_collections().
         """
+        from models.vectorstore import vectorstore_manager
+        
         try:
-            collections = []
-            chroma_db_dir = Path(settings.CHROMA_DB_DIRECTORY)
-            
-            if not chroma_db_dir.exists():
-                logger.warning(f"ChromaDB directory not found: {chroma_db_dir}")
-                return collections
-            
-            # Scan for subdirectories - each is a ChromaDB collection
-            for item in sorted(chroma_db_dir.iterdir()):
-                if item.is_dir():
-                    collection_id = item.name
-                    # Create human-readable label from directory name
-                    label = collection_id.replace("_", " ").replace("chroma db", "ChromaDB").title()
-                    
-                    collections.append({
-                        "id": collection_id,
-                        "label": label,
-                        "type": "chroma",
-                        "path": str(item),
-                        "isDefault": collection_id == "chroma_db_merged",
-                    })
-            
-            logger.info(f"Found {len(collections)} ChromaDB collections: {[c['id'] for c in collections]}")
+            collections = await vectorstore_manager.list_collections()
             return collections
-            
         except Exception as e:
             logger.error(f"Failed to get collections: {e}")
             raise
@@ -76,21 +54,17 @@ class IngestionController:
     ) -> Dict[str, Any]:
         """
         Create a new ChromaDB collection.
+        
+        Delegates to VectorStoreManager.create_collection().
         """
+        from models.vectorstore import vectorstore_manager
+        
         try:
-            # TODO: Implement actual ChromaDB collection creation
-            logger.info(f"[MOCK] Creating collection: {name}")
-            return {
-                "success": True,
-                "collection": {
-                    "id": name,
-                    "name": name,
-                    "description": description,
-                    "type": "chroma",
-                    "createdAt": "2026-01-31T12:00:00.000Z",
-                },
-                "message": f"Collection '{name}' created successfully",
-            }
+            result = await vectorstore_manager.create_collection(
+                collection_id=name,
+                description=description
+            )
+            return result
         except Exception as e:
             logger.error(f"Failed to create collection: {e}")
             raise
@@ -236,20 +210,52 @@ class IngestionController:
     ) -> Dict[str, Any]:
         """
         Ingest documents into a ChromaDB collection.
-        """
-        try:
-            # TODO: Implement actual vector embedding and storage
-            logger.info(f"[MOCK] Ingesting {len(documents)} documents to {collection_id}")
+        
+        Delegates to VectorStoreManager.ingest() which handles:
+        - Batch embedding with EmbeddingManager
+        - Collection management (create/get)
+        - ChromaDB storage
+        
+        Each document should have:
+        - id: unique document ID
+        - content: text to embed
+        - metadata: dict with source info (may include images with imageUrl)
+        
+        Args:
+            collection_id: ChromaDB collection ID (directory name)
+            documents: List of documents with id, content, metadata
+            strategy: Embedding strategy used (for logging)
             
-            return {
-                "success": True,
-                "collectionId": collection_id,
-                "strategy": strategy,
-                "documentCount": len(documents),
-                "message": f"Successfully ingested {len(documents)} documents to {collection_id}",
-            }
+        Returns:
+            Success response with ingestion stats
+        """
+        from models.vectorstore import vectorstore_manager
+        
+        try:
+            # Log document summary
+            total_images = sum(
+                len(doc.get('metadata', {}).get('images', []))
+                for doc in documents
+            )
+            if total_images > 0:
+                logger.info(f"[Ingest] Documents contain {total_images} images with URLs")
+            
+            # Delegate to VectorStoreManager
+            result = await vectorstore_manager.ingest(
+                collection_id=collection_id,
+                documents=documents,
+                strategy=strategy,
+                batch_size=32
+            )
+            
+            # Add image count to result
+            if total_images > 0:
+                result["totalImages"] = total_images
+            
+            return result
+            
         except Exception as e:
-            logger.error(f"Failed to ingest documents: {e}")
+            logger.error(f"[Ingest] Failed to ingest documents: {e}", exc_info=True)
             raise
     
     # =========================================================================

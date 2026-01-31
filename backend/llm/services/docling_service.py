@@ -520,11 +520,17 @@ class DoclingService:
         return None
     
     def _get_bbox(self, item: Dict[str, Any]) -> Optional[Dict[str, float]]:
-        """Extract bounding box from item's provenance."""
+        """Extract bounding box from item's provenance.
+        
+        Returns normalized bbox with 'y' representing position from TOP of page
+        (smaller y = higher on page) for consistent sorting.
+        """
         prov = item.get('prov', [])
         for p in prov:
             bbox = p.get('bbox', None)
             if bbox:
+                coord_origin = bbox.get('coord_origin', 'TOPLEFT') if isinstance(bbox, dict) else 'TOPLEFT'
+                
                 # Docling bbox format: [x0, y0, x1, y1] or {l, t, r, b}
                 if isinstance(bbox, list) and len(bbox) == 4:
                     return {
@@ -538,12 +544,28 @@ class DoclingService:
                     t = bbox.get('t', bbox.get('y', 0))
                     r = bbox.get('r', l)
                     b = bbox.get('b', t)
-                    return {
-                        'x': l,
-                        'y': t,
-                        'width': r - l,
-                        'height': b - t
-                    }
+                    
+                    # For BOTTOMLEFT coordinates, 't' is distance from bottom
+                    # We need to invert for top-to-bottom sorting
+                    # Use negative of 't' so that items higher on page sort first
+                    if coord_origin == 'BOTTOMLEFT':
+                        # Store original 't' as 'sort_y' (negated for correct sort order)
+                        # Higher 't' = higher on page = should come first
+                        return {
+                            'x': l,
+                            'y': -t,  # Negate for correct top-to-bottom sort
+                            'width': r - l,
+                            'height': abs(t - b),
+                            '_original_t': t,
+                            '_original_b': b
+                        }
+                    else:
+                        return {
+                            'x': l,
+                            'y': t,
+                            'width': r - l,
+                            'height': b - t
+                        }
         return None
     
     def _transform_text_item(self, item: Dict[str, Any], idx: int) -> Optional[Dict[str, Any]]:
@@ -880,10 +902,16 @@ class DoclingService:
         return None
     
     def _sort_items_by_position(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Sort items by their position (top-to-bottom, left-to-right)."""
+        """Sort items by their position (top-to-bottom, left-to-right).
+        
+        Items without bbox are placed at the end to avoid displacing positioned items.
+        """
         def sort_key(item):
             bbox = item.get('bbox', {})
-            y = bbox.get('y', 0)
+            if not bbox:
+                # Items without bbox go to the end (use large values)
+                return (float('inf'), float('inf'))
+            y = bbox.get('y', float('inf'))
             x = bbox.get('x', 0)
             return (y, x)
         

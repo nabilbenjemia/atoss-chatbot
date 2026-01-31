@@ -93,7 +93,7 @@ export default function ImageItem({
                         {/* Classification dropdown */}
                         {showClassDropdown && availableClasses.length > 0 && (
                             <div className="absolute top-full right-0 mt-1 bg-white border border-tum-grey-7 
-                                shadow-lg py-1 z-10 min-w-[120px]">
+                                shadow-lg py-1 z-10 min-w-[120px] max-h-80 overflow-y-auto">
                                 {availableClasses.map((cls) => (
                                     <button
                                         key={cls}

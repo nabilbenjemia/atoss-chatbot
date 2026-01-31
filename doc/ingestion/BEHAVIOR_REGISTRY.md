@@ -550,6 +550,66 @@ LLM Service owns the config:
 
 ---
 
+## ChromaDB Architecture
+
+### Current Implementation: Directory-per-Collection
+
+The current implementation creates **a new directory per collection** (e.g., `chroma_db_merged`, `chroma_db_snowflake`), but uses the **same collection name** (`tum_docs` from `CHROMA_COLLECTION_NAME`) inside each directory.
+
+**Directory Structure:**
+```
+resources/chroma_db/                         # CHROMA_DB_DIRECTORY (parent)
+├── chroma_db_merged/                        # Collection directory (targetDb from UI)
+│   └── [ChromaDB internal files]
+│       └── collection: "tum_docs"           # CHROMA_COLLECTION_NAME
+│
+├── chroma_db_snowflake/                     # Another collection directory
+│   └── [ChromaDB internal files]
+│       └── collection: "tum_docs"           # Same collection name
+│
+└── my_new_collection/                       # Created by user via UI
+    └── [ChromaDB internal files]
+        └── collection: "tum_docs"           # Same collection name
+```
+
+**Configuration Settings:**
+```python
+# backend/llm/config/settings.py
+CHROMA_DB_DIRECTORY: str = "./resources/chroma_db"           # Parent directory
+CHROMA_PERSIST_DIRECTORY: str = "./resources/chroma_db/chroma_db_merged"  # Default
+CHROMA_COLLECTION_NAME: str = "tum_docs"                     # Used in ALL directories
+```
+
+**Data Flow:**
+```
+Frontend: targetDb = "chroma_db_snowflake"
+    ↓
+LLM Service: collection_path = CHROMA_DB_DIRECTORY.parent / targetDb
+    ↓
+ChromaDB: client = PersistentClient(path=collection_path)
+    ↓
+ChromaDB: collection = client.get_or_create_collection(name=CHROMA_COLLECTION_NAME)
+```
+
+**Rationale:**
+- Each "collection" in the UI is isolated in its own directory
+- Allows independent backup/deletion of collections
+- Simplifies collection discovery (scan directories)
+- `CHROMA_COLLECTION_NAME` acts as a constant internal name
+
+**Alternative Approach (Not Implemented):**
+Single ChromaDB directory with multiple collection names:
+```
+resources/chroma_db/                         # Single ChromaDB instance
+└── [ChromaDB internal files]
+    ├── collection: "lectures"
+    ├── collection: "manuals"
+    └── collection: "faqs"
+```
+This would be more memory-efficient but harder to manage independently.
+
+---
+
 ## Version History
 
 | Version | Date | Changes |
@@ -558,3 +618,4 @@ LLM Service owns the config:
 | 1.1 | 2026-01-31 | Added BHV-009: Duplicate Ingestion Prevention |
 | 1.2 | 2026-01-31 | Added Helper Function Types and Strategy Types documentation |
 | 1.3 | 2026-01-31 | Added Backend Proxy Architecture documentation |
+| 1.4 | 2026-01-31 | Added ChromaDB Architecture documentation |

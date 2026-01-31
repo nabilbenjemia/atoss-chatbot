@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'react-toastify';
+import { createCollection } from '../../../services/ingestionApi';
 
 /**
  * Icons mapped by strategy ID
@@ -63,6 +64,7 @@ export default function IngestionModal({
     isOpen,
     onClose,
     onShowPreview, // Callback to show preview in main content area
+    onCollectionCreated, // Callback to refresh collections list after creation
     backendConfig,
     isIngesting = false,
     progress = 0,
@@ -119,20 +121,27 @@ export default function IngestionModal({
         setIsCreatingDb(true);
 
         try {
-            // Mock backend call
-            await new Promise(resolve => setTimeout(resolve, 800));
+            const result = await createCollection(newDbName.trim());
 
-            // Success
-            toast.success(`Collection "${newDbName}" created successfully`);
+            if (result.success) {
+                toast.success(`Collection "${result.collection?.name || newDbName}" created successfully`);
 
-            // Set as selected and exit edit mode
-            setSelectedDb(newDbName);
-            setIsCreatingNewDb(false);
+                // Set as selected and exit edit mode
+                const createdName = result.collection?.name || newDbName.trim();
+                setSelectedDb(createdName);
+                setIsCreatingNewDb(false);
+                setNewDbName('');
 
-            // Normally we'd refresh the list here, but for now we'll just proceed with the name
+                // Refresh collections list to include the new collection
+                if (onCollectionCreated) {
+                    await onCollectionCreated();
+                }
+            } else {
+                toast.error(result.error || 'Failed to create collection');
+            }
         } catch (e) {
-            console.error(e);
-            toast.error("Failed to create collection");
+            console.error('Create collection error:', e);
+            toast.error(e.message || 'Failed to create collection');
         } finally {
             setIsCreatingDb(false);
         }

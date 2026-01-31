@@ -197,6 +197,36 @@ export function deserializeHistory(dataArray) {
     return dataArray.map(deserializeCommand).filter(Boolean);
 }
 
+/**
+ * Get a human-readable description of a command
+ * @param {Object} command - Command object
+ * @returns {string} - Human-readable description
+ */
+export function getCommandDescription(command) {
+    if (!command || !command.type) return 'Unknown action';
+
+    switch (command.type) {
+        case 'EDIT_ITEM':
+            return 'Edit text';
+        case 'DELETE_ITEM':
+            return 'Delete item';
+        case 'RESTORE_ITEM':
+            return 'Restore item';
+        case 'CHANGE_CLASS':
+            return `Change class to "${command.newClass}"`;
+        case 'BATCH_DELETE':
+            return `Delete ${command.itemIds?.length || 0} items`;
+        case 'RENAME_DOCUMENT':
+            return 'Rename document';
+        case 'BATCH_UPDATE':
+            return `Update ${command.changes?.length || 0} items`;
+        case 'BATCH_INSERT_AFTER':
+            return `Insert ${command.insertions?.length || 0} items`;
+        default:
+            return command.type.replace(/_/g, ' ').toLowerCase();
+    }
+}
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -322,9 +352,10 @@ const UNDO = 'UNDO';
 const REDO = 'REDO';
 const RESET = 'RESET';
 const RESTORE = 'RESTORE';
+const CLEAR_LAST_ACTION = 'CLEAR_LAST_ACTION';
 
 const commandReducer = (state, action) => {
-    const { past, present, future } = state;
+    const { past, present, future, lastAction } = state;
     const maxHistory = INGESTION_CONFIG.history.maxUndoSteps;
 
     switch (action.type) {
@@ -342,6 +373,7 @@ const commandReducer = (state, action) => {
                 past: newPast,
                 present: newPresent,
                 future: [], // Clear redo stack on new action
+                lastAction: null, // Clear last action on new execute
             };
         }
 
@@ -355,6 +387,7 @@ const commandReducer = (state, action) => {
                 past: past.slice(0, -1),
                 present: newPresent,
                 future: [command, ...future],
+                lastAction: { type: 'undo', command },
             };
         }
 
@@ -368,6 +401,7 @@ const commandReducer = (state, action) => {
                 past: [...past, command],
                 present: newPresent,
                 future: future.slice(1),
+                lastAction: { type: 'redo', command },
             };
         }
 
@@ -376,6 +410,7 @@ const commandReducer = (state, action) => {
                 past: [],
                 present: action.payload,
                 future: [],
+                lastAction: null,
             };
         }
 
@@ -385,6 +420,14 @@ const commandReducer = (state, action) => {
                 past: action.payload.past || [],
                 present: action.payload.present,
                 future: action.payload.future || [],
+                lastAction: null,
+            };
+        }
+
+        case CLEAR_LAST_ACTION: {
+            return {
+                ...state,
+                lastAction: null,
             };
         }
 
@@ -408,6 +451,7 @@ const useCommandHistory = (initialState) => {
         past: [],
         present: initialState,
         future: [],
+        lastAction: null,
     });
 
     /**
@@ -419,6 +463,7 @@ const useCommandHistory = (initialState) => {
 
     /**
      * Undo the last command
+     * @returns {Object|null} - The command that was undone, or null
      */
     const undo = useCallback(() => {
         dispatch({ type: UNDO });
@@ -426,9 +471,17 @@ const useCommandHistory = (initialState) => {
 
     /**
      * Redo the last undone command
+     * @returns {Object|null} - The command that was redone, or null
      */
     const redo = useCallback(() => {
         dispatch({ type: REDO });
+    }, []);
+
+    /**
+     * Clear the last action notification
+     */
+    const clearLastAction = useCallback(() => {
+        dispatch({ type: CLEAR_LAST_ACTION });
     }, []);
 
     /**
@@ -472,6 +525,7 @@ const useCommandHistory = (initialState) => {
     const canRedo = state.future.length > 0;
     const undoCount = state.past.length;
     const redoCount = state.future.length;
+    const lastAction = state.lastAction;
 
     // Memoize the return object to prevent unnecessary re-renders
     return useMemo(() => ({
@@ -486,7 +540,9 @@ const useCommandHistory = (initialState) => {
         canRedo,
         undoCount,
         redoCount,
-    }), [state.present, execute, undo, redo, reset, restore, getFullState, canUndo, canRedo, undoCount, redoCount]);
+        lastAction,
+        clearLastAction,
+    }), [state.present, execute, undo, redo, reset, restore, getFullState, canUndo, canRedo, undoCount, redoCount, lastAction, clearLastAction]);
 };
 
 export default useCommandHistory;

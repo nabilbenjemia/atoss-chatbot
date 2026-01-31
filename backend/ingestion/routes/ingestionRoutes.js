@@ -33,6 +33,9 @@ const upload = multer({
 // GET /api/ingestion/config - Get backend configuration
 router.get('/config', ingestionController.getConfig);
 
+// POST /api/ingestion/collection - Create new collection
+router.post('/collection', ingestionController.createCollection);
+
 // ============================================================================
 // DOCUMENT PROCESSING
 // ============================================================================

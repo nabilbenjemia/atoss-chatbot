@@ -48,6 +48,20 @@ export const getBackendConfig = async () => {
     return response.data;
 };
 
+/**
+ * Create a new ChromaDB collection
+ * @param {string} name - Collection name (will be used as directory name)
+ * @param {string} description - Optional description
+ * @returns {Promise<{success: boolean, collection: Object, message: string}>}
+ */
+export const createCollection = async (name, description = null) => {
+    const response = await ingestionApi.post('/api/ingestion/collection', {
+        name,
+        description,
+    });
+    return response.data;
+};
+
 // ============================================================================
 // DOCUMENT PROCESSING
 // ============================================================================
@@ -237,16 +251,39 @@ export const previewEmbeddings = async (strategy, documentState) => {
 
 /**
  * Ingest document content into a vector database
+ * 
+ * Accepts either pre-transformed documents array (from preview) or raw documentState.
+ * If documentState is provided, it will be transformed to documents format.
+ * 
  * @param {string} targetDb - The target database ID
- * @param {Object} documentState - The document state to ingest
+ * @param {Array|Object} documentsOrState - Either documents array from preview, or documentState
  * @param {string} strategy - The ingestion strategy
+ * @param {Object} options - Additional options
+ * @param {string} options.source - Source filename for metadata
  * @returns {Promise<{success: boolean, ...}>}
  */
-export const startIngestion = async (targetDb, documentState, strategy = 'embed_per_page') => {
+export const startIngestion = async (targetDb, documentsOrState, strategy = 'embed_per_page', options = {}) => {
+    let documents;
+    let source = options.source || 'unknown';
+    
+    // Check if this is already a documents array (from preview) or raw documentState
+    if (Array.isArray(documentsOrState)) {
+        // Already transformed documents array
+        documents = documentsOrState;
+    } else if (documentsOrState?.pages) {
+        // Raw documentState - transform it locally
+        const preview = generateLocalPreview(strategy, documentsOrState);
+        documents = preview.documents;
+        source = documentsOrState.filename || source;
+    } else {
+        throw new Error('Invalid input: expected documents array or documentState with pages');
+    }
+    
     const response = await ingestionApi.post('/api/ingestion/ingest', {
         targetDb,
-        documentState,
+        documents,
         strategy,
+        source,
     });
     return response.data;
 };

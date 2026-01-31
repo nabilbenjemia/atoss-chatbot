@@ -32,7 +32,7 @@ import {
 
 // External hooks
 import useBackendConfig from '../hooks/useBackendConfig';
-import useCommandHistory, { Commands, serializeCommand } from '../hooks/useCommandHistory';
+import useCommandHistory, { Commands, serializeCommand, getCommandDescription } from '../hooks/useCommandHistory';
 
 // Utility functions
 import { mockCurrentUser, shouldUseMockAuth } from '../mocks/ingestionMocks';
@@ -88,7 +88,7 @@ export default function IngestionPage() {
  */
 function IngestionPageLayout() {
     const navigate = useNavigate();
-    const { config: backendConfig, loading: configLoading } = useBackendConfig();
+    const { config: backendConfig, loading: configLoading, refetch: refetchConfig } = useBackendConfig();
 
     // Local UI state for title editing
     const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -135,7 +135,27 @@ function IngestionPageLayout() {
         getFullState: getCommandFullState,
         canUndo,
         canRedo,
+        lastAction,
+        clearLastAction,
     } = useCommandHistory(null);
+
+    // Show toast notification when undo/redo happens
+    useEffect(() => {
+        if (lastAction) {
+            const actionType = lastAction.type === 'undo' ? 'Undo' : 'Redo';
+            const description = getCommandDescription(lastAction.command);
+            toast.info(`${actionType}: ${description}`, {
+                position: 'bottom-center',
+                autoClose: 2000,
+                hideProgressBar: true,
+                closeOnClick: true,
+                pauseOnHover: false,
+                draggable: false,
+                icon: lastAction.type === 'undo' ? '↩️' : '↪️',
+            });
+            clearLastAction();
+        }
+    }, [lastAction, clearLastAction]);
 
     // Auto-save document content and command history
     // Only save when the current command history belongs to the selected document
@@ -524,10 +544,12 @@ function IngestionPageLayout() {
         actions.startIngestion();
 
         try {
+            // Send pre-transformed documents from preview (not raw documentState)
             const result = await startIngestion(
                 previewConfig.targetDb,
-                commandDocumentState,
-                previewConfig.strategy
+                embeddingPreview.documents,
+                previewConfig.strategy,
+                { source: commandDocumentState.filename }
             );
 
             if (result.success) {
@@ -608,23 +630,27 @@ function IngestionPageLayout() {
             actions.updateIngestionProgress(Math.round(((i) / documentIds.length) * 100));
 
             try {
+                // Generate preview first to get transformed documents
+                let filePreview = null;
+                try {
+                    const previewResult = await previewEmbeddings(previewConfig.strategy, content);
+                    if (previewResult.success) {
+                        filePreview = previewResult.preview;
+                    }
+                } catch (previewError) {
+                    console.warn(`Could not generate preview for ${docId}:`, previewError);
+                }
+
+                // Send pre-transformed documents from preview
+                const documentsToIngest = filePreview?.documents || content;
                 const result = await startIngestion(
                     previewConfig.targetDb,
-                    content,
-                    previewConfig.strategy
+                    documentsToIngest,
+                    previewConfig.strategy,
+                    { source: content.filename }
                 );
 
                 if (result.success) {
-                    // Generate preview for this file to store with ingested entry
-                    let filePreview = null;
-                    try {
-                        const previewResult = await previewEmbeddings(previewConfig.strategy, content);
-                        if (previewResult.success) {
-                            filePreview = previewResult.preview;
-                        }
-                    } catch (previewError) {
-                        console.warn(`Could not generate preview for ${docId}:`, previewError);
-                    }
 
                     // Create ingested entry in cache with ingestionId
                     const ingestedEntry = createIngestedFile(
@@ -947,6 +973,7 @@ function IngestionPageLayout() {
                 isOpen={activeModal === MODAL_TYPES.INGEST}
                 onClose={handleCloseModal}
                 onShowPreview={handleShowPreview}
+                onCollectionCreated={refetchConfig}
                 backendConfig={backendConfig}
                 isIngesting={isIngesting}
                 progress={ingestionProgress}

@@ -180,6 +180,10 @@ function EmbeddingCard({ embedding, embeddingNumber }) {
                                 if (typeof value === 'object' && value !== null) {
                                     return null;
                                 }
+                                // Skip undefined, null, or empty values
+                                if (value === undefined || value === null || value === '') {
+                                    return null;
+                                }
                                 return (
                                     <div key={key} className="flex flex-col">
                                         <span className="text-tum-grey-4 text-xs">{key}</span>

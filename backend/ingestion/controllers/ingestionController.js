@@ -33,6 +33,45 @@ const getConfig = async (req, res) => {
     }
 };
 
+/**
+ * POST /api/ingestion/collection
+ * Create a new ChromaDB collection
+ * 
+ * Proxies to LLM service /api/ingestion/collection.
+ */
+const createCollection = async (req, res) => {
+    try {
+        const { name, description } = req.body;
+
+        if (!name || typeof name !== 'string' || !name.trim()) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Collection name is required' 
+            });
+        }
+
+        // Validate name format (alphanumeric, underscores, hyphens only)
+        const cleanName = name.trim().toLowerCase().replace(/\s+/g, '_');
+        if (!/^[a-z0-9_-]+$/.test(cleanName)) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Collection name can only contain letters, numbers, underscores, and hyphens' 
+            });
+        }
+
+        // Create collection via ingestion service (proxies to LLM service)
+        const result = await ingestionService.createCollection(cleanName, description);
+        res.json(result);
+    } catch (error) {
+        console.error('Create collection error:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to create collection', 
+            details: error.message 
+        });
+    }
+};
+
 // ============================================================================
 // DOCUMENT UPLOAD & PROCESSING (Proxy to LLM Service)
 // ============================================================================
@@ -166,22 +205,22 @@ const previewEmbeddings = async (req, res) => {
  * Ingest content into vector database
  * 
  * Proxies to LLM service /api/ingestion/ingest.
- * Receives pre-processed document state from frontend.
+ * Receives pre-transformed documents array from frontend.
  */
 const startIngestion = async (req, res) => {
     try {
-        const { targetDb, documentState, strategy = 'embed_per_page' } = req.body;
+        const { targetDb, documents, strategy = 'embed_per_page', source = 'unknown' } = req.body;
 
         if (!targetDb) {
             return res.status(400).json({ error: 'targetDb is required' });
         }
 
-        if (!documentState) {
-            return res.status(400).json({ error: 'documentState is required' });
+        if (!documents || !Array.isArray(documents)) {
+            return res.status(400).json({ error: 'documents array is required' });
         }
 
         // Ingest to vector database via LLM service
-        const result = await ingestionService.ingestToVectorDb(targetDb, documentState, strategy);
+        const result = await ingestionService.ingestToVectorDb(targetDb, documents, strategy, source);
 
         res.status(200).json({
             success: true,
@@ -254,6 +293,7 @@ const generateImageDescriptions = async (req, res) => {
 
 module.exports = {
     getConfig,
+    createCollection,
     uploadDocument,
     previewEmbeddings,
     startIngestion,
