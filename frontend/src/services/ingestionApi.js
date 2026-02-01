@@ -101,6 +101,21 @@ export const uploadDocument = async (file, config = {}) => {
 const LOCAL_STRATEGIES = ['embed_per_page', 'chunked_fixed', 'chunked_document'];
 
 /**
+ * Generate a simple hash from a string for unique ID generation
+ * @param {string} str - The string to hash
+ * @returns {string} - A short hash string
+ */
+const simpleHash = (str) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash).toString(36).substring(0, 8);
+};
+
+/**
  * Generate embedding preview locally (for local strategies)
  * This is the frontend implementation of preview generation.
  * 
@@ -110,6 +125,9 @@ const LOCAL_STRATEGIES = ['embed_per_page', 'chunked_fixed', 'chunked_document']
  */
 const generateLocalPreview = (strategy, documentState) => {
     const documents = [];
+    const filename = documentState.filename || 'unknown';
+    // Create a unique prefix from filename to avoid ID collisions across files
+    const fileHash = simpleHash(filename + Date.now().toString());
 
     if (strategy === 'embed_per_page') {
         // Page-based embedding: one embedding per page
@@ -159,11 +177,12 @@ const generateLocalPreview = (strategy, documentState) => {
 
             if (fullContent.trim() || images.length > 0) {
                 documents.push({
-                    id: `page_${pageNum}`,
+                    // Include fileHash in ID to make it unique across different files
+                    id: `${fileHash}_page_${pageNum}`,
                     content: fullContent,
                     metadata: {
                         page_num: pageNum,
-                        source: documentState.filename || 'unknown',
+                        source: filename,
                         document_type: 'pdf',
                         image_count: images.length,
                         images: images.length > 0 ? images : undefined,
@@ -193,11 +212,12 @@ const generateLocalPreview = (strategy, documentState) => {
             const chunk = allContent.slice(position, end);
 
             documents.push({
-                id: `chunk_${chunkIndex}`,
+                // Include fileHash in ID to make it unique across different files
+                id: `${fileHash}_chunk_${chunkIndex}`,
                 content: chunk,
                 metadata: {
                     chunk_index: chunkIndex,
-                    source: documentState.filename || 'unknown',
+                    source: filename,
                     document_type: 'pdf',
                     char_count: chunk.length,
                     word_count: chunk.split(/\s+/).filter(Boolean).length,
@@ -309,7 +329,7 @@ export const runBackendHelper = async (helperId, content, params = {}) => {
 };
 
 /**
- * Generate AI descriptions for images
+ * Generate AI descriptions for images (batch - waits for all)
  * Sends document ID and image data to backend for AI processing
  * @param {string} documentId - The document ID
  * @param {Array} images - Array of { id, imageUrl, classification, pageNumber }
@@ -323,6 +343,98 @@ export const generateImageDescriptions = async (documentId, images) => {
     return response.data;
 };
 
+/**
+ * Stream AI descriptions for images (SSE - real-time updates)
+ * Each description is received immediately when generated
+ * 
+ * @param {string} documentId - The document ID
+ * @param {Array} images - Array of { id, imageUrl, classification, pageNumber }
+ * @param {Object} callbacks - Event handlers
+ * @param {Function} callbacks.onStart - Called when streaming starts: (total, documentId) => void
+ * @param {Function} callbacks.onDescription - Called for each description: (imageId, classification, description) => void
+ * @param {Function} callbacks.onError - Called on error: (error, imageId?) => void
+ * @param {Function} callbacks.onDone - Called when complete: (success, total) => void
+ * @returns {Promise<void>}
+ */
+export const streamImageDescriptions = async (documentId, images, callbacks = {}) => {
+    const { onStart, onDescription, onError, onDone } = callbacks;
+    const baseUrl = import.meta.env.VITE_INGESTION_URL || 'http://localhost:4005';
+
+    return new Promise((resolve, reject) => {
+        // Use fetch with POST to get SSE stream
+        fetch(`${baseUrl}/api/ingestion/helper/image-descriptions/stream`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ documentId, images }),
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                const processText = (text) => {
+                    buffer += text;
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+
+                                switch (data.type) {
+                                    case 'start':
+                                        onStart?.(data.total, data.documentId);
+                                        break;
+                                    case 'description':
+                                        onDescription?.(data.imageId, data.classification, data.description);
+                                        break;
+                                    case 'error':
+                                        onError?.(data.error, data.imageId);
+                                        break;
+                                    case 'done':
+                                        onDone?.(data.success, data.total);
+                                        resolve();
+                                        return;
+                                }
+                            } catch (e) {
+                                console.error('[streamImageDescriptions] Parse error:', e);
+                            }
+                        }
+                    }
+                };
+
+                const pump = () => {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            // Process any remaining buffer
+                            if (buffer) processText('');
+                            resolve();
+                            return;
+                        }
+                        processText(decoder.decode(value, { stream: true }));
+                        pump();
+                    }).catch(err => {
+                        onError?.(err.message);
+                        reject(err);
+                    });
+                };
+
+                pump();
+            })
+            .catch(err => {
+                onError?.(err.message);
+                reject(err);
+            });
+    });
+};
+
 // Export all functions as named exports
 export default {
     getBackendConfig,
@@ -331,4 +443,5 @@ export default {
     startIngestion,
     runBackendHelper,
     generateImageDescriptions,
+    streamImageDescriptions,
 };

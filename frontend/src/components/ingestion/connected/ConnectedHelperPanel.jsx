@@ -18,7 +18,7 @@ import {
     DOC_STATUS,
 } from '../../../context/ingestion';
 import useBackendConfig from '../../../hooks/useBackendConfig';
-import { generateImageDescriptions } from '../../../services/ingestionApi';
+import { streamImageDescriptions } from '../../../services/ingestionApi';
 import { Commands } from '../../../hooks/useCommandHistory';
 
 export default function ConnectedHelperPanel({ commandState, executeCommand }) {
@@ -117,9 +117,6 @@ export default function ConnectedHelperPanel({ commandState, executeCommand }) {
 
                     for (const page of documentState.pages) {
                         for (const item of page.items) {
-                            // Debug: log each item type
-                            console.log(`[AI Image Helper] Page ${page.pageNumber}, Item: ${item.id}, Type: ${item.type}, Deleted: ${item.deleted}`);
-
                             if ((item.type === 'image' || item.type === 'picture') && !item.deleted) {
                                 images.push({
                                     id: item.id,
@@ -131,40 +128,63 @@ export default function ConnectedHelperPanel({ commandState, executeCommand }) {
                         }
                     }
 
-                    console.log(`[AI Image Helper] Found ${images.length} images:`, images.map(i => ({ id: i.id, classification: i.classification })));
+                    console.log(`[AI Image Helper] Found ${images.length} images:`, images);
 
-                    if (images.length === 0) {
-                        message = 'No images found in document. Make sure the document contains image items.';
+                    // Filter out images without URLs
+                    const imagesWithUrls = images.filter(i => i.imageUrl);
+                    if (imagesWithUrls.length < images.length) {
+                        console.warn(`[AI Image Helper] ${images.length - imagesWithUrls.length} images have no imageUrl`);
+                    }
+
+                    if (imagesWithUrls.length === 0) {
+                        message = 'No images with URLs found in document. Images may not have been processed correctly.';
                         break;
                     }
 
-                    // Call backend to generate descriptions
-                    const result = await generateImageDescriptions(
+                    // Stream descriptions - each one updates UI immediately
+                    let successCount = 0;
+                    let totalCount = imagesWithUrls.length;
+
+                    await streamImageDescriptions(
                         documentState.documentId,
-                        images
+                        imagesWithUrls,
+                        {
+                            onStart: (total, docId) => {
+                                console.log(`[AI Image Helper] Started streaming ${total} images for ${docId}`);
+                                toast.info(`Generating descriptions for ${total} image(s)...`);
+                            },
+                            onDescription: (imageId, classification, description) => {
+                                console.log(`[AI Image Helper] Got description for ${imageId}`);
+                                successCount++;
+
+                                // Insert description immediately after the image
+                                const insertion = {
+                                    afterItemId: imageId,
+                                    newItem: {
+                                        id: `desc_${imageId}_${Date.now()}`,
+                                        type: 'text',
+                                        content: `**Image Description:** ${description}`,
+                                        deleted: false,
+                                    },
+                                };
+                                executeCommand(Commands.batchInsertAfter([insertion]));
+
+                                // Show progress toast
+                                toast.success(`✓ ${successCount}/${totalCount}: ${classification}`, { autoClose: 1500 });
+                            },
+                            onError: (error, imageId) => {
+                                console.error(`[AI Image Helper] Error for ${imageId || 'stream'}:`, error);
+                                if (imageId) {
+                                    toast.warning(`Failed for image: ${error}`, { autoClose: 3000 });
+                                }
+                            },
+                            onDone: (success, total) => {
+                                console.log(`[AI Image Helper] Done: ${success}/${total} successful`);
+                            },
+                        }
                     );
 
-                    if (result.success && result.descriptions) {
-                        // Create insertions: new text items after each image
-                        const insertions = result.descriptions
-                            .filter(d => d.description)
-                            .map(d => ({
-                                afterItemId: d.imageId,
-                                newItem: {
-                                    id: `desc_${d.imageId}_${Date.now()}`,
-                                    type: 'text',
-                                    content: `**Image Description:** ${d.description}`,
-                                    deleted: false,
-                                },
-                            }));
-
-                        if (insertions.length > 0) {
-                            executeCommand(Commands.batchInsertAfter(insertions));
-                        }
-                        message = result.message || `Generated descriptions for ${insertions.length} image(s)`;
-                    } else {
-                        message = result.error || 'Failed to generate descriptions';
-                    }
+                    message = `Generated descriptions for ${successCount}/${totalCount} image(s)`;
                     break;
                 }
 

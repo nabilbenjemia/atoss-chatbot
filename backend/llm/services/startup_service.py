@@ -10,6 +10,7 @@ from typing import Callable, List, Optional
 from models.embedding_model import embedding_manager
 from models.vectorstore import vectorstore_manager
 from models.llm_model import llm_manager
+from models.vllm_model import vllm_manager
 from models.reranker_model import reranker_manager
 from services.rag_chain_service import rag_chain_service
 from services.docling_service import DoclingService
@@ -39,9 +40,10 @@ class StartupService:
         """
         steps = [
             ("Loading Docling PDF converter...", self._load_docling, 10),
-            ("Loading embedding model...", self._load_embeddings, 30),
-            ("Loading vector store...", self._load_vectorstore, 50),
-            ("Loading LLM (Ollama)...", self._load_llm, 75),
+            ("Loading embedding model...", self._load_embeddings, 25),
+            ("Loading vector store...", self._load_vectorstore, 40),
+            ("Loading LLM (Ollama)...", self._load_llm, 55),
+            ("Loading Vision LLM (Ollama)...", self._load_vllm, 70),
             ("Loading reranker (optional)...", self._load_reranker, 85),
             ("Initializing RAG chain...", self._load_rag_chain, 100),
         ]
@@ -83,6 +85,10 @@ class StartupService:
         """Load the Ollama LLM"""
         await llm_manager.load()
 
+    async def _load_vllm(self):
+        """Load the Ollama Vision LLM for image understanding"""
+        await vllm_manager.load()
+
     async def _load_reranker(self):
         """Load the cross-encoder reranker (optional, can be disabled)"""
         await asyncio.to_thread(reranker_manager.load)
@@ -102,6 +108,7 @@ class StartupService:
                 "embedding_model": embedding_manager.is_loaded,
                 "vectorstore": vectorstore_manager.is_loaded,
                 "llm": llm_manager.is_loaded,
+                "vllm": vllm_manager.is_loaded,
                 "reranker": reranker_manager.is_loaded,
                 "rag_chain": rag_chain_service.is_ready,
             },
@@ -119,6 +126,7 @@ class StartupService:
 
         # Unload in reverse order
         reranker_manager.unload()
+        vllm_manager.unload()
         llm_manager.unload()
         vectorstore_manager.unload()
         embedding_manager.unload()

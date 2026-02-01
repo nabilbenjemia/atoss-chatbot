@@ -1,5 +1,4 @@
-"""
-Ingestion Routes for LLM Service
+"""Ingestion Routes for LLM Service
 
 Provides endpoints for:
 - Document conversion (Docling)
@@ -11,9 +10,10 @@ Provides endpoints for:
 import json
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, AsyncGenerator
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from controllers.ingestion_controller import ingestion_controller
@@ -35,7 +35,7 @@ with open(CONFIG_PATH) as f:
 class ImageItem(BaseModel):
     """Image item for AI description generation"""
     id: str
-    imageUrl: str
+    imageUrl: Optional[str] = None
     classification: Optional[str] = "unclassified"
     pageNumber: Optional[int] = None
 
@@ -251,6 +251,53 @@ async def ai_image_descriptions(request: ImageDescriptionsRequest):
     except Exception as e:
         logger.error(f"Failed to generate image descriptions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/helper/ai_image_descriptions/stream")
+async def ai_image_descriptions_stream(request: ImageDescriptionsRequest):
+    """
+    Stream AI descriptions for images using SSE.
+    
+    Each description is sent immediately when generated, allowing
+    the frontend to update the UI progressively.
+    
+    SSE Events:
+    - data: {"type": "start", "total": n} - Start of processing
+    - data: {"type": "description", "imageId": ..., "classification": ..., "description": ...}
+    - data: {"type": "error", "imageId": ..., "error": ...} - Error for specific image
+    - data: {"type": "done", "success": n, "total": n} - End of processing
+    """
+    async def generate_stream() -> AsyncGenerator[str, None]:
+        images = [img.model_dump() for img in request.images]
+        total = len(images)
+        success_count = 0
+        
+        # Send start event
+        yield f"data: {json.dumps({'type': 'start', 'total': total, 'documentId': request.documentId})}\n\n"
+        
+        # Process each image and stream result
+        async for result in ingestion_controller.generate_image_descriptions_stream(
+            document_id=request.documentId,
+            images=images
+        ):
+            if result.get('error'):
+                yield f"data: {json.dumps({'type': 'error', 'imageId': result['imageId'], 'error': result['error']})}\n\n"
+            else:
+                success_count += 1
+                yield f"data: {json.dumps({'type': 'description', 'imageId': result['imageId'], 'classification': result.get('classification', 'unclassified'), 'description': result['description']})}\n\n"
+        
+        # Send done event
+        yield f"data: {json.dumps({'type': 'done', 'success': success_count, 'total': total})}\n\n"
+    
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 @router.post("/helper/{helper_id}")

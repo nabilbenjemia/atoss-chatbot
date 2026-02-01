@@ -291,6 +291,42 @@ const generateImageDescriptions = async (req, res) => {
     }
 };
 
+/**
+ * POST /api/ingestion/helper/image-descriptions/stream
+ * Stream AI descriptions for images via SSE
+ * 
+ * Each description is sent immediately when generated.
+ * Frontend receives events and can update UI progressively.
+ */
+const streamImageDescriptions = async (req, res) => {
+    try {
+        const { documentId, images } = req.body;
+
+        if (!documentId) {
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.write(`data: ${JSON.stringify({ type: 'error', error: 'documentId is required' })}\n\n`);
+            return res.end();
+        }
+
+        if (!images || !Array.isArray(images) || images.length === 0) {
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.write(`data: ${JSON.stringify({ type: 'error', error: 'images array is required' })}\n\n`);
+            return res.end();
+        }
+
+        // Stream descriptions via content viewer service
+        await contentViewerService.streamImageDescriptions(documentId, images, res);
+    } catch (error) {
+        console.error('Image descriptions stream error:', error);
+        // Try to send error via SSE if headers not sent
+        if (!res.headersSent) {
+            res.setHeader('Content-Type', 'text/event-stream');
+        }
+        res.write(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`);
+        res.end();
+    }
+};
+
 module.exports = {
     getConfig,
     createCollection,
@@ -299,4 +335,5 @@ module.exports = {
     startIngestion,
     runHelper,
     generateImageDescriptions,
+    streamImageDescriptions,
 };

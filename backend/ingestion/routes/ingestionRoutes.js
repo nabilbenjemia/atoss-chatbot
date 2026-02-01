@@ -63,4 +63,7 @@ router.post('/helper', ingestionController.runHelper);
 // POST /api/ingestion/helper/image-descriptions - Generate AI descriptions for images
 router.post('/helper/image-descriptions', ingestionController.generateImageDescriptions);
 
+// POST /api/ingestion/helper/image-descriptions/stream - Stream AI descriptions (SSE)
+router.post('/helper/image-descriptions/stream', ingestionController.streamImageDescriptions);
+
 module.exports = router;

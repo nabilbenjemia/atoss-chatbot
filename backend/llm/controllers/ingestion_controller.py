@@ -269,33 +269,197 @@ class IngestionController:
     ) -> Dict[str, Any]:
         """
         Generate AI descriptions for images using vision model.
+        
+        Uses VisionLLMManager to generate descriptions for each image.
+        Falls back to mock descriptions if vision model is unavailable.
         """
+        from models.vllm_model import vllm_manager
+        
         try:
-            # TODO: Implement actual vision model inference
-            logger.info(f"[MOCK] Generating descriptions for {len(images)} images")
+            logger.info(f"Generating descriptions for {len(images)} images in document {document_id}")
             
-            descriptions = []
+            # Try to load vision model if not already loaded
+            if not vllm_manager.is_loaded:
+                try:
+                    await vllm_manager.load()
+                except Exception as e:
+                    logger.warning(f"Vision model not available, using mock: {e}")
+                    return self._generate_mock_descriptions(images)
+            
+            # Prepare images for batch processing
+            batch_images = []
+            skipped_count = 0
             for img in images:
                 classification = img.get("classification", "unclassified")
                 page_num = img.get("pageNumber", "unknown")
+                image_url = img.get("imageUrl", "")
                 
-                # Generate classification-aware mock description
-                desc = self._get_mock_description(classification, page_num)
+                # Skip images without URLs
+                if not image_url:
+                    logger.warning(f"Skipping image {img['id']}: no imageUrl provided")
+                    skipped_count += 1
+                    continue
                 
-                descriptions.append({
-                    "imageId": img["id"],
-                    "classification": classification,
-                    "description": desc,
+                # Build classification-aware prompt
+                prompt = self._get_description_prompt(classification, page_num)
+                
+                batch_images.append({
+                    "id": img["id"],
+                    "image": image_url,
+                    "prompt": prompt,
+                    "context": f"Document: {document_id}, Page: {page_num}, Classification: {classification}"
                 })
+            
+            if skipped_count > 0:
+                logger.info(f"Skipped {skipped_count} images without URLs")
+            
+            if not batch_images:
+                logger.warning("No images with URLs to process")
+                return {
+                    "success": True,
+                    "descriptions": [],
+                    "message": "No images with URLs to process",
+                }
+            
+            # Generate descriptions using vision model
+            results = await vllm_manager.describe_images_batch(
+                batch_images,
+                default_prompt="Beschreibe dieses Bild aus einem Schulungsdokument kurz und prägnant."
+            )
+            
+            # Format response
+            descriptions = []
+            for i, result in enumerate(results):
+                img = images[i]
+                descriptions.append({
+                    "imageId": result["id"],
+                    "classification": img.get("classification", "unclassified"),
+                    "description": result.get("description", ""),
+                    "error": result.get("error") if result.get("error") else None,
+                })
+            
+            # Count successes
+            success_count = sum(1 for d in descriptions if d["description"] and not d.get("error"))
             
             return {
                 "success": True,
                 "descriptions": descriptions,
-                "message": f"Generated descriptions for {len(descriptions)} image(s)",
+                "message": f"Generated descriptions for {success_count}/{len(descriptions)} image(s)",
             }
         except Exception as e:
             logger.error(f"Failed to generate image descriptions: {e}")
-            raise
+            # Fall back to mock on error
+            logger.info("Falling back to mock descriptions")
+            return self._generate_mock_descriptions(images)
+    
+    async def generate_image_descriptions_stream(
+        self,
+        document_id: str,
+        images: List[Dict]
+    ):
+        """
+        Stream AI descriptions for images using vision model.
+        
+        Yields each description as it's generated, enabling real-time UI updates.
+        
+        Yields:
+            Dict with 'imageId', 'classification', 'description' or 'error'
+        """
+        from models.vllm_model import vllm_manager
+        
+        logger.info(f"Streaming descriptions for {len(images)} images in document {document_id}")
+        
+        # Try to load vision model if not already loaded
+        if not vllm_manager.is_loaded:
+            try:
+                await vllm_manager.load()
+            except Exception as e:
+                logger.warning(f"Vision model not available: {e}")
+                # Yield mock descriptions
+                for img in images:
+                    classification = img.get("classification", "unclassified")
+                    page_num = img.get("pageNumber", "unknown")
+                    yield {
+                        "imageId": img["id"],
+                        "classification": classification,
+                        "description": self._get_mock_description(classification, page_num),
+                    }
+                return
+        
+        # Process each image and yield result immediately
+        for img in images:
+            classification = img.get("classification", "unclassified")
+            page_num = img.get("pageNumber", "unknown")
+            image_url = img.get("imageUrl", "")
+            
+            # Skip images without URLs
+            if not image_url:
+                logger.warning(f"Skipping image {img['id']}: no imageUrl provided")
+                yield {
+                    "imageId": img["id"],
+                    "classification": classification,
+                    "error": "No image URL provided",
+                }
+                continue
+            
+            # Build classification-aware prompt
+            prompt = self._get_description_prompt(classification, page_num)
+            
+            try:
+                description = await vllm_manager.describe_image(
+                    image=image_url,
+                    prompt=prompt,
+                    context=f"Document: {document_id}, Page: {page_num}, Classification: {classification}"
+                )
+                logger.info(f"Generated description for image {img['id']}")
+                yield {
+                    "imageId": img["id"],
+                    "classification": classification,
+                    "description": description,
+                }
+            except Exception as e:
+                logger.error(f"Failed to describe image {img['id']}: {e}")
+                yield {
+                    "imageId": img["id"],
+                    "classification": classification,
+                    "error": str(e),
+                }
+    
+    def _generate_mock_descriptions(self, images: List[Dict]) -> Dict[str, Any]:
+        """Generate mock descriptions when vision model is unavailable"""
+        descriptions = []
+        for img in images:
+            classification = img.get("classification", "unclassified")
+            page_num = img.get("pageNumber", "unknown")
+            desc = self._get_mock_description(classification, page_num)
+            descriptions.append({
+                "imageId": img["id"],
+                "classification": classification,
+                "description": desc,
+            })
+        return {
+            "success": True,
+            "descriptions": descriptions,
+            "message": f"Generated mock descriptions for {len(descriptions)} image(s) (vision model unavailable)",
+        }
+    
+    def _get_description_prompt(self, classification: str, page_num: Any) -> str:
+        """Get classification-aware prompt for the vision model"""
+        prompts = {
+            "logo": "Beschreibe dieses Logo kurz. Was ist zu sehen und welches Unternehmen könnte es sein?",
+            "icon": "Was zeigt dieses Icon? Beschreibe seine Bedeutung im Kontext einer Software-Anleitung.",
+            "bar_chart": "Beschreibe dieses Balkendiagramm. Welche Daten werden dargestellt?",
+            "line_chart": "Beschreibe dieses Liniendiagramm. Welche Trends sind erkennbar?",
+            "pie_chart": "Beschreibe dieses Kreisdiagramm. Welche Verteilung wird gezeigt?",
+            "flow_chart": "Beschreibe dieses Flussdiagramm. Welcher Prozess oder Arbeitsablauf wird dargestellt?",
+            "screenshot_from_computer": "Beschreibe diesen Screenshot einer Software-Oberfläche. Welche Elemente sind sichtbar und was kann der Benutzer hier tun?",
+            "screenshot_from_manual": "Beschreibe diesen Screenshot aus einer Anleitung. Welche Schritte oder Funktionen werden gezeigt?",
+            "photograph": "Beschreibe dieses Foto kurz.",
+            "table": "Beschreibe diese Tabelle. Welche Daten enthält sie?",
+            "diagram": "Beschreibe dieses Diagramm. Welche Struktur oder Beziehungen werden dargestellt?",
+        }
+        base_prompt = prompts.get(classification, "Beschreibe dieses Bild aus einem Schulungsdokument.")
+        return f"{base_prompt} Das Bild stammt von Seite {page_num}."
     
     def _get_mock_description(self, classification: str, page_num: Any) -> str:
         """Get mock description based on classification"""
@@ -313,7 +477,7 @@ class IngestionController:
             "diagram": "This is a diagram illustrating relationships or structures.",
         }
         base = prompts.get(classification, "This is a visual element from the document.")
-        return f"{base} Found on page {page_num}. [Mock description - replace with actual AI vision model output]"
+        return f"{base} Found on page {page_num}. [Mock - vision model unavailable]"
     
     async def run_helper(
         self,

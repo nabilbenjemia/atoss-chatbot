@@ -571,7 +571,8 @@
 - Button shows loading state briefly
 - All logo images are removed from view
 - Toast: "X logo(s) removed" or "No logos found"
-- Undo button enables (can undo all at once with Ctrl+Z)
+- **Single file loaded:** Undo button enables (can undo all at once with Ctrl+Z)
+- **Multiple files loaded:** A confirmation modal pops up asking which files to apply the helper to
 
 **Sequence Diagram:**
 
@@ -633,7 +634,8 @@
 **Expected Observations:**
 - Text items with empty/whitespace-only content are removed from view
 - Toast: "X empty item(s) removed" or "No empty items found"
-- Undo button enables (can restore all with Ctrl+Z)
+- **Single file loaded:** Undo button enables (can restore all with Ctrl+Z)
+- **Multiple files loaded:** A confirmation modal pops up asking which files to apply the helper to
 
 **Sequence Diagram:**
 Same as 6.1, but:
@@ -653,7 +655,8 @@ Same as 6.1, but:
 - Modal opens with text input
 - After confirm, all text items matching regex are removed from view
 - Toast: "X item(s) matched and deleted" or "No items matched"
-- Undo button enables (can restore all with Ctrl+Z)
+- **Single file loaded:** Undo button enables (can restore all with Ctrl+Z)
+- **Multiple files loaded:** A confirmation modal pops up first asking which files to apply the helper to
 
 **Sequence Diagram:**
 
