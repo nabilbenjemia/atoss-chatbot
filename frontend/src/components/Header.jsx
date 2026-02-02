@@ -27,6 +27,10 @@ export default function Header({ role, isDarkMode }) {
       <Link key="chatbot" to="/chatbot" className={headerLink}>← Back to Chatbot</Link>,
       <Link key="profile" to="/profile" className={headerLink}>Profile</Link>
     ];
+  } else {
+    leftButtons = [
+      <Link key="chatbot" to="/chatbot" className={headerLink}>← Back to Chatbot</Link>,
+    ];
   }
 
   // Optionally, add admin links on the right for /chatbot
@@ -35,14 +39,14 @@ export default function Header({ role, isDarkMode }) {
       <Link
         key="analytics"
         to="/analytics"
-        className="px-4 py-1.5 text-sm font-medium rounded-full border transition bg-red-600 text-white border-red-600 hover:bg-red-700"
+        className="px-4 py-1.5 text-sm font-medium rounded-full border transition bg-red-600 text-white border-red-600 hover:bg-red-700 hover:text-white"
       >
         Analytics
       </Link>,
       <Link
         key="ingest"
         to="/ingest"
-        className="px-4 py-1.5 text-sm font-medium rounded-full border transition bg-red-600 text-white border-red-600 hover:bg-red-700"
+        className="px-4 py-1.5 text-sm font-medium rounded-full border transition bg-red-600 text-white border-red-600 hover:bg-red-700 hover:text-white"
       >
         Manage Knowledge
       </Link>
