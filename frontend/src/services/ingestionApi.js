@@ -9,6 +9,7 @@
  */
 
 import axios from 'axios';
+import { LOCAL_STRATEGIES, generateLocalPreview, isLocalStrategy } from '../hooks/useLocalStrategy';
 
 // Ingestion service URL
 const INGESTION_URL = import.meta.env.VITE_INGESTION_URL || 'http://localhost:4005';
@@ -94,153 +95,8 @@ export const uploadDocument = async (file, config = {}) => {
 // EMBEDDING & INGESTION
 // ============================================================================
 
-/**
- * LOCAL STRATEGIES - IDs that are handled in frontend
- * These strategies do not require backend processing
- */
-const LOCAL_STRATEGIES = ['embed_per_page', 'chunked_fixed', 'chunked_document'];
-
-/**
- * Generate a simple hash from a string for unique ID generation
- * @param {string} str - The string to hash
- * @returns {string} - A short hash string
- */
-const simpleHash = (str) => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32bit integer
-    }
-    return Math.abs(hash).toString(36).substring(0, 8);
-};
-
-/**
- * Generate embedding preview locally (for local strategies)
- * This is the frontend implementation of preview generation.
- * 
- * @param {string} strategy - The embedding strategy
- * @param {Object} documentState - The document state with pages
- * @returns {Object} - Preview of embeddings
- */
-const generateLocalPreview = (strategy, documentState) => {
-    const documents = [];
-    const filename = documentState.filename || 'unknown';
-    // Create a unique prefix from filename to avoid ID collisions across files
-    const fileHash = simpleHash(filename + Date.now().toString());
-
-    if (strategy === 'embed_per_page') {
-        // Page-based embedding: one embedding per page
-        (documentState.pages || []).forEach((page, idx) => {
-            const pageNum = page.pageNumber || idx + 1;
-            const activeItems = (page.items || []).filter(item => !item.deleted);
-
-            // Combine all text content from the page
-            const textContent = activeItems
-                .filter(item => item.type === 'text')
-                .map(item => item.content)
-                .join('\n\n');
-
-            // Gather image data
-            const images = activeItems
-                .filter(item => item.type === 'image')
-                .map(item => ({
-                    uuid: item.id,
-                    imageUrl: item.imageUrl,
-                    imageWidth: item.imageWidth,
-                    imageHeight: item.imageHeight,
-                    classification: item.classification || 'unknown',
-                    description: item.description,
-                }));
-
-            // Gather table data as markdown
-            const tableContent = activeItems
-                .filter(item => item.type === 'table')
-                .map(item => {
-                    if (!item.tableData) return '';
-                    const headers = item.tableData.headers?.join(' | ') || '';
-                    const separator = item.tableData.headers?.map(() => '---').join(' | ') || '';
-                    const rows = item.tableData.rows?.map(row => row.join(' | ')).join('\n| ') || '';
-                    return `| ${headers} |\n| ${separator} |\n| ${rows} |`;
-                })
-                .filter(Boolean)
-                .join('\n\n');
-
-            const tables = activeItems
-                .filter(item => item.type === 'table')
-                .map(item => ({
-                    id: item.id,
-                    tableData: item.tableData,
-                }));
-
-            const fullContent = [textContent, tableContent].filter(Boolean).join('\n\n');
-
-            if (fullContent.trim() || images.length > 0) {
-                documents.push({
-                    // Include fileHash in ID to make it unique across different files
-                    id: `${fileHash}_page_${pageNum}`,
-                    content: fullContent,
-                    metadata: {
-                        page_num: pageNum,
-                        source: filename,
-                        document_type: 'pdf',
-                        image_count: images.length,
-                        images: images.length > 0 ? images : undefined,
-                        tables: tables.length > 0 ? tables : undefined,
-                        char_count: fullContent.length,
-                        word_count: fullContent.split(/\s+/).filter(Boolean).length,
-                    },
-                });
-            }
-        });
-    } else if (strategy === 'chunked_fixed' || strategy === 'chunked_document') {
-        // Fixed-size chunking: merge all content and split into chunks with overlap
-        const allContent = (documentState.pages || []).flatMap(page =>
-            (page.items || [])
-                .filter(item => !item.deleted && item.type === 'text')
-                .map(item => item.content)
-        ).join('\n\n');
-
-        // Chunk with ~500 character chunks with overlap
-        const chunkSize = 500;
-        const overlap = 100;
-        let position = 0;
-        let chunkIndex = 1;
-
-        while (position < allContent.length) {
-            const end = Math.min(position + chunkSize, allContent.length);
-            const chunk = allContent.slice(position, end);
-
-            documents.push({
-                // Include fileHash in ID to make it unique across different files
-                id: `${fileHash}_chunk_${chunkIndex}`,
-                content: chunk,
-                metadata: {
-                    chunk_index: chunkIndex,
-                    source: filename,
-                    document_type: 'pdf',
-                    char_count: chunk.length,
-                    word_count: chunk.split(/\s+/).filter(Boolean).length,
-                    start_position: position,
-                    end_position: end,
-                },
-            });
-
-            position = end - overlap;
-            if (position >= allContent.length - overlap) break;
-            chunkIndex++;
-        }
-    }
-
-    return {
-        source: documentState.filename || 'unknown',
-        document_type: 'pdf',
-        page_count: documentState.totalPages || documentState.pages?.length || 0,
-        total_embeddings: documents.length,
-        strategy: strategy,
-        documents,
-    };
-};
+// NOTE: Local strategy logic (generateLocalPreview, LOCAL_STRATEGIES, isLocalStrategy)
+// is now in hooks/useLocalStrategy.js and imported at the top of this file.
 
 /**
  * Preview embeddings that will be created from a document
@@ -254,9 +110,9 @@ const generateLocalPreview = (strategy, documentState) => {
  * @returns {Promise<Object>} - Preview of embeddings to be created
  */
 export const previewEmbeddings = async (strategy, documentState) => {
-    // Check if this is a local strategy
-    if (LOCAL_STRATEGIES.includes(strategy)) {
-        // Generate preview locally
+    // Check if this is a local strategy (handled in frontend)
+    if (isLocalStrategy(strategy)) {
+        // Generate preview locally using hook function
         const preview = generateLocalPreview(strategy, documentState);
         return { success: true, preview };
     }

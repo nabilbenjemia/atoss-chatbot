@@ -1,64 +1,41 @@
 /**
- * Ingestion Mock Data
+ * Ingestion Mocks
  * 
- * Utilities and mock data still used by frontend for:
- * - Development authentication bypass
- * - Data format conversion
+ * Mock data and utilities for testing the ingestion page without authentication.
+ * Used when VITE_USE_MOCK_AUTH is set to 'true'.
  */
 
-// Mock delay helper (used for UI transitions)
-export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Mock user for development (bypassing auth)
+/**
+ * Mock user for testing without authentication
+ */
 export const mockCurrentUser = {
-    id: 'dev_user_1',
-    email: 'admin@tum.de',
-    firstName: 'Dev',
-    lastName: 'Admin',
-    role: 'admin', // TODO: Remove mock when auth provides role
-};
-
-// Check if we should use mock user (development mode)
-export const shouldUseMockAuth = () => {
-    // In development, bypass auth for ingestion page
-    return import.meta.env.DEV || import.meta.env.VITE_MOCK_AUTH === 'true';
+    id: 'mock-user-001',
+    email: 'admin@example.com',
+    firstName: 'Admin',
+    lastName: 'User',
+    role: 'admin',
+    preferences: {
+        theme: 'light',
+    },
 };
 
 /**
- * Convert embedding preview to simulated backend response
- * This replaces base64 imageUrls with mock server URLs
- * @param {Object} preview - The embedding preview with base64 images
- * @returns {Object} - Preview with server URLs for images
+ * Check if mock auth should be used
+ * Returns true if:
+ * - VITE_USE_MOCK_AUTH is explicitly set to 'true', OR
+ * - In development mode (DEV) and VITE_USE_MOCK_AUTH is not explicitly 'false'
+ * 
+ * @returns {boolean} True if mock auth is enabled
  */
-export const convertPreviewToIngestedFormat = (preview) => {
-    if (!preview || !preview.documents) return preview;
-
-    const SERVER_BASE = 'http://localhost:8000/static/embeddings';
-
-    const documents = preview.documents.map(doc => {
-        if (!doc.metadata?.images) return doc;
-
-        const updatedImages = doc.metadata.images.map(img => ({
-            ...img,
-            // Replace base64 URL with mock server URL
-            imageUrl: `${SERVER_BASE}/${preview.source}/${img.uuid}.png`,
-            // Mark original imageUrl as stored separately
-            storedLocally: false,
-        }));
-
-        return {
-            ...doc,
-            metadata: {
-                ...doc.metadata,
-                images: updatedImages,
-            },
-        };
-    });
-
-    return {
-        ...preview,
-        documents,
-        ingestedAt: new Date().toISOString(),
-        status: 'ingested',
-    };
+export const shouldUseMockAuth = () => {
+    const envValue = import.meta.env.VITE_USE_MOCK_AUTH;
+    
+    // Explicit true
+    if (envValue === 'true') return true;
+    
+    // Explicit false
+    if (envValue === 'false') return false;
+    
+    // Default: use mock in development mode
+    return import.meta.env.DEV;
 };

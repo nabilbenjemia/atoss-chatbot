@@ -91,14 +91,6 @@ export const INGESTION_CONFIG = {
                 icon: '🤖',
                 status: 'development', // 'enabled', 'development', 'coming_soon'
             },
-            {
-                id: 'hierarchical',
-                label: 'Hierarchical (AI)',
-                description: 'Multi-level embeddings with AI-generated summaries',
-                type: 'backend',
-                icon: '🏗️',
-                status: 'coming_soon',
-            },
         ],
     },
 

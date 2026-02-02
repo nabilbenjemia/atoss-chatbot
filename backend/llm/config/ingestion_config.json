@@ -15,19 +15,6 @@
                     "topic detection"
                 ],
                 "requires_llm": true
-            },
-            {
-                "id": "hierarchical",
-                "label": "Hierarchical (AI)",
-                "description": "AI builds multi-level chunk hierarchy for parent-child retrieval",
-                "type": "backend",
-                "enabled": false,
-                "endpoint": "/api/ingestion/strategy/hierarchical",
-                "features": [
-                    "parent-child relationships",
-                    "multi-level retrieval"
-                ],
-                "requires_llm": true
             }
         ]
     },

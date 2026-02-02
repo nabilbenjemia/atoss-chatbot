@@ -44,26 +44,6 @@
                 }
             },
             {
-                "id": "remove_decorative",
-                "label": "Remove Decorative Images",
-                "description": "Removes logos, icons, stamps, signatures, barcodes, and QR codes",
-                "type": "local",
-                "enabled": true,
-                "icon": "🎨",
-                "input_type": "images",
-                "output_type": "deletion",
-                "filter": {
-                    "classification": [
-                        "logo",
-                        "icon",
-                        "stamp",
-                        "signature",
-                        "bar_code",
-                        "qr_code"
-                    ]
-                }
-            },
-            {
                 "id": "remove_empty",
                 "label": "Remove Empty Text",
                 "description": "Finds text items with empty or whitespace-only content and marks them as deleted",

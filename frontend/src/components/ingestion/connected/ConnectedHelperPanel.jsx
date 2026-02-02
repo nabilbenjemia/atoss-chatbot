@@ -18,8 +18,10 @@ import {
     DOC_STATUS,
 } from '../../../context/ingestion';
 import useBackendConfig from '../../../hooks/useBackendConfig';
+import useLocalHelper, { findAllImages } from '../../../hooks/useLocalHelper';
 import { streamImageDescriptions } from '../../../services/ingestionApi';
 import { Commands } from '../../../hooks/useCommandHistory';
+import { INGESTION_CONFIG } from '../../../config/ingestionConfig';
 
 export default function ConnectedHelperPanel({ commandState, executeCommand }) {
     const { runningHelper, isIngesting } = useUI();
@@ -30,17 +32,31 @@ export default function ConnectedHelperPanel({ commandState, executeCommand }) {
     // Use commandState (from useCommandHistory) as the document state
     const documentState = commandState;
 
+    // Use local helper hook for frontend-only helpers
+    const localHelperHook = useLocalHelper();
+
     const disabled = !documentState || isIngesting;
 
     // Get helpers from backend config, split by type and filter enabled only
+    // Fall back to static INGESTION_CONFIG if backend doesn't return helpers
     const localHelpers = useMemo(() => {
         const helpers = backendConfig?.helpers || [];
-        return helpers.filter(h => h.type === 'local' && h.enabled);
+        const filtered = helpers.filter(h => h.type === 'local' && h.enabled !== false);
+        // Fallback to static config if no helpers from backend
+        if (filtered.length === 0) {
+            return INGESTION_CONFIG.helpers.local || [];
+        }
+        return filtered;
     }, [backendConfig]);
 
     const backendHelpers = useMemo(() => {
         const helpers = backendConfig?.helpers || [];
-        return helpers.filter(h => h.type === 'backend' && h.enabled);
+        const filtered = helpers.filter(h => h.type === 'backend' && h.enabled !== false);
+        // Fallback to static config if no backend helpers from API
+        if (filtered.length === 0) {
+            return INGESTION_CONFIG.helpers.backend || [];
+        }
+        return filtered;
     }, [backendConfig]);
 
     // Get all helpers as a flat array for lookup
@@ -62,46 +78,19 @@ export default function ConnectedHelperPanel({ commandState, executeCommand }) {
             let message = '';
 
             switch (helperId) {
-                case 'remove_logos': {
-                    const logoItemIds = [];
-                    for (const page of documentState.pages) {
-                        for (const item of page.items) {
-                            if ((item.type === 'image' || item.type === 'picture') && item.classification === 'logo' && !item.deleted) {
-                                logoItemIds.push(item.id);
-                            }
-                        }
-                    }
-                    if (logoItemIds.length > 0) {
-                        executeCommand(Commands.batchDelete(logoItemIds));
-                    }
-                    message = logoItemIds.length > 0 ? `${logoItemIds.length} logo(s) removed` : 'No logos found';
-                    break;
-                }
-
+                case 'remove_logos':
                 case 'remove_empty': {
-                    const emptyItemIds = [];
-                    for (const page of documentState.pages) {
-                        for (const item of page.items) {
-                            if (item.type === 'text' && !item.deleted) {
-                                const trimmed = item.content.trim();
-                                if (!trimmed || trimmed.length <= 1) {
-                                    emptyItemIds.push(item.id);
-                                }
-                            }
-                        }
+                    // Use local helper hook for these helpers
+                    const result = localHelperHook.execute(helperId, documentState);
+                    if (result.itemIds.length > 0) {
+                        executeCommand(Commands.batchDelete(result.itemIds));
                     }
-                    if (emptyItemIds.length > 0) {
-                        executeCommand(Commands.batchDelete(emptyItemIds));
-                    }
-                    message = emptyItemIds.length > 0 ? `${emptyItemIds.length} empty item(s) removed` : 'No empty items found';
+                    message = result.message;
                     break;
                 }
 
                 case 'ai_image_descriptions': {
-                    // Collect all non-deleted images/pictures with their info
-                    // Support both 'image' and 'picture' types for compatibility
-                    const images = [];
-
+                    // Use findAllImages from useLocalHelper to collect images
                     // Debug: log document structure
                     console.log('[AI Image Helper] Document state:', {
                         documentId: documentState?.documentId,
@@ -115,25 +104,14 @@ export default function ConnectedHelperPanel({ commandState, executeCommand }) {
                         break;
                     }
 
-                    for (const page of documentState.pages) {
-                        for (const item of page.items) {
-                            if ((item.type === 'image' || item.type === 'picture') && !item.deleted) {
-                                images.push({
-                                    id: item.id,
-                                    imageUrl: item.imageUrl,
-                                    classification: item.classification || 'unclassified',
-                                    pageNumber: page.pageNumber,
-                                });
-                            }
-                        }
-                    }
+                    // Use helper function from useLocalHelper hook
+                    const allImages = findAllImages(documentState, false); // Include images without URLs for logging
+                    console.log(`[AI Image Helper] Found ${allImages.length} images:`, allImages);
 
-                    console.log(`[AI Image Helper] Found ${images.length} images:`, images);
-
-                    // Filter out images without URLs
-                    const imagesWithUrls = images.filter(i => i.imageUrl);
-                    if (imagesWithUrls.length < images.length) {
-                        console.warn(`[AI Image Helper] ${images.length - imagesWithUrls.length} images have no imageUrl`);
+                    // Filter to only images with URLs
+                    const imagesWithUrls = findAllImages(documentState, true);
+                    if (imagesWithUrls.length < allImages.length) {
+                        console.warn(`[AI Image Helper] ${allImages.length - imagesWithUrls.length} images have no imageUrl`);
                     }
 
                     if (imagesWithUrls.length === 0) {
@@ -199,7 +177,7 @@ export default function ConnectedHelperPanel({ commandState, executeCommand }) {
             toast.error('Helper failed: ' + error.message);
             actions.failHelper();
         }
-    }, [documentState, executeCommand, actions]);
+    }, [documentState, executeCommand, actions, localHelperHook]);
 
     // Handle helper button click
     const handleHelperClick = useCallback((helperId) => {
