@@ -230,6 +230,7 @@ function ItemsPerPageSelector({ value, onChange, hasVisualContent }) {
  * @param {Object} props
  * @param {Object} props.preview - Embedding preview data
  * @param {boolean} props.isLoading - Loading state
+ * @param {boolean} props.isIngesting - Ingestion in progress state
  * @param {Function} props.onCancel - Cancel handler (null for read-only mode)
  * @param {Function} props.onConfirm - Confirm handler for single file (null for read-only mode)
  * @param {Function} props.onConfirmAll - Confirm handler for all files (multi-file mode)
@@ -240,6 +241,7 @@ function ItemsPerPageSelector({ value, onChange, hasVisualContent }) {
 export default function EmbeddingPreviewViewer({
     preview,
     isLoading,
+    isIngesting = false,
     onCancel,
     onConfirm,
     onConfirmAll,
@@ -308,8 +310,10 @@ export default function EmbeddingPreviewViewer({
                         <>
                             <button
                                 onClick={onCancel}
-                                className="px-4 py-2 text-sm font-semibold text-tum-black bg-white border border-tum-grey-7 
-                                    rounded-lg hover:bg-tum-grey-9 transition-colors flex items-center gap-2"
+                                disabled={isIngesting}
+                                className={`px-4 py-2 text-sm font-semibold text-tum-black bg-white border border-tum-grey-7 
+                                    rounded-lg transition-colors flex items-center gap-2
+                                    ${isIngesting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-tum-grey-9'}`}
                             >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -318,28 +322,40 @@ export default function EmbeddingPreviewViewer({
                             </button>
                             <button
                                 onClick={onConfirm}
-                                className="px-4 py-2 text-sm font-semibold text-white bg-tum-blue 
-                                    rounded-lg hover:bg-tum-dark-blue transition-colors flex items-center gap-2
-                                    shadow-md shadow-tum-blue/20"
+                                disabled={isIngesting}
+                                className={`px-4 py-2 text-sm font-semibold text-white bg-tum-blue 
+                                    rounded-lg transition-colors flex items-center gap-2
+                                    shadow-md shadow-tum-blue/20
+                                    ${isIngesting ? 'opacity-70 cursor-not-allowed' : 'hover:bg-tum-dark-blue'}`}
                             >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                                Confirm & Ingest
+                                {isIngesting ? (
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                )}
+                                {isIngesting ? 'Ingesting...' : 'Confirm & Ingest'}
                             </button>
 
                             {/* Confirm All button for Multi-File */}
                             {isMultiFile && totalFilesInPreview > 1 && (
                                 <button
                                     onClick={onConfirmAll}
-                                    className="px-4 py-2 text-sm font-semibold text-white bg-tum-green 
-                                        rounded-lg hover:bg-tum-green/90 transition-colors flex items-center gap-2
-                                        shadow-md shadow-tum-green/20"
+                                    disabled={isIngesting}
+                                    className={`px-4 py-2 text-sm font-semibold text-white bg-tum-green 
+                                        rounded-lg transition-colors flex items-center gap-2
+                                        shadow-md shadow-tum-green/20
+                                        ${isIngesting ? 'opacity-70 cursor-not-allowed' : 'hover:bg-tum-green/90'}`}
                                 >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    Ingest All ({totalFilesInPreview})
+                                    {isIngesting ? (
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    )}
+                                    {isIngesting ? 'Ingesting...' : `Ingest All (${totalFilesInPreview})`}
                                 </button>
                             )}
                         </>

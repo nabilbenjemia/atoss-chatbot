@@ -93,7 +93,24 @@ export const generateIngestionId = (documentState, strategy, targetDb) => {
 };
 
 /**
+ * Generate an ingestedId based on content and strategy.
+ * 
+ * This ID groups ingestions by content + strategy (for sidebar display):
+ * - Same content + same strategy = same ingestedId (one sidebar entry)
+ * - Same content ingested to different DBs = same sidebar entry, multiple ingestionIds
+ * 
+ * @param {Object} documentState - The document state
+ * @param {string} strategy - Ingestion strategy
+ * @returns {string} - Ingested ID
+ */
+export const generateIngestedId = (documentState, strategy) => {
+    const contentFingerprint = generateContentFingerprint(documentState);
+    return `${contentFingerprint}_${strategy}`;
+};
+
+/**
  * Check if content has already been ingested with same strategy to same DB.
+ * Checks against all ingestionIds stored in ingestionIds array.
  * 
  * @param {Object} documentState - The document state
  * @param {string} strategy - Ingestion strategy
@@ -104,7 +121,17 @@ export const checkIngestionDuplicate = (documentState, strategy, targetDb) => {
     const ingestionId = generateIngestionId(documentState, strategy, targetDb);
     const ingestedFiles = getIngestedFiles();
 
-    const existingEntry = ingestedFiles.find(f => f.ingestionId === ingestionId);
+    // Check both ingestionIds array and legacy single ingestionId field
+    const existingEntry = ingestedFiles.find(f => {
+        // Check in ingestionIds array first
+        if (f.ingestionIds && Array.isArray(f.ingestionIds)) {
+            if (f.ingestionIds.includes(ingestionId)) {
+                return true;
+            }
+        }
+        // Fallback: check legacy single ingestionId field
+        return f.ingestionId === ingestionId;
+    });
 
     return {
         isDuplicate: !!existingEntry,
@@ -255,19 +282,20 @@ export const saveIngestedFiles = (files) => {
 /**
  * Create or update an ingested file entry
  * - Does NOT remove the uploaded file (user may want to re-ingest with different strategy)
- * - Creates ingested entry keyed by documentId + strategy
- * - If same documentId + strategy exists, updates it (preserves ability to re-ingest)
- * - If different strategy, creates new entry
- * - Stores ingestionId for duplicate detection
+ * - Creates ingested entry keyed by content + strategy (ingestedId)
+ * - If same content + strategy exists, updates it and adds new ingestionId
+ * - Different content = different sidebar entry
+ * - Stores ingestionIds array for duplicate detection
  * 
  * @param {string} documentId - Original document ID
  * @param {string} strategy - Ingestion strategy used
  * @param {Object} embeddingData - Embedding preview data to cache
  * @param {Object} fileInfo - Optional file info (filename, etc.) - if not provided, will look up from uploaded files
  * @param {string} [targetDb] - Target database (optional)
- * @param {string} [ingestionId] - Content-based ingestion ID for duplicate detection
+ * @param {string} [ingestionId] - Content-based ingestion ID for duplicate detection (contentHash_strategy_targetDb)
+ * @param {string} [ingestedId] - Content-based ID for sidebar grouping (contentHash_strategy)
  */
-export const createIngestedFile = (documentId, strategy, embeddingData, fileInfo = null, targetDb = null, ingestionId = null) => {
+export const createIngestedFile = (documentId, strategy, embeddingData, fileInfo = null, targetDb = null, ingestionId = null, ingestedId = null) => {
     // Get file info from uploaded files if not provided
     let file = fileInfo;
     if (!file) {
@@ -280,22 +308,39 @@ export const createIngestedFile = (documentId, strategy, embeddingData, fileInfo
         return null;
     }
 
-    // Create unique ingested ID based on documentId + strategy
-    const ingestedId = `${documentId}_${strategy}`;
+    // Use provided ingestedId or fallback to documentId + strategy (legacy behavior)
+    const effectiveIngestedId = ingestedId || `${documentId}_${strategy}`;
 
     // Get existing ingested files
     const ingestedFiles = getIngestedFiles();
-    const existingIndex = ingestedFiles.findIndex(f => f.ingestedId === ingestedId);
+    const existingIndex = ingestedFiles.findIndex(f => f.ingestedId === effectiveIngestedId);
 
     // Calculate embedding count from the embedding data
     const embeddingCount = embeddingData?.chunks?.length ||
         embeddingData?.embeddings?.length ||
         embeddingData?.count || 0;
 
+    // Track all ingestionIds associated with this ingestedId (for proper cleanup on deletion)
+    let ingestionIds = [];
+    if (existingIndex >= 0) {
+        // Preserve existing ingestionIds
+        ingestionIds = ingestedFiles[existingIndex].ingestionIds || [];
+        // Add legacy single ingestionId if exists and not already in array
+        const legacyIngestionId = ingestedFiles[existingIndex].ingestionId;
+        if (legacyIngestionId && !ingestionIds.includes(legacyIngestionId)) {
+            ingestionIds.push(legacyIngestionId);
+        }
+    }
+    // Add new ingestionId if provided and not already tracked
+    if (ingestionId && !ingestionIds.includes(ingestionId)) {
+        ingestionIds.push(ingestionId);
+    }
+
     const ingestedEntry = {
-        id: ingestedId,
-        ingestedId,
-        ingestionId,  // Content-based ID for duplicate detection
+        id: effectiveIngestedId,
+        ingestedId: effectiveIngestedId,
+        ingestionId,  // Latest ingestionId (for backward compatibility)
+        ingestionIds, // All ingestionIds associated with this ingestedId
         documentId,  // Keep reference to original document
         strategy,
         targetDb: targetDb || 'default',
@@ -322,12 +367,12 @@ export const createIngestedFile = (documentId, strategy, embeddingData, fileInfo
     saveIngestedFiles(ingestedFiles);
 
     // Save embedding data with the ingested ID as key
-    const embeddingKey = `${INGESTION_CONFIG.storage.embeddingCachePrefix}${ingestedId}`;
+    const embeddingKey = `${INGESTION_CONFIG.storage.embeddingCachePrefix}${effectiveIngestedId}`;
     saveToCache(embeddingKey, {
         ...embeddingData,
         strategy,
         documentId,
-        ingestedId,
+        ingestedId: effectiveIngestedId,
     });
 
     return ingestedEntry;
@@ -383,11 +428,31 @@ export const markFileAsIngested = (documentId, embeddingData) => {
  * Remove an ingested file from cache
  * Only removes the ingested file entry and its embedding cache.
  * Does NOT remove the uploaded file (user may want to re-ingest with different strategy).
+ * Also clears all associated ingestionIds from duplicate detection.
  * 
  * @param {string} ingestedId - Ingested file ID (documentId_strategy format) or legacy documentId
  */
 export const removeIngestedFile = (ingestedId) => {
     const files = getIngestedFiles();
+
+    // Find the entry to get all associated ingestionIds
+    const entryToRemove = files.find(f => f.ingestedId === ingestedId || f.documentId === ingestedId);
+
+    // Collect all ingestionIds that need to be cleared from duplicate detection
+    const ingestionIdsToClear = [];
+    if (entryToRemove) {
+        // Add from ingestionIds array
+        if (entryToRemove.ingestionIds && Array.isArray(entryToRemove.ingestionIds)) {
+            ingestionIdsToClear.push(...entryToRemove.ingestionIds);
+        }
+        // Also add single ingestionId if not already included
+        if (entryToRemove.ingestionId && !ingestionIdsToClear.includes(entryToRemove.ingestionId)) {
+            ingestionIdsToClear.push(entryToRemove.ingestionId);
+        }
+    }
+
+    console.log(`[removeIngestedFile] Removing ingestedId: ${ingestedId}`);
+    console.log(`[removeIngestedFile] Associated ingestionIds to clear:`, ingestionIdsToClear);
 
     // Remove from ingested files list
     const filtered = files.filter(f =>
@@ -395,8 +460,11 @@ export const removeIngestedFile = (ingestedId) => {
     );
     saveIngestedFiles(filtered);
 
-    // Clear the embedding cache
+    // Clear the embedding cache for the ingestedId
     clearCache(`${INGESTION_CONFIG.storage.embeddingCachePrefix}${ingestedId}`);
+
+    // Note: ingestionIds are cleared from the ingested files list above,
+    // so checkIngestionDuplicate() will no longer find them
 };
 
 /**

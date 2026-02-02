@@ -15,10 +15,10 @@ import {
     loadFromCache,
     saveToCache,
     clearCache,
-    getKeysWithPrefix,
     clearKeysWithPrefix,
 } from '../../../hooks/useLocalCache';
 import { INGESTION_CONFIG } from '../../../config/ingestionConfig';
+import { removeIngestedFile, getIngestedFiles } from '../../../utils/fileCacheManager';
 
 /**
  * Format bytes to human readable
@@ -127,20 +127,34 @@ export default function CacheManagement({ onClose, onCacheCleared }) {
         });
 
         // Check for embedding caches (ingested files)
-        const embeddingKeys = getKeysWithPrefix(INGESTION_CONFIG.storage.embeddingCachePrefix);
-        embeddingKeys.forEach(key => {
-            const data = loadFromCache(key);
-            if (data) {
-                const size = JSON.stringify(data).length * 2;
-                items.push({
-                    key,
-                    type: 'embedding',
-                    filename: data.source || key.replace(INGESTION_CONFIG.storage.embeddingCachePrefix, ''),
-                    size,
-                    data,
-                    documentId: key.replace(INGESTION_CONFIG.storage.embeddingCachePrefix, ''),
-                });
+        // Use the ingested files list as source of truth
+        const ingestedFiles = getIngestedFiles();
+        ingestedFiles.forEach(file => {
+            const embeddingKey = `${INGESTION_CONFIG.storage.embeddingCachePrefix}${file.ingestedId}`;
+            const embeddingData = loadFromCache(embeddingKey);
+
+            // Calculate size (entry metadata + embedding data if exists)
+            let size = JSON.stringify(file).length * 2;
+            if (embeddingData) {
+                size += JSON.stringify(embeddingData).length * 2;
             }
+
+            // Count associated ingestionIds for display
+            const ingestionCount = file.ingestionIds?.length || (file.ingestionId ? 1 : 0);
+
+            items.push({
+                key: file.ingestedId, // Use ingestedId as key for UI
+                type: 'embedding',
+                filename: file.originalFilename || file.filename || file.documentId,
+                size,
+                data: embeddingData,
+                documentId: file.documentId,
+                ingestedId: file.ingestedId,
+                ingestionIds: file.ingestionIds || [],
+                strategy: file.strategy,
+                targetDb: file.targetDb,
+                ingestionCount,
+            });
         });
 
         return items;
@@ -221,16 +235,11 @@ export default function CacheManagement({ onClose, onCacheCleared }) {
                     // Clear content cache
                     clearCache(`${INGESTION_CONFIG.storage.contentFilesPrefix}${item.documentId}`);
                 } else if (item.type === 'embedding') {
-                    // For embedding items, remove from ingested files list AND clear embedding cache
-                    const ingestedFiles = loadFromCache(INGESTION_CONFIG.storage.ingestedFilesKey) || [];
-                    const filteredFiles = ingestedFiles.filter(f => f.documentId !== item.documentId);
-                    if (filteredFiles.length > 0) {
-                        saveToCache(INGESTION_CONFIG.storage.ingestedFilesKey, filteredFiles);
-                    } else {
-                        clearCache(INGESTION_CONFIG.storage.ingestedFilesKey);
-                    }
-                    // Clear embedding cache
-                    clearCache(item.key);
+                    // For embedding items, use removeIngestedFile which handles:
+                    // - Removing from ingested files list
+                    // - Clearing all associated ingestionIds (for duplicate detection)
+                    // - Clearing embedding cache
+                    removeIngestedFile(item.ingestedId);
                 } else {
                     // For other items (editor), just clear the key
                     clearCache(item.key);

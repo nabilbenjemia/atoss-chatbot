@@ -48,6 +48,7 @@ import {
     updateUploadedFile,
     createIngestedFile,
     checkIngestionDuplicate,
+    generateIngestedId,
 } from '../utils/fileCacheManager';
 import { INGESTION_CONFIG } from '../config/ingestionConfig';
 import { previewEmbeddings, startIngestion, generateImageDescriptions } from '../services/ingestionApi';
@@ -553,14 +554,18 @@ function IngestionPageLayout() {
             );
 
             if (result.success) {
-                // Create ingested entry in cache with ingestionId for future duplicate detection
+                // Generate ingestedId (content + strategy) for sidebar grouping
+                const ingestedId = generateIngestedId(commandDocumentState, previewConfig.strategy);
+
+                // Create ingested entry in cache with both IDs
                 const ingestedEntry = createIngestedFile(
                     selectedDocumentId,
                     previewConfig.strategy,
                     embeddingPreview,
                     { filename: commandDocumentState.filename, documentId: selectedDocumentId },
                     previewConfig.targetDb,
-                    ingestionId
+                    ingestionId,  // contentHash_strategy_targetDb (duplicate detection)
+                    ingestedId    // contentHash_strategy (sidebar grouping)
                 );
 
                 // Update state
@@ -651,15 +656,18 @@ function IngestionPageLayout() {
                 );
 
                 if (result.success) {
+                    // Generate ingestedId (content + strategy) for sidebar grouping
+                    const ingestedId = generateIngestedId(content, previewConfig.strategy);
 
-                    // Create ingested entry in cache with ingestionId
+                    // Create ingested entry in cache with both IDs
                     const ingestedEntry = createIngestedFile(
                         docId,
                         previewConfig.strategy,
                         filePreview,
                         { filename: content.filename, documentId: docId },
                         previewConfig.targetDb,
-                        ingestionId
+                        ingestionId,  // contentHash_strategy_targetDb (duplicate detection)
+                        ingestedId    // contentHash_strategy (sidebar grouping)
                     );
 
                     // Collect all ingested entries
@@ -904,6 +912,7 @@ function IngestionPageLayout() {
                     <EmbeddingPreviewViewer
                         preview={embeddingPreview}
                         isLoading={isLoadingPreview}
+                        isIngesting={isIngesting}
                         onCancel={() => actions.exitPreviewMode(rightSidebarCollapsed)}
                         onConfirm={handleConfirmIngestion}
                         onConfirmAll={handleConfirmIngestionAll}
