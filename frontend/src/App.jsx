@@ -11,6 +11,7 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import UserProfilePage from "./pages/UserProfilePage.jsx";
 import IngestionPage from "./pages/IngestionPage.jsx";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard.jsx";
+import AdminRoute from "./components/AdminRoute.jsx";
 
 
 export default function App() {
@@ -39,7 +40,11 @@ export default function App() {
         />
         <Route path="/profile" element={<UserProfilePage />} />
         {/* Admin routes */}
-        <Route path="/admin/ingestion" element={<IngestionPage />} />
+        <Route path="/admin/ingestion" element={
+          <AdminRoute>
+            <IngestionPage />
+          </AdminRoute>
+        } />
       </Routes>
       <ToastContainer
         position="top-right"

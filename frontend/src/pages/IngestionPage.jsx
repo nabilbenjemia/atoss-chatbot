@@ -35,8 +35,7 @@ import useBackendConfig from '../hooks/useBackendConfig';
 import useCommandHistory, { Commands, serializeCommand, getCommandDescription } from '../hooks/useCommandHistory';
 
 // Utility functions
-import { mockCurrentUser, shouldUseMockAuth } from '../mocks/ingestionMocks';
-import { getCurrentUser } from '../services/api';
+import { getCurrentUser, isAuthenticated } from '../services/api';
 import {
     getUploadedFiles,
     getIngestedFiles,
@@ -173,17 +172,17 @@ function IngestionPageLayout() {
 
     // ===== Initialization Effects =====
 
-    // Auth check
+    // Auth check - AdminRoute already handles this, but keep as safety check
     useEffect(() => {
-        const user = shouldUseMockAuth() ? mockCurrentUser : getCurrentUser();
-        if (!user) {
+        if (!isAuthenticated()) {
             toast.error('Please log in to access this page');
             navigate('/');
             return;
         }
-        if (!shouldUseMockAuth() && user.role !== 'admin') {
+        const user = getCurrentUser();
+        if (!user || user.role !== 'Admin') {
             toast.error('Admin access required');
-            navigate(-1);
+            navigate('/chatbot');
         }
     }, [navigate]);
 
@@ -797,8 +796,22 @@ function IngestionPageLayout() {
                             <ConnectedFileQueue />
                         </div>
 
-                        {/* Cache Management Button */}
-                        <div className="mt-3 pt-3 border-t border-tum-grey-7">
+                        {/* Bottom Actions */}
+                        <div className="mt-3 pt-3 border-t border-tum-grey-7 space-y-2">
+                            {/* Back to Chat Button */}
+                            <button
+                                onClick={() => navigate('/chatbot')}
+                                className="w-full text-xs px-3 py-2 bg-tum-blue text-white 
+                                    rounded-lg hover:bg-tum-blue-dark transition-colors
+                                    flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                </svg>
+                                Back to Chat
+                            </button>
+
+                            {/* Cache Management Button */}
                             <button
                                 onClick={() => setShowCacheManagement(true)}
                                 disabled={isPreviewMode}
