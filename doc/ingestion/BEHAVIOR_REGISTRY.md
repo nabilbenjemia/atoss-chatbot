@@ -51,6 +51,36 @@ This document defines the expected behaviors for the ingestion system. Each beha
 
 ## Ingestion Behaviors
 
+### Ingested File ID System
+
+The ingestion system uses **two different IDs** for ingested files:
+
+| ID Type | Format | Purpose | Used In |
+|---------|--------|---------|---------|
+| **Sidebar ID** (`id`) | `ingest_${documentId}_${timestamp}` | Unique display ID for sidebar list | UI rendering, React keys |
+| **Duplication Check ID** (`ingestedId`) | `${documentId}_${strategy}` | Check if same file+strategy already ingested | Cache lookup, update detection |
+
+**Example:**
+```
+Document: report.pdf (documentId: "abc123")
+Strategy: embed_per_page
+Timestamp: 1706700000000
+
+Sidebar ID (id):        "ingest_abc123_1706700000000"  ← Always unique
+Duplication ID:         "abc123_embed_per_page"        ← Same for re-ingestion
+```
+
+**Rationale:**
+- `id` must be unique for React rendering (even for re-ingestions)
+- `ingestedId` must be consistent to detect if a file+strategy combo already exists
+
+**Implementation:**
+- `fileCacheManager.js` → `createIngestedFile()` generates both IDs
+- Sidebar uses `id` for React keys
+- Duplication check uses `ingestedId` for `findIndex()`
+
+---
+
 ### BHV-003: Ingest Same PDF with Different Strategy
 **Trigger:** User ingests the same PDF document using a different ingestion strategy
 

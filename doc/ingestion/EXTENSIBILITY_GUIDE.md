@@ -91,44 +91,24 @@ The backend ingestion service must also support the new file type. Check `backen
 Helper functions are tools that modify document content (remove logos, clean text, etc.). They are divided into:
 
 - **Local helpers**: Run entirely in the browser (fast, no API call)
-- **Backend helpers**: Require AI/LLM processing (call `runBackendHelper()` API)
+- **Backend helpers**: Require AI/LLM processing (call backend API)
 
-### Helper Registry Structure
+### Complete Checklist: Adding a New LOCAL Helper
 
-**File:** `frontend/src/config/ingestionConfig.js`
+A local helper runs entirely in the frontend browser. Follow ALL steps:
 
-```javascript
-helpers: {
-    local: [
-        {
-            id: 'remove_logos',           // Unique identifier
-            label: 'Remove All Logos',    // Button text
-            description: 'Delete all images classified as logos',  // Tooltip
-            type: 'local',
-            icon: '🖼️',                   // Emoji or component
-            hasInput: false,              // Optional: shows "..." if true (for regex, etc.)
-        },
-        // Add more local helpers here
-    ],
-    backend: [
-        {
-            id: 'ai_image_descriptions',
-            label: 'Generate Image Descriptions (AI)',
-            description: 'Use AI to generate descriptions for images',
-            type: 'backend',
-            icon: '🤖',
-        },
-        // Add more backend helpers here
-    ],
-},
-```
+| Step | File | Action |
+|------|------|--------|
+| 1 | `frontend/src/config/ingestionConfig.js` | Add helper to `helpers.local` array |
+| 2 | `frontend/src/hooks/useLocalHelper.js` | Add helper ID to `LOCAL_HELPERS` array |
+| 3 | `frontend/src/hooks/useLocalHelper.js` | Add finder function (e.g., `findHeaderItems`) |
+| 4 | `frontend/src/hooks/useLocalHelper.js` | Add case in `executeLocalHelper()` switch |
+| 5 | `backend/ingestion/config/localConfig.json` | Add helper to `helpers.localHelpers` array |
 
-### Adding a New Local Helper
-
-**Step 1:** Add to config registry
+**Step 1: Frontend Config Registry**
 
 ```javascript
-// In ingestionConfig.js → helpers.local
+// frontend/src/config/ingestionConfig.js → helpers.local
 {
     id: 'remove_headers',
     label: 'Remove Headers/Footers',
@@ -138,50 +118,82 @@ helpers: {
 },
 ```
 
-**Step 2:** Implement the logic in `ConnectedHelperPanel.jsx`
-
-**File:** `frontend/src/components/ingestion/ConnectedHelperPanel.jsx`
+**Step 2: Add to LOCAL_HELPERS constant**
 
 ```javascript
-const executeHelper = useCallback(async (helperId) => {
-    // ... existing code ...
-
-    switch (helperId) {
-        // ... existing cases ...
-
-        case 'remove_headers': {
-            const headerItemIds = [];
-            for (const page of documentState.pages) {
-                for (const item of page.items) {
-                    if (item.type === 'text' && 
-                        (item.classification === 'header' || item.classification === 'footer') && 
-                        !item.deleted) {
-                        headerItemIds.push(item.id);
-                    }
-                }
-            }
-            if (headerItemIds.length > 0) {
-                executeCommand(Commands.batchDelete(headerItemIds));
-            }
-            message = headerItemIds.length > 0 
-                ? `${headerItemIds.length} header/footer(s) removed` 
-                : 'No headers/footers found';
-            break;
-        }
-
-        default:
-            message = 'Unknown helper';
-    }
-    // ...
-}, [documentState, executeCommand, actions]);
+// frontend/src/hooks/useLocalHelper.js
+export const LOCAL_HELPERS = ['remove_logos', 'remove_empty', 'delete_regex', 'remove_headers'];
 ```
 
-### Adding a New Backend Helper
-
-**Step 1:** Add to config registry
+**Step 3: Add finder function**
 
 ```javascript
-// In ingestionConfig.js → helpers.backend
+// frontend/src/hooks/useLocalHelper.js
+export const findHeaderItems = (documentState) => {
+    const itemIds = [];
+    if (!documentState?.pages) return itemIds;
+
+    for (const page of documentState.pages) {
+        for (const item of page.items || []) {
+            if (item.type === 'text' && 
+                (item.classification === 'header' || item.classification === 'footer') && 
+                !item.deleted) {
+                itemIds.push(item.id);
+            }
+        }
+    }
+    return itemIds;
+};
+```
+
+**Step 4: Add switch case in executeLocalHelper**
+
+```javascript
+// frontend/src/hooks/useLocalHelper.js → executeLocalHelper()
+case 'remove_headers': {
+    const itemIds = findHeaderItems(documentState);
+    const message = itemIds.length > 0
+        ? `${itemIds.length} header/footer(s) removed`
+        : 'No headers/footers found';
+    return { itemIds, message };
+}
+```
+
+**Step 5: Backend Config (for API response consistency)**
+
+```json
+// backend/ingestion/config/localConfig.json → helpers.localHelpers
+{
+    "id": "remove_headers",
+    "label": "Remove Headers/Footers",
+    "description": "Delete text items marked as headers or footers",
+    "type": "local",
+    "enabled": true,
+    "icon": "📋",
+    "input_type": "text",
+    "output_type": "deletion"
+}
+```
+
+---
+
+### Complete Checklist: Adding a New BACKEND Helper
+
+A backend helper requires AI/LLM processing via the backend services. Follow ALL steps:
+
+| Step | File | Action |
+|------|------|--------|
+| 1 | `frontend/src/config/ingestionConfig.js` | Add helper to `helpers.backend` array |
+| 2 | `backend/llm/config/ingestion_config.json` | Add helper to `helpers.items` array |
+| 3 | `frontend/src/components/ingestion/connected/ConnectedHelperPanel.jsx` | Add case in `executeHelper()` switch |
+| 4 | `backend/llm/routes/ingestion_routes.py` | Add endpoint handler |
+| 5 | `backend/llm/controllers/ingestion_controller.py` | Implement AI logic |
+| 6 | `backend/ingestion/controllers/ingestionController.js` | Add proxy handler (if needed) |
+
+**Step 1: Frontend Config Registry**
+
+```javascript
+// frontend/src/config/ingestionConfig.js → helpers.backend
 {
     id: 'ai_summarize_pages',
     label: 'Summarize Pages (AI)',
@@ -191,33 +203,74 @@ const executeHelper = useCallback(async (helperId) => {
 },
 ```
 
-**Step 2:** Implement in `ConnectedHelperPanel.jsx`
+**Step 2: LLM Service Config**
+
+```json
+// backend/llm/config/ingestion_config.json → helpers.items
+{
+    "id": "ai_summarize_pages",
+    "label": "AI Summarize Pages",
+    "description": "Uses LLM to generate a summary for each page",
+    "type": "backend",
+    "enabled": true,
+    "icon": "📝",
+    "endpoint": "/api/ingestion/helper/ai_summarize_pages",
+    "input_type": "pages",
+    "output_type": "summaries",
+    "requires_llm": true
+}
+```
+
+**Step 3: Frontend Handler**
 
 ```javascript
+// frontend/src/components/ingestion/connected/ConnectedHelperPanel.jsx → executeHelper()
 case 'ai_summarize_pages': {
     const result = await runBackendHelper(helperId, documentState, {});
     if (result.success && result.modifiedItems) {
-        const changes = result.modifiedItems
-            .filter(m => m.summary)
-            .map(m => ({
-                itemId: m.id,
-                newValues: { summary: m.summary },
-                oldValues: { summary: '' },
-            }));
-        if (changes.length > 0) {
-            executeCommand(Commands.batchUpdate(changes));
-        }
-        message = result.message || 'AI summaries generated';
+        const insertions = result.modifiedItems.map(m => ({
+            afterItemId: m.id,
+            newItem: {
+                id: `summary_${m.id}_${Date.now()}`,
+                type: 'text',
+                content: `**Summary:** ${m.summary}`,
+                deleted: false,
+            },
+        }));
+        executeCommand(Commands.batchInsertAfter(insertions));
     }
+    message = result.message || 'AI summaries generated';
     break;
 }
 ```
 
-**Step 3:** Implement backend handler
+**Step 4: LLM Service Route**
 
-**File:** `backend/ingestion/controllers/` - Add handler for the new helper ID.
+```python
+# backend/llm/routes/ingestion_routes.py
+@router.post("/helper/ai_summarize_pages")
+async def ai_summarize_pages(request: SummarizePagesRequest):
+    controller = IngestionController()
+    return await controller.summarize_pages(request.document_state)
+```
 
-### Helpers with Input (e.g., Regex)
+**Step 5: LLM Service Controller**
+
+```python
+# backend/llm/controllers/ingestion_controller.py
+async def summarize_pages(self, document_state: dict) -> dict:
+    summaries = []
+    for page in document_state.get("pages", []):
+        text = " ".join(item["content"] for item in page.get("items", []) 
+                       if item.get("type") == "text")
+        summary = await self.llm.generate(f"Summarize: {text}")
+        summaries.append({"pageNumber": page["pageNumber"], "summary": summary})
+    return {"success": True, "summaries": summaries}
+```
+
+---
+
+### Helpers with User Input (e.g., Regex)
 
 For helpers that need user input, use `hasInput: true` and open a modal:
 
@@ -231,10 +284,10 @@ For helpers that need user input, use `hasInput: true` and open a modal:
     icon: '🔄',
 },
 
-// In executeHelper:
-case 'find_replace': {
-    actions.openModal(MODAL_TYPES.FIND_REPLACE);  // Open custom modal
-    return;  // Don't complete helper yet
+// In ConnectedHelperPanel.jsx → handleHelperClick():
+if (helperId === 'find_replace') {
+    actions.openModal(MODAL_TYPES.FIND_REPLACE);
+    return;
 }
 ```
 
@@ -246,44 +299,26 @@ case 'find_replace': {
 
 Ingestion strategies define how document content is converted to embeddings:
 
-- **Local strategies**: Processing happens in browser (chunking logic)
-- **Backend strategies**: Processing requires AI (semantic analysis)
+- **Local strategies**: Processing happens in browser (chunking logic in `useLocalStrategy.js`)
+- **Backend strategies**: Processing requires AI (semantic analysis via LLM service)
 
-### Strategy Registry Structure
+### Complete Checklist: Adding a New LOCAL Strategy
 
-**File:** `frontend/src/config/ingestionConfig.js`
+A local strategy runs entirely in the frontend browser. Follow ALL steps:
 
-```javascript
-strategies: {
-    local: [
-        {
-            id: 'embed_per_page',
-            label: 'One Embedding per Page',
-            description: 'Merge all text on each page into a single chunk',
-            type: 'local',
-            icon: '📄',
-        },
-        // Add more local strategies
-    ],
-    backend: [
-        {
-            id: 'semantic_sections',
-            label: 'Semantic Sections (AI)',
-            description: 'Use AI to detect topic boundaries',
-            type: 'backend',
-            icon: '🤖',
-            status: 'development',  // 'enabled', 'development', 'coming_soon'
-        },
-    ],
-},
-```
+| Step | File | Action |
+|------|------|--------|
+| 1 | `frontend/src/config/ingestionConfig.js` | Add strategy to `strategies.local` array |
+| 2 | `frontend/src/hooks/useLocalStrategy.js` | Add strategy ID to `LOCAL_STRATEGIES` array |
+| 3 | `frontend/src/hooks/useLocalStrategy.js` | Add generation function (e.g., `generateSentenceEmbeddings`) |
+| 4 | `frontend/src/hooks/useLocalStrategy.js` | Add case in `generateLocalPreview()` |
+| 5 | `backend/ingestion/config/localConfig.json` | Add strategy to `strategies.localStrategies` array |
+| 6 | `frontend/src/components/ingestion/modals/IngestionModal.jsx` | Add icon to `STRATEGY_ICONS` (optional) |
 
-### Adding a New Strategy
-
-**Step 1:** Add to config registry
+**Step 1: Frontend Config Registry**
 
 ```javascript
-// In ingestionConfig.js → strategies.local
+// frontend/src/config/ingestionConfig.js → strategies.local
 {
     id: 'chunked_sentences',
     label: 'Sentence-Based Chunks',
@@ -293,45 +328,159 @@ strategies: {
 },
 ```
 
-**Step 2:** Add to `IngestionModal.jsx` strategies list
-
-**File:** `frontend/src/components/ingestion/IngestionModal.jsx`
+**Step 2: Add to LOCAL_STRATEGIES constant**
 
 ```javascript
-const INGESTION_STRATEGIES = [
-    // ... existing strategies ...
-    {
-        id: 'chunked_sentences',
-        label: 'Sentence-Based',
-        shortDesc: 'Natural breaks',
-        description: 'Splits content at sentence boundaries for natural chunk boundaries.',
-        icon: ICONS.chunked_document,
-        disabled: false,  // Set to true if not ready
-    },
-];
+// frontend/src/hooks/useLocalStrategy.js
+export const LOCAL_STRATEGIES = ['embed_per_page', 'chunked_fixed', 'chunked_document', 'chunked_sentences'];
 ```
 
-**Step 3:** Implement backend processing
+**Step 3: Add generation function**
 
-The strategy ID is sent to `previewEmbeddings()` and `startIngestion()` APIs. Backend must handle the new strategy.
+```javascript
+// frontend/src/hooks/useLocalStrategy.js
+const generateSentenceEmbeddings = (documentState, fileHash, filename) => {
+    const documents = [];
+    const allContent = (documentState.pages || []).flatMap(page =>
+        (page.items || [])
+            .filter(item => !item.deleted && item.type === 'text')
+            .map(item => item.content)
+    ).join(' ');
+
+    // Split by sentence boundaries
+    const sentences = allContent.split(/(?<=[.!?])\s+/);
+    let chunkIndex = 1;
+    
+    for (const sentence of sentences) {
+        if (sentence.trim()) {
+            documents.push({
+                id: `${fileHash}_sentence_${chunkIndex}`,
+                content: sentence.trim(),
+                metadata: {
+                    chunk_index: chunkIndex,
+                    source: filename,
+                    document_type: 'pdf',
+                    char_count: sentence.length,
+                },
+            });
+            chunkIndex++;
+        }
+    }
+    return documents;
+};
+```
+
+**Step 4: Add case in generateLocalPreview**
+
+```javascript
+// frontend/src/hooks/useLocalStrategy.js → generateLocalPreview()
+} else if (strategy === 'chunked_sentences') {
+    documents = generateSentenceEmbeddings(documentState, fileHash, filename);
+}
+```
+
+**Step 5: Backend Config (for API response consistency)**
+
+```json
+// backend/ingestion/config/localConfig.json → strategies.localStrategies
+{
+    "id": "chunked_sentences",
+    "label": "Sentence-Based Chunks",
+    "description": "Split into chunks at sentence boundaries",
+    "type": "local",
+    "enabled": true,
+    "features": ["natural boundaries", "sentence-level"]
+}
+```
+
+**Step 6: Add Icon (optional)**
+
+```javascript
+// frontend/src/components/ingestion/modals/IngestionModal.jsx → STRATEGY_ICONS
+chunked_sentences: (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="..." />
+    </svg>
+),
+```
+
+---
+
+### Complete Checklist: Adding a New BACKEND Strategy
+
+A backend strategy requires AI/LLM processing. Follow ALL steps:
+
+| Step | File | Action |
+|------|------|--------|
+| 1 | `frontend/src/config/ingestionConfig.js` | Add strategy to `strategies.backend` array |
+| 2 | `backend/llm/config/ingestion_config.json` | Add strategy to `strategies.items` array |
+| 3 | `backend/llm/routes/ingestion_routes.py` | Add endpoint handler |
+| 4 | `backend/llm/controllers/ingestion_controller.py` | Implement AI logic |
+| 5 | `frontend/src/components/ingestion/modals/IngestionModal.jsx` | Add icon to `STRATEGY_ICONS` (optional) |
+
+**Step 1: Frontend Config Registry**
+
+```javascript
+// frontend/src/config/ingestionConfig.js → strategies.backend
+{
+    id: 'semantic_sections',
+    label: 'Semantic Sections (AI)',
+    description: 'Use AI to detect topic boundaries and split accordingly',
+    type: 'backend',
+    icon: '🤖',
+    status: 'development',  // 'enabled', 'development', 'coming_soon'
+},
+```
+
+**Step 2: LLM Service Config**
+
+```json
+// backend/llm/config/ingestion_config.json → strategies.items
+{
+    "id": "semantic_sections",
+    "label": "Semantic Sections (AI)",
+    "description": "AI identifies logical sections based on content meaning",
+    "type": "backend",
+    "enabled": true,
+    "endpoint": "/api/ingestion/strategy/semantic_sections",
+    "features": ["context-aware boundaries", "topic detection"],
+    "requires_llm": true
+}
+```
+
+**Step 3: LLM Service Route**
+
+```python
+# backend/llm/routes/ingestion_routes.py
+@router.post("/strategy/semantic_sections")
+async def semantic_sections_strategy(request: StrategyRequest):
+    controller = IngestionController()
+    return await controller.run_strategy("semantic_sections", request.document_state)
+```
+
+**Step 4: LLM Service Controller**
+
+```python
+# backend/llm/controllers/ingestion_controller.py
+async def _run_semantic_sections(self, document_state: dict, options: dict) -> dict:
+    # Use LLM to identify topic boundaries
+    # Return chunked documents with semantic groupings
+    pass
+```
+
+---
 
 ### Strategy Status Control
 
 Use the `status` field to control availability:
 
-```javascript
-{
-    id: 'experimental_strategy',
-    label: 'Experimental',
-    status: 'coming_soon',  // Won't appear in enabled strategies list
-}
-```
-
 | Status | Behavior |
 |--------|----------|
 | `'enabled'` | Available for use |
 | `'development'` | Available but marked as beta |
-| `'coming_soon'` | Hidden from selection, shows as "coming soon" |
+| `'coming_soon'` | Hidden from selection |
+
+---
 
 ### Utility Functions
 
@@ -343,8 +492,14 @@ import {
     getStrategyById 
 } from '../config/ingestionConfig';
 
+import {
+    isLocalStrategy as isLocal,
+    generateLocalPreview,
+    LOCAL_STRATEGIES
+} from '../hooks/useLocalStrategy';
+
 // Check if strategy runs locally
-if (isLocalStrategy('embed_per_page')) { /* local processing */ }
+if (isLocal('embed_per_page')) { /* local processing */ }
 
 // Get all available strategies
 const available = getEnabledStrategies();
