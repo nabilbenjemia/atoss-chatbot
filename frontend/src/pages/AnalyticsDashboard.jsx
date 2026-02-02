@@ -256,16 +256,16 @@ const AnalyticsDashboard = () => {
                     {/* Overall Stats Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                         <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
-                            <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>Processed Queries <span className="text-xs font-normal">(1 word queries skipped)</span></div>
-                            <div className="text-4xl font-bold text-tum-dark-blue">{overall?.totalQueries || 0}</div>
+                            <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>Processed Queries <span className="text-[10px] font-normal">(1 word queries skipped)</span></div>
+                            <div className={`text-4xl font-bold ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>{overall?.totalQueries || 0}</div>
                         </div>
                         <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
-                            <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>Total Queries <span className="text-xs font-normal">(including 1 word queries)</span></div>
-                            <div className="text-4xl font-bold text-tum-dark-blue">{overall?.totalQueriesIncludingOneWord || 0}</div>
+                            <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>Total Queries <span className="text-[10px] font-normal">(including 1 word queries)</span></div>
+                            <div className={`text-4xl font-bold ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>{overall?.totalQueriesIncludingOneWord || 0}</div>
                         </div>
                         <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
                             <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>Total Users</div>
-                            <div className="text-4xl font-bold text-tum-dark-blue">{overall?.uniqueUsers || 0}</div>
+                            <div className={`text-4xl font-bold ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>{overall?.uniqueUsers || 0}</div>
                         </div>
                         <div className={`${isDarkMode ? 'bg-tum-green-6 border-tum-green-3 text-white' : 'bg-tum-green-5 border-tum-green-2'} rounded-xl p-6 border shadow-lg`}>
                             <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>🟢 Active Now (15min)</div>
@@ -276,21 +276,29 @@ const AnalyticsDashboard = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                         {/* Top Keywords Chart */}
                         <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
-                            <h2 className="text-xl font-semibold mb-4 text-tum-dark-blue">Top Keywords</h2>
+                            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>Top Keywords</h2>
                             {keywords && keywords.length > 0 ? (
                                 <Plot
                                     data={keywordData}
                                     layout={{
                                         paper_bgcolor: 'rgba(0,0,0,0)',
                                         plot_bgcolor: 'rgba(0,0,0,0)',
-                                        font: { color: '#20252A' },
+                                        font: { color: isDarkMode ? '#FFFFFF' : '#20252A' },
                                         xaxis: {
-                                            gridcolor: '#C2D7EF',
-                                            title: 'Keywords'
+                                            gridcolor: isDarkMode ? '#444' : '#C2D7EF',
+                                            title: {
+                                                text: 'Keywords',
+                                                font: { color: isDarkMode ? '#FFFFFF' : '#20252A' }
+                                            },
+                                            tickfont: { color: isDarkMode ? '#FFFFFF' : '#20252A' }
                                         },
                                         yaxis: {
-                                            gridcolor: '#C2D7EF',
-                                            title: 'Frequency'
+                                            gridcolor: isDarkMode ? '#444' : '#C2D7EF',
+                                            title: {
+                                                text: 'Frequency',
+                                                font: { color: isDarkMode ? '#FFFFFF' : '#20252A' }
+                                            },
+                                            tickfont: { color: isDarkMode ? '#FFFFFF' : '#20252A' }
                                         },
                                         margin: { t: 20, b: 80, l: 60, r: 20 },
                                         height: 350
@@ -306,19 +314,20 @@ const AnalyticsDashboard = () => {
 
                         {/* Category Distribution Chart */}
                         <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
-                            <h2 className="text-xl font-semibold mb-4 text-tum-dark-blue">Query Categories</h2>
+                            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>Query Categories</h2>
                             {categories && categories.length > 0 ? (
                                 <Plot
                                     data={categoryData}
                                     layout={{
                                         paper_bgcolor: 'rgba(0,0,0,0)',
                                         plot_bgcolor: 'rgba(0,0,0,0)',
-                                        font: { color: '#20252A' },
+                                        font: { color: isDarkMode ? '#FFFFFF' : '#20252A' },
                                         showlegend: true,
                                         legend: {
                                             orientation: 'v',
                                             x: 1.15,
-                                            y: 0.5
+                                            y: 0.5,
+                                            font: { color: isDarkMode ? '#FFFFFF' : '#20252A' }
                                         },
                                         margin: { t: 30, b: 30, l: 30, r: 220 },
                                         height: 350
@@ -335,7 +344,7 @@ const AnalyticsDashboard = () => {
 
                     {/* Timeline Chart - Full Width */}
                     <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
-                        <h2 className="text-xl font-semibold mb-4 text-tum-dark-blue">
+                        <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>
                             Queries Over Time
                             {!startDate && !endDate && <span className={`${isDarkMode ? 'text-white' : 'text-tum-grey-4'} text-sm ml-2`}>(Last 7 Days)</span>}
                             {(startDate || endDate) && (
@@ -350,7 +359,7 @@ const AnalyticsDashboard = () => {
                                 layout={{
                                     paper_bgcolor: 'rgba(0,0,0,0)',
                                     plot_bgcolor: 'rgba(0,0,0,0)',
-                                    font: { color: '#20252A' },
+                                    font: { color: isDarkMode ? '#FFFFFF' : '#20252A' },
                                     xaxis: {
                                         gridcolor: '#C2D7EF',
                                         title: 'Date'
