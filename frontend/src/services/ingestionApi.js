@@ -9,7 +9,7 @@
  */
 
 import axios from 'axios';
-import { LOCAL_STRATEGIES, generateLocalPreview, isLocalStrategy } from '../hooks/useLocalStrategy';
+import { generateLocalPreview, isLocalStrategy } from '../hooks/useLocalStrategy';
 
 // Ingestion service URL
 const INGESTION_URL = import.meta.env.VITE_INGESTION_URL || 'http://localhost:4005';
@@ -169,22 +169,6 @@ export const startIngestion = async (targetDb, documentsOrState, strategy = 'emb
 // ============================================================================
 
 /**
- * Run a backend AI helper function
- * @param {string} helperId - The helper function ID
- * @param {Object} content - The document content to process
- * @param {Object} params - Optional parameters for the helper
- * @returns {Promise<{success: boolean, modifiedItems: Array, message?: string}>}
- */
-export const runBackendHelper = async (helperId, content, params = {}) => {
-    const response = await ingestionApi.post('/api/ingestion/helper', {
-        helperId,
-        content,
-        params,
-    });
-    return response.data;
-};
-
-/**
  * Generate AI descriptions for images (batch - waits for all)
  * Sends document ID and image data to backend for AI processing
  * @param {string} documentId - The document ID
@@ -294,10 +278,10 @@ export const streamImageDescriptions = async (documentId, images, callbacks = {}
 // Export all functions as named exports
 export default {
     getBackendConfig,
+    createCollection,
     uploadDocument,
     previewEmbeddings,
     startIngestion,
-    runBackendHelper,
     generateImageDescriptions,
     streamImageDescriptions,
 };

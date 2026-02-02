@@ -177,17 +177,24 @@ function EmbeddingCard({ embedding, embeddingNumber }) {
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
                             {Object.entries(metadata || {}).map(([key, value]) => {
                                 // Skip complex objects (images, tables) - they're shown above
-                                if (typeof value === 'object' && value !== null) {
+                                // But allow simple arrays like page_numbers
+                                if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                                    return null;
+                                }
+                                // Skip arrays that contain objects (like images array)
+                                if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
                                     return null;
                                 }
                                 // Skip undefined, null, or empty values
                                 if (value === undefined || value === null || value === '') {
                                     return null;
                                 }
+                                // Format arrays as comma-separated string
+                                const displayValue = Array.isArray(value) ? value.join(', ') : String(value);
                                 return (
                                     <div key={key} className="flex flex-col">
                                         <span className="text-tum-grey-4 text-xs">{key}</span>
-                                        <span className="text-tum-black font-medium">{String(value)}</span>
+                                        <span className="text-tum-black font-medium">{displayValue}</span>
                                     </div>
                                 );
                             })}

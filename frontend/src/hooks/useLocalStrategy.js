@@ -7,7 +7,7 @@
  * @see doc/ingestion/API_CONTRACTS.md
  */
 
-import { useCallback, useMemo } from 'react';
+// Note: React hooks removed - this file now only exports pure functions
 
 /**
  * LOCAL STRATEGIES - IDs that are handled in frontend
@@ -300,43 +300,4 @@ export const isLocalStrategy = (strategyId) => {
     return LOCAL_STRATEGIES.includes(strategyId);
 };
 
-/**
- * Hook for using local strategies
- * Provides memoized functions for generating previews and checking strategy types.
- * 
- * @returns {Object} - { generatePreview, isLocal, localStrategies }
- */
-export default function useLocalStrategy() {
-    /**
-     * Generate preview for a local strategy
-     * @param {string} strategy - The embedding strategy
-     * @param {Object} documentState - The document state with pages
-     * @returns {Object|null} - Preview object or null if not a local strategy
-     */
-    const generatePreview = useCallback((strategy, documentState) => {
-        if (!isLocalStrategy(strategy)) {
-            return null;
-        }
-        return generateLocalPreview(strategy, documentState);
-    }, []);
 
-    /**
-     * Check if a strategy is local
-     */
-    const isLocal = useCallback((strategyId) => {
-        return isLocalStrategy(strategyId);
-    }, []);
-
-    /**
-     * List of local strategy IDs
-     */
-    const localStrategies = useMemo(() => LOCAL_STRATEGIES, []);
-
-    return {
-        generatePreview,
-        isLocal,
-        localStrategies,
-        // Also export the raw function for non-hook usage
-        generateLocalPreview,
-    };
-}

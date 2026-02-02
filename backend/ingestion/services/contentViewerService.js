@@ -59,14 +59,6 @@ const runAiHelper = async (helperId, content, params = {}) => {
 };
 
 /**
- * Generate AI descriptions for images in document
- * @param {Object} content - Document content with pages/items
- */
-const generateImageDescriptions = async (content) => {
-    return runAiHelper('ai_image_descriptions', content);
-};
-
-/**
  * Generate AI descriptions for specific images
  * Calls LLM service vision model endpoint to generate descriptions
  * 
@@ -291,12 +283,6 @@ const generateMockImageDescriptionsFromImages = (documentId, images) => {
 module.exports = {
     // AI Helpers
     runAiHelper,
-    generateImageDescriptions,
     generateImageDescriptionsFromImages,
     streamImageDescriptions,
-    // Classification prompts
-    getPromptForClassification,
-    // Mock (for development)
-    generateMockImageDescriptions,
-    generateMockImageDescriptionsFromImages,
 };

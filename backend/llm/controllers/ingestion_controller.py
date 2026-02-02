@@ -538,8 +538,6 @@ class IngestionController:
         try:
             if strategy_id == "semantic_sections":
                 return await self._run_semantic_sections(document_state, options)
-            elif strategy_id == "hierarchical":
-                return await self._run_hierarchical(document_state, options)
             else:
                 return {
                     "success": False,
@@ -596,41 +594,6 @@ class IngestionController:
                 ],
             },
             "message": "[MOCK] Semantic sections strategy - replace with actual LLM implementation",
-        }
-    
-    async def _run_hierarchical(
-        self,
-        document_state: Dict,
-        options: Optional[Dict] = None
-    ) -> Dict[str, Any]:
-        """
-        Run hierarchical chunking strategy.
-        
-        AI builds multi-level chunk hierarchy for parent-child retrieval.
-        """
-        # TODO: Implement actual hierarchical chunking with LLM
-        logger.info("[MOCK] Running hierarchical strategy")
-        
-        return {
-            "success": True,
-            "strategy": "hierarchical",
-            "preview": {
-                "source": document_state.get("filename", "document"),
-                "strategy": "hierarchical",
-                "total_embeddings": 1,
-                "documents": [
-                    {
-                        "id": "root",
-                        "content": "Document summary...",
-                        "metadata": {
-                            "level": 0,
-                            "parent": None,
-                            "children": ["section_1", "section_2"],
-                        },
-                    },
-                ],
-            },
-            "message": "[MOCK] Hierarchical strategy - replace with actual LLM implementation",
         }
 
 
