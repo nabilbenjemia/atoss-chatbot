@@ -20,6 +20,7 @@ import uvicorn
 
 from config.settings import settings
 from routes.chat_routes import router as chat_router
+from routes.ingestion_routes import router as ingestion_router
 from services.startup_service import startup_service
 
 # Add the llm directory to the path for imports
@@ -99,11 +100,24 @@ app.add_middleware(
 # Mount static files for serving images from resources folder
 resources_path = Path(__file__).parent / "docling" / "output" / "resources"
 if resources_path.exists():
-    app.mount("/resources", StaticFiles(directory=str(resources_path)), name="resources")
-    logger.info(f"Serving static images from: {resources_path}")
+    app.mount("/docling-resources", StaticFiles(directory=str(resources_path)), name="docling_resources")
+    logger.info(f"Serving docling images from: {resources_path}")
+
+# Mount static files for permanent image storage (after ingestion)
+permanent_images_path = Path(__file__).parent / "resources" / "pictures"
+permanent_images_path.mkdir(parents=True, exist_ok=True)
+app.mount("/resources/pictures", StaticFiles(directory=str(permanent_images_path)), name="permanent_images")
+logger.info(f"Serving permanent images from: {permanent_images_path}")
+
+# Mount static files for extracted document images (temporary, for editing)
+static_images_path = Path(__file__).parent / "static" / "images"
+static_images_path.mkdir(parents=True, exist_ok=True)
+app.mount("/static/images", StaticFiles(directory=str(static_images_path)), name="static_images")
+logger.info(f"Serving document images from: {static_images_path}")
 
 # Include routers
 app.include_router(chat_router)
+app.include_router(ingestion_router)
 
 
 @app.get("/")
@@ -114,10 +128,20 @@ async def root():
         "version": "1.0.0",
         "status": "running",
         "endpoints": {
-            "status": "/api/chat/status",
-            "generate": "/api/chat/generate",
-            "stream": "/api/chat/stream",
-            "health": "/api/chat/health"
+            "chat": {
+                "status": "/api/chat/status",
+                "generate": "/api/chat/generate",
+                "stream": "/api/chat/stream",
+                "health": "/api/chat/health",
+            },
+            "ingestion": {
+                "config": "/api/ingestion/config",
+                "collections": "/api/ingestion/collections",
+                "convert": "/api/ingestion/convert",
+                "ingest": "/api/ingestion/ingest",
+                "helpers": "/api/ingestion/helper/{helper_id}",
+                "strategies": "/api/ingestion/strategy/{strategy_id}",
+            },
         }
     }
 

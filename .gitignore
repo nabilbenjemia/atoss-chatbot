@@ -91,12 +91,18 @@ backend/llm/chroma_db_snowflake_600chunks_300overlapping/*.sqlite3
 *storybook.log
 storybook-static
 
+# ChromaDB
+**/chroma.sqlite3
+
 # Testing & Development (not for production)
 frontend/.storybook/
 frontend/tests/
 pyrightconfig.json
 backend/llm/docling/
-doc/FEATURE_*.md
+
+# LLM static images (generated at runtime)
+backend/llm/static/images/
+
 
 # Speckit - AI spec generation
 .specify/

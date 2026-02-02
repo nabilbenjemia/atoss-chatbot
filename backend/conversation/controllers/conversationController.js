@@ -1,5 +1,27 @@
 const conversationService = require('../services/conversationService');
 const messageService = require('../services/messageService');
+const fs = require('fs');
+
+// Auto-detect if running in Docker or locally
+const isDocker = () => {
+  try {
+    // Check for Docker-specific files
+    if (fs.existsSync('/.dockerenv')) return true;
+    // Check cgroup (Linux containers)
+    const cgroup = fs.readFileSync('/proc/1/cgroup', 'utf8');
+    return cgroup.includes('docker') || cgroup.includes('kubepods');
+  } catch {
+    return false;
+  }
+};
+
+// Use environment variable if set, otherwise auto-detect
+const getLlmUrl = () => {
+  if (process.env.CHATBOT_SERVICE_URL) {
+    return process.env.CHATBOT_SERVICE_URL;
+  }
+  return isDocker() ? 'http://llm:8000' : 'http://localhost:8000';
+};
 
 //POST /api/conversations
 const createConversation = async (req, res) => {
@@ -69,145 +91,146 @@ const updateConversationTitle = async (req, res) => {
 
 //DELETE /api/conversations/:id
 const deleteConversation = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const deletedConversation = await conversationService.deleteConversation(id);
-        if (!deletedConversation) {
-            return res.status(404).json({ error: "Conversation not found" });
-        }
-        
-        // Delete associated messages (don't fail if no messages exist)
-        const deletedMessages = await messageService.deleteMessagesByConversationId(id);
-        
-        res.status(200).json({ 
-            message: `Conversation and ${deletedMessages.deletedCount} message(s) deleted successfully` 
-        });
-    } catch (error) {
-        console.error('Error deleting conversation:', error);
-        res.status(500).json({ error: "Failed to delete conversation", details: error.message });
+  try {
+    const { id } = req.params;
+    const deletedConversation = await conversationService.deleteConversation(id);
+    if (!deletedConversation) {
+      return res.status(404).json({ error: "Conversation not found" });
     }
+
+    // Delete associated messages (don't fail if no messages exist)
+    const deletedMessages = await messageService.deleteMessagesByConversationId(id);
+
+    res.status(200).json({
+      message: `Conversation and ${deletedMessages.deletedCount} message(s) deleted successfully`
+    });
+  } catch (error) {
+    console.error('Error deleting conversation:', error);
+    res.status(500).json({ error: "Failed to delete conversation", details: error.message });
+  }
 };
 
 const axios = require('axios');
 
 /** GET /api/conversations/:conversationId/stream?query=... */
 const streamMessage = async (req, res) => {
-    const { conversationId } = req.params;
-    const { query, history } = req.query;
+  const { conversationId } = req.params;
+  const { query, history } = req.query;
 
-    console.log('Stream request received:', { conversationId, query: query?.substring(0, 50), historyLength: history?.length });
+  console.log('Stream request received:', { conversationId, query: query?.substring(0, 50), historyLength: history?.length });
 
-    // Validate query parameter
-    if (!query) {
-        console.error('Missing query parameter');
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.write(`data: ${JSON.stringify({ error: 'Missing query parameter' })}\n\n`);
-        res.end();
-        return;
-    }
-
-    // Set SSE headers
+  // Validate query parameter
+  if (!query) {
+    console.error('Missing query parameter');
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders();
+    res.write(`data: ${JSON.stringify({ error: 'Missing query parameter' })}\n\n`);
+    res.end();
+    return;
+  }
 
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  try {
+    // Parse history and convert to ChatMessage format
+    let parsedHistory = [];
     try {
-        // Parse history and convert to ChatMessage format
-        let parsedHistory = [];
-        try {
-            const decoded = JSON.parse(history || '[]');
-            // Handle double-stringified history
-            parsedHistory = typeof decoded === 'string' ? JSON.parse(decoded) : decoded;
-        } catch (e) {
-            console.warn('Failed to parse history:', e.message);
-        }
-        
-        const conversationHistory = parsedHistory.map(msg => ({
-            role: msg.role || (msg.sender === 'user' ? 'user' : 'assistant'),
-            content: msg.content
-        }));
-
-        console.log('Forwarding to LLM server with', conversationHistory.length, 'history messages');
-
-        // Proxy to FastAPI stream endpoint - use Docker service name
-        const llmUrl = process.env.CHATBOT_SERVICE_URL || 'http://llm:8000';
-        const response = await axios({
-            method: 'POST',
-            url: `${llmUrl}/api/chat/stream`,
-            data: {
-                message: query,
-                conversation_id: conversationId,
-                conversation_history: conversationHistory
-            },
-            responseType: 'stream',
-            timeout: 120000  // 2 minute timeout
-        });
-
-        // Pipe the SSE stream directly to the client
-        response.data.pipe(res);
-
-        response.data.on('error', (err) => {
-            console.error('Stream error:', err);
-            res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
-            res.end();
-        });
-
-    } catch (error) {
-        console.error('Stream endpoint error:', error.message);
-        res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-        res.end();
+      const decoded = JSON.parse(history || '[]');
+      // Handle double-stringified history
+      parsedHistory = typeof decoded === 'string' ? JSON.parse(decoded) : decoded;
+    } catch (e) {
+      console.warn('Failed to parse history:', e.message);
     }
+
+    const conversationHistory = parsedHistory.map(msg => ({
+      role: msg.role || (msg.sender === 'user' ? 'user' : 'assistant'),
+      content: msg.content
+    }));
+
+    console.log('Forwarding to LLM server with', conversationHistory.length, 'history messages');
+
+    // Auto-detect Docker or local environment
+    const llmUrl = getLlmUrl();
+    console.log('Using LLM URL:', llmUrl);
+    const response = await axios({
+      method: 'POST',
+      url: `${llmUrl}/api/chat/stream`,
+      data: {
+        message: query,
+        conversation_id: conversationId,
+        conversation_history: conversationHistory
+      },
+      responseType: 'stream',
+      timeout: 120000  // 2 minute timeout
+    });
+
+    // Pipe the SSE stream directly to the client
+    response.data.pipe(res);
+
+    response.data.on('error', (err) => {
+      console.error('Stream error:', err);
+      res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+      res.end();
+    });
+
+  } catch (error) {
+    console.error('Stream endpoint error:', error.message);
+    res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+    res.end();
+  }
 };
 
 /** POST /api/conversations/:conversationId/messages/batch */
 const createMessageBatch = async (req, res) => {
-    try {
-        const { conversationId } = req.params;  // ADD: Get conversationId from params
-        const { userMessage, aiMessage, userId, isNewConversation } = req.body;
+  try {
+    const { conversationId } = req.params;  // ADD: Get conversationId from params
+    const { userMessage, aiMessage, userId, isNewConversation } = req.body;
 
-        let convId = conversationId;  // FIX: Use conversationId from params
+    let convId = conversationId;  // FIX: Use conversationId from params
 
-        // Create conversation if new
-        if (isNewConversation || conversationId === 'new') {
-            const newConv = await conversationService.createConversation({
-                userId,
-                title: "Untitled"
-            });
-            convId = newConv._id;
-        }
-
-        // Update title if first message
-        const conversation = await conversationService.getConversationById(convId);
-        if (conversation && conversation.title === "Untitled") {
-            // Extract first 30 chars from user message as title
-            // TODO: Implement AI-based title generation from userMessage
-            const suggestedTitle = userMessage.substring(0, 30) + "...";
-            await conversationService.updateConversationTitle(convId, suggestedTitle);
-        }
-
-        // Save both messages
-        const savedUserMsg = await messageService.createMessage({
-            conversationId: convId,
-            sender: 'user',
-            content: userMessage
-        });
-
-        const savedAiMsg = await messageService.createMessage({
-            conversationId: convId,
-            sender: 'ai',
-            content: aiMessage
-        });
-
-        res.status(201).json({
-            conversationId: convId,
-            userMessage: savedUserMsg,
-            aiMessage: savedAiMsg
-        });
-
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+    // Create conversation if new
+    if (isNewConversation || conversationId === 'new') {
+      const newConv = await conversationService.createConversation({
+        userId,
+        title: "Untitled"
+      });
+      convId = newConv._id;
     }
+
+    // Update title if first message
+    const conversation = await conversationService.getConversationById(convId);
+    if (conversation && conversation.title === "Untitled") {
+      // Extract first 30 chars from user message as title
+      // TODO: Implement AI-based title generation from userMessage
+      const suggestedTitle = userMessage.substring(0, 30) + "...";
+      await conversationService.updateConversationTitle(convId, suggestedTitle);
+    }
+
+    // Save both messages
+    const savedUserMsg = await messageService.createMessage({
+      conversationId: convId,
+      sender: 'user',
+      content: userMessage
+    });
+
+    const savedAiMsg = await messageService.createMessage({
+      conversationId: convId,
+      sender: 'ai',
+      content: aiMessage
+    });
+
+    res.status(201).json({
+      conversationId: convId,
+      userMessage: savedUserMsg,
+      aiMessage: savedAiMsg
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
 
 module.exports = {

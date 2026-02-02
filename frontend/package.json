@@ -12,15 +12,15 @@
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",
     "axios": "^1.13.1",
-    "plotly.js": "^2.30.0",
+    "plotly.js": "^2.35.3",
     "prop-types": "^15.8.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0",
     "react-plotly.js": "^2.6.0",
     "react-router-dom": "^6.30.2",
-    "remark-gfm": "^4.0.1",
-    "react-toastify": "^11.0.5"
+    "react-toastify": "^11.0.5",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
