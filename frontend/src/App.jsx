@@ -9,7 +9,9 @@ import ChatbotPage from "./pages/ChatbotPage.jsx";
 import LearningPage from "./pages/LearningMaterialPage.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import UserProfilePage from "./pages/UserProfilePage.jsx";
+import IngestionPage from "./pages/IngestionPage.jsx";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard.jsx";
+import AdminRoute from "./components/AdminRoute.jsx";
 
 
 export default function App() {
@@ -20,24 +22,29 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/forget-password" element={<ForgetPass />} />
-        <Route 
-          path="/chatbot" 
+        <Route
+          path="/chatbot"
           element={
             <ProtectedRoute>
               <ChatbotPage />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/learning" 
+        <Route
+          path="/learning"
           element={
             <ProtectedRoute>
               <LearningPage />
             </ProtectedRoute>
-          } 
+          }
         />
         <Route path="/profile" element={<UserProfilePage />} />
-        <Route path="/analytics" element={<AnalyticsDashboard />} />
+        {/* Admin routes */}
+        <Route path="/admin/ingestion" element={
+          <AdminRoute>
+            <IngestionPage />
+          </AdminRoute>
+        } />
       </Routes>
       <ToastContainer
         position="top-right"

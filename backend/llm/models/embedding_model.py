@@ -115,6 +115,37 @@ class EmbeddingManager:
         # Wichtig: .tolist() wandelt das Numpy-Array in eine Liste um
         return self._embeddings.encode(text, normalize_embeddings=True).tolist()
 
+    def embed_documents(self, texts: List[str], batch_size: int = 32, show_progress: bool = True) -> List[List[float]]:
+        """
+        Generate embeddings for multiple texts in batches.
+        
+        Args:
+            texts: List of texts to embed
+            batch_size: Number of texts to process at once
+            show_progress: Whether to show progress bar
+            
+        Returns:
+            List of embeddings (each embedding is a list of floats)
+        """
+        if not self._is_loaded or self._embeddings is None:
+            raise RuntimeError("Embedding model not loaded")
+        
+        if not texts:
+            return []
+        
+        logger.info("Embedding %d documents in batches of %d", len(texts), batch_size)
+        
+        # SentenceTransformer handles batching internally
+        embeddings = self._embeddings.encode(
+            texts,
+            batch_size=batch_size,
+            normalize_embeddings=True,
+            show_progress_bar=show_progress
+        )
+        
+        # Convert numpy arrays to lists
+        return [emb.tolist() for emb in embeddings]
+
     def get_embeddings(self) -> SentenceTransformer:
         """Get the loaded embedding model"""
         if not self._is_loaded or self._embeddings is None:

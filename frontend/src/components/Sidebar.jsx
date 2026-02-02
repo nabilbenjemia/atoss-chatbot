@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+<<<<<<< HEAD
 import * as assets from '../assets';
+=======
+import { tum_klinikum_logo, tum_logo_darkmode, new_chat_logo, search_logo, minimize_logo, maximize_logo, profile_photo_mock, expand_down_logo, expand_up_logo, delete_logo } from '../assets';
+>>>>>>> e0932842ef7066aadf9b7f271982a64b74b05873
 import { authAPI, getCurrentUser, userAPI } from '../services/api';
 
 export default function Sidebar({ conversationTitles, setConversationTitles, setConversationId, conversationId, userId, onNewChat, isDarkMode = false }) {
@@ -8,10 +12,10 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
   const currentUser = getCurrentUser();
   const [userProfile, setUserProfile] = useState(null);
   const [isMinimized, setIsMinimized] = useState(false);
-  
+
   // Get language from user profile or default to English
   const language = userProfile?.preferences?.language || 'en';
-  
+
   // Translations
   const translations = {
     en: {
@@ -29,7 +33,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
       profile: 'Profil'
     }
   };
-  
+
   const t = translations[language] || translations.en;
   const [isHistoryVisible, setIsHistoryVisible] = useState(true);
   const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
@@ -134,10 +138,10 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
   const handleDeleteConversation = async (convId) => {
     try {
       console.log("Deleting conversation:", convId);
-      
+
       // Use environment variable or default to localhost
       const API_BASE_URL = import.meta.env.VITE_CONVERSATION_URL || 'http://localhost:4004';
-      
+
       // Call DELETE API
       const response = await fetch(`${API_BASE_URL}/api/conversations/${convId}`, {
         method: 'DELETE',
@@ -149,16 +153,16 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
       }
 
       console.log("Conversation deleted successfully");
-      
+
       // Only update UI after successful deletion
       setConversationTitles(conversationTitles.filter(conv => conv._id !== convId));
-      
+
       // Close the dropdown
       setDeleteDropdownId(null);
-      
+
       // If the deleted conversation was selected, clear the selection
       setConversationId(null);
-      
+
     } catch (error) {
       console.error("Failed to delete conversation:", error);
       // Optionally show an error message to the user
@@ -169,13 +173,6 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
   return ( 
     <div className={`${isDarkMode ? 'bg-[#1f1f1f]' : 'bg-tum-blue-light-4'} ${isMinimized ? 'w-12' : 'w-64'} ${isDarkMode ? 'text-gray-200' : 'text-black'} h-full p-2 rounded-r-2xl flex flex-col transition-all duration-300 overflow-hidden`}>
       <div className={`flex ${isMinimized ? 'justify-center' : (isDarkMode ? 'justify-between' : 'justify-between')} items-start mb-1`}>
-        {/*!isMinimized && (
-          <img 
-            src={isDarkMode ? tum_logo_darkmode : tum_klinikum_logo} 
-            alt="TUM Klinikum Logo" 
-            className={isDarkMode ? "h-12 w-auto rounded-lg" : "h-16 w-auto -ml-5 -my-2"} 
-          />
-        )*/}
         <button 
           onClick={() => setIsMinimized(!isMinimized)}
           className={`p-2 rounded w-10 h-10 flex items-center ml-auto justify-center focus:outline-none border-0 ${isDarkMode ? 'bg-[#1f1f1f] hover:bg-[#2f2f2f]' : 'bg-tum-blue-light-4'}`}
@@ -238,15 +235,14 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
               <ul>
                 {filteredConversations.length > 0 ? (
                   filteredConversations.map((conv) => (
-                    <li 
-                      key={conv._id} 
-                      className={`group flex items-center justify-between p-1 mb-1 cursor-pointer rounded ${
-                        isDarkMode 
+                    <li
+                      key={conv._id}
+                      className={`group flex items-center justify-between p-1 mb-1 cursor-pointer rounded ${isDarkMode
                           ? `hover:bg-[#2f2f2f] ${conversationId === conv._id ? 'border-2 border-tum-blue bg-[#2f2f2f]' : ''}`
                           : `hover:bg-tum-blue-light-2 ${conversationId === conv._id ? 'border-2 border-tum-blue' : ''}`
-                      }`}
+                        }`}
                     >
-                      <span 
+                      <span
                         className="truncate text-sm font-montserrat flex-1"
                         onClick={() => {
                           console.log("Selected conversation ID:", conv._id);
@@ -255,13 +251,12 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
                       >
                         {conv.title}
                       </span>
-                      
-                      <div 
-                        className={`relative flex-shrink-0 transition-opacity ${
-                          deleteDropdownId === conv._id 
-                            ? 'opacity-100' 
+
+                      <div
+                        className={`relative flex-shrink-0 transition-opacity ${deleteDropdownId === conv._id
+                            ? 'opacity-100'
                             : 'opacity-0 group-hover:opacity-100'
-                        }`}
+                          }`}
                         ref={deleteDropdownId === conv._id ? deleteDropdownRef : null}
                       >
                         {deleteDropdownId === conv._id ? (
@@ -298,7 +293,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
           )}
 
           <div className="relative mt-auto" ref={dropdownRef}>
-            <div 
+            <div
               className={`flex items-center gap-3 p-1 cursor-pointer rounded ${isDarkMode ? 'hover:bg-[#2f2f2f]' : 'border-gray-700 hover:bg-tum-blue-light-2'}`}
               onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
             >
@@ -351,6 +346,17 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
                   >
                     Analytics
                   </button>
+                )}
+                {currentUser?.role === 'Admin' && (
+                  <button
+                    onClick={() => {
+                      setShowLogoutDropdown(false);
+                      navigate('/admin/ingestion');
+                    }}
+                    className={`w-full text-left px-4 py-2 text-sm rounded-lg transition-colors border-b ${isDarkMode ? 'text-gray-200 bg-[#2f2f2f] hover:bg-[#3f3f3f] border-gray-700' : 'text-tum-black bg-tum-white hover:bg-tum-blue-light-2 border-tum-grey-7'}`}
+                  >
+                    Ingestion
+                  </button>
                 )*/}
                 <button
                   onClick={handleLogout}
@@ -379,7 +385,7 @@ export default function Sidebar({ conversationTitles, setConversationTitles, set
               </ul>
           </nav>
           <div className="relative mt-auto" ref={dropdownRef}>
-            <div 
+            <div
               className={`w-8 h-8 rounded-full bg-gray-500 overflow-hidden cursor-pointer hover:ring-2 hover:ring-tum-blue border-2 ${isDarkMode ? 'border-gray-600' : 'border-gray-300'}`}
               onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
               title="Click to logout"
