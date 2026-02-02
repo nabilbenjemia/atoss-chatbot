@@ -100,10 +100,16 @@ app.add_middleware(
 # Mount static files for serving images from resources folder
 resources_path = Path(__file__).parent / "docling" / "output" / "resources"
 if resources_path.exists():
-    app.mount("/resources", StaticFiles(directory=str(resources_path)), name="resources")
-    logger.info(f"Serving static images from: {resources_path}")
+    app.mount("/docling-resources", StaticFiles(directory=str(resources_path)), name="docling_resources")
+    logger.info(f"Serving docling images from: {resources_path}")
 
-# Mount static files for extracted document images
+# Mount static files for permanent image storage (after ingestion)
+permanent_images_path = Path(__file__).parent / "resources" / "pictures"
+permanent_images_path.mkdir(parents=True, exist_ok=True)
+app.mount("/resources/pictures", StaticFiles(directory=str(permanent_images_path)), name="permanent_images")
+logger.info(f"Serving permanent images from: {permanent_images_path}")
+
+# Mount static files for extracted document images (temporary, for editing)
 static_images_path = Path(__file__).parent / "static" / "images"
 static_images_path.mkdir(parents=True, exist_ok=True)
 app.mount("/static/images", StaticFiles(directory=str(static_images_path)), name="static_images")

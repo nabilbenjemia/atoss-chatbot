@@ -211,6 +211,11 @@ class IngestionController:
         """
         Ingest documents into a ChromaDB collection.
         
+        Before ingestion, this method:
+        1. Migrates images from temporary storage (static/images/) to
+           permanent storage (resources/pictures/) with UUID filenames
+        2. Updates imageUrl in metadata to use permanent storage paths
+        
         Delegates to VectorStoreManager.ingest() which handles:
         - Batch embedding with EmbeddingManager
         - Collection management (create/get)
@@ -230,15 +235,20 @@ class IngestionController:
             Success response with ingestion stats
         """
         from models.vectorstore import vectorstore_manager
+        from services.image_storage_service import image_storage_service
         
         try:
-            # Log document summary
+            # Count images before processing
             total_images = sum(
                 len(doc.get('metadata', {}).get('images', []))
                 for doc in documents
             )
+            
+            # Migrate images to permanent storage before ingestion
             if total_images > 0:
-                logger.info(f"[Ingest] Documents contain {total_images} images with URLs")
+                logger.info(f"[Ingest] Processing {total_images} images for permanent storage...")
+                documents, url_mapping = image_storage_service.process_documents_for_ingestion(documents)
+                logger.info(f"[Ingest] Migrated {len(url_mapping)} unique images to permanent storage")
             
             # Delegate to VectorStoreManager
             result = await vectorstore_manager.ingest(
@@ -251,6 +261,7 @@ class IngestionController:
             # Add image count to result
             if total_images > 0:
                 result["totalImages"] = total_images
+                result["migratedImages"] = len(url_mapping) if total_images > 0 else 0
             
             return result
             
@@ -284,7 +295,7 @@ class IngestionController:
                     await vllm_manager.load()
                 except Exception as e:
                     logger.warning(f"Vision model not available, using mock: {e}")
-                    return self._generate_mock_descriptions(images)
+                   
             
             # Prepare images for batch processing
             batch_images = []
@@ -350,7 +361,7 @@ class IngestionController:
             logger.error(f"Failed to generate image descriptions: {e}")
             # Fall back to mock on error
             logger.info("Falling back to mock descriptions")
-            return self._generate_mock_descriptions(images)
+            return self._generate_default_descriptions(images)
     
     async def generate_image_descriptions_stream(
         self,
@@ -382,7 +393,7 @@ class IngestionController:
                     yield {
                         "imageId": img["id"],
                         "classification": classification,
-                        "description": self._get_mock_description(classification, page_num),
+                        "description": self._get_default_description(classification, page_num),
                     }
                 return
         
@@ -425,13 +436,13 @@ class IngestionController:
                     "error": str(e),
                 }
     
-    def _generate_mock_descriptions(self, images: List[Dict]) -> Dict[str, Any]:
-        """Generate mock descriptions when vision model is unavailable"""
+    def _generate_default_descriptions(self, images: List[Dict]) -> Dict[str, Any]:
+        """Generate default descriptions when vision model is unavailable"""
         descriptions = []
         for img in images:
             classification = img.get("classification", "unclassified")
             page_num = img.get("pageNumber", "unknown")
-            desc = self._get_mock_description(classification, page_num)
+            desc = self._get_default_description(classification, page_num)
             descriptions.append({
                 "imageId": img["id"],
                 "classification": classification,
@@ -461,8 +472,8 @@ class IngestionController:
         base_prompt = prompts.get(classification, "Beschreibe dieses Bild aus einem Schulungsdokument.")
         return f"{base_prompt} Das Bild stammt von Seite {page_num}."
     
-    def _get_mock_description(self, classification: str, page_num: Any) -> str:
-        """Get mock description based on classification"""
+    def _get_default_description(self, classification: str, page_num: Any) -> str:
+        """Get default description based on classification"""
         prompts = {
             "logo": "This appears to be a company or brand logo.",
             "icon": "This is a small symbolic icon used for visual emphasis.",
@@ -477,7 +488,7 @@ class IngestionController:
             "diagram": "This is a diagram illustrating relationships or structures.",
         }
         base = prompts.get(classification, "This is a visual element from the document.")
-        return f"{base} Found on page {page_num}. [Mock - vision model unavailable]"
+        return f"{base} Found on page {page_num}. [default - vision model unavailable]"
     
     async def run_helper(
         self,
