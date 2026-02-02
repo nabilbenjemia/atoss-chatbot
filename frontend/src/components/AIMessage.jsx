@@ -141,9 +141,9 @@ export default function AIMessage({ message, createdAt, isStreaming }) {
     return (
         <div className="flex justify-start mb-4 group">
             <div className="relative max-w-[70%]">
-                <div className="bg-gray-200 text-gray-800 px-4 py-3 rounded-2xl break-words prose prose-sm prose-gray max-w-none
+                <div className="bg-gray-200 text-gray-800 px-4 py-2 rounded-2xl break-words prose prose-sm prose-gray max-w-none
                     prose-headings:font-semibold prose-headings:text-gray-900 prose-headings:mt-3 prose-headings:mb-2
-                    prose-p:my-1.5 prose-p:leading-relaxed
+                    prose-p:my-1 prose-p:leading-relaxed
                     prose-ul:my-2 prose-ul:pl-4 prose-ol:my-2 prose-ol:pl-4
                     prose-li:my-0.5
                     prose-strong:text-gray-900
