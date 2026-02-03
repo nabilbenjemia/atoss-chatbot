@@ -17,6 +17,7 @@ import { useState, useEffect } from 'react';
  * @param {Object} props.helper - Helper object { id, label, description, icon }
  * @param {string} props.currentDocumentId - Currently selected document ID
  * @param {string} props.currentFilename - Currently selected document filename
+ * @param {boolean} props.isDarkMode - Whether the app is in dark mode
  */
 export default function HelperFileSelectModal({
     isOpen,
@@ -25,7 +26,7 @@ export default function HelperFileSelectModal({
     files = [],
     helper = null,
     currentDocumentId = null,
-
+    isDarkMode = false,
 }) {
     const [selectedIds, setSelectedIds] = useState(new Set());
 
@@ -80,31 +81,35 @@ export default function HelperFileSelectModal({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             {/* Backdrop */}
             <div
-                className="fixed inset-0 bg-tum-black/40 backdrop-blur-sm"
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm"
                 onClick={onClose}
             />
 
             {/* Modal */}
-            <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className={`relative rounded-xl shadow-2xl w-full max-w-md overflow-hidden ${isDarkMode ? 'bg-[#2d2d2d]' : 'bg-white'}`}>
                 {/* Header */}
-                <div className="px-4 py-3 border-b border-tum-grey-7 bg-gradient-to-r from-tum-blue-light-5 to-tum-blue-light-4">
+                <div className={`px-4 py-3 border-b ${isDarkMode ? 'bg-[#333] border-[#404040]' : 'bg-gradient-to-r from-tum-blue-light-5 to-tum-blue-light-4 border-tum-grey-7'}`}>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             {helper?.icon && (
                                 <span className="text-2xl">{helper.icon}</span>
                             )}
                             <div>
-                                <h3 className="font-semibold text-tum-black">
+                                <h3 className={`font-semibold ${isDarkMode ? 'text-white' : 'text-tum-black'}`}>
                                     {helper?.label || 'Apply Helper'}
                                 </h3>
-                                <p className="text-xs text-tum-grey-4">
+                                <p className={`text-xs ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-4'}`}>
                                     Select files to apply this helper to
                                 </p>
                             </div>
                         </div>
                         <button
                             onClick={onClose}
-                            className="text-tum-grey-4 hover:text-red-500 bg-transparent hover:bg-red-50 rounded-full p-1 transition-colors"
+                            className={`rounded-full p-1 transition-colors
+                                ${isDarkMode 
+                                    ? 'text-[#888] hover:text-red-400 hover:bg-red-400/10' 
+                                    : 'text-tum-grey-4 hover:text-red-500 hover:bg-red-50'
+                                }`}
                         >
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -115,8 +120,8 @@ export default function HelperFileSelectModal({
 
                 {/* Description */}
                 {helper?.description && (
-                    <div className="px-4 py-2 bg-tum-grey-9 border-b border-tum-grey-7">
-                        <p className="text-sm text-tum-grey-3">{helper.description}</p>
+                    <div className={`px-4 py-2 border-b ${isDarkMode ? 'bg-[#404040] border-[#555]' : 'bg-tum-grey-9 border-tum-grey-7'}`}>
+                        <p className={`text-sm ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-3'}`}>{helper.description}</p>
                     </div>
                 )}
 
@@ -125,21 +130,25 @@ export default function HelperFileSelectModal({
                     {eligibleFiles.length === 0 ? (
                         <div className="text-center py-4">
                             <div className="text-3xl mb-2">📭</div>
-                            <p className="text-sm text-tum-grey-4">No eligible files</p>
-                            <p className="text-xs text-tum-grey-5 mt-1">
+                            <p className={`text-sm ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-4'}`}>No eligible files</p>
+                            <p className={`text-xs mt-1 ${isDarkMode ? 'text-[#888]' : 'text-tum-grey-5'}`}>
                                 Upload and process files first
                             </p>
                         </div>
                     ) : (
                         <>
                             {/* Select All Header */}
-                            <div className="flex items-center justify-between mb-3 pb-2 border-b border-tum-grey-7">
-                                <span className="text-xs font-semibold text-tum-grey-3 uppercase tracking-wide">
+                            <div className={`flex items-center justify-between mb-3 pb-2 border-b ${isDarkMode ? 'border-[#404040]' : 'border-tum-grey-7'}`}>
+                                <span className={`text-xs font-semibold uppercase tracking-wide ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-3'}`}>
                                     Files ({eligibleFiles.length})
                                 </span>
                                 <button
                                     onClick={handleSelectAll}
-                                    className="px-3 py-1 text-xs font-medium rounded-full bg-tum-blue-light-5 text-tum-blue hover:bg-tum-blue-light-3 transition-colors"
+                                    className={`px-3 py-1 text-xs font-medium rounded-full transition-colors
+                                        ${isDarkMode 
+                                            ? 'bg-tum-blue/20 text-tum-blue hover:bg-tum-blue/30' 
+                                            : 'bg-tum-blue-light-5 text-tum-blue hover:bg-tum-blue-light-3'
+                                        }`}
                                 >
                                     {allSelected ? 'Deselect All' : 'Select All'}
                                 </button>
@@ -150,12 +159,13 @@ export default function HelperFileSelectModal({
                                 {eligibleFiles.map((file) => (
                                     <label
                                         key={file.documentId}
-                                        className={`
-                                            flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors
+                                        className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors
                                             ${selectedIds.has(file.documentId)
                                                 ? 'bg-tum-blue-light-5 border border-tum-blue'
-                                                : 'bg-tum-grey-9 border border-transparent hover:bg-tum-grey-8'}
-                                        `}
+                                                : isDarkMode
+                                                    ? 'bg-[#404040] border border-transparent hover:bg-[#4a4a4a]'
+                                                    : 'bg-tum-grey-9 border border-transparent hover:bg-tum-grey-8'
+                                            }`}
                                     >
                                         <input
                                             type="checkbox"
@@ -165,7 +175,7 @@ export default function HelperFileSelectModal({
                                                 focus:ring-tum-blue focus:ring-1 cursor-pointer"
                                         />
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm text-tum-black truncate" title={file.filename}>
+                                            <p className={`text-sm truncate ${isDarkMode ? 'text-white' : 'text-tum-black'}`} title={file.filename}>
                                                 {file.filename}
                                             </p>
                                         </div>
@@ -178,11 +188,14 @@ export default function HelperFileSelectModal({
                 </div>
 
                 {/* Footer */}
-                <div className="px-4 py-3 border-t border-tum-grey-7 bg-tum-grey-9 flex justify-end gap-2">
+                <div className={`px-4 py-3 border-t flex justify-end gap-2 ${isDarkMode ? 'bg-[#333] border-[#404040]' : 'bg-tum-grey-9 border-tum-grey-7'}`}>
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 text-sm font-medium text-tum-grey-3 bg-white 
-                            border border-tum-grey-7 rounded-lg hover:bg-tum-grey-9 transition-colors"
+                        className={`px-4 py-2 text-sm font-medium border rounded-lg transition-colors
+                            ${isDarkMode 
+                                ? 'bg-[#404040] border-[#555] text-white hover:bg-[#4a4a4a]' 
+                                : 'bg-white border-tum-grey-7 text-tum-grey-3 hover:bg-tum-grey-9'
+                            }`}
                     >
                         Cancel
                     </button>

@@ -58,11 +58,12 @@ const getShortDesc = (strategy) => {
 export default function IngestionModal({
     isOpen,
     onClose,
-    onShowPreview, // Callback to show preview in main content area
-    onCollectionCreated, // Callback to refresh collections list after creation
+    onShowPreview,
+    onCollectionCreated,
     backendConfig,
     isIngesting = false,
     progress = 0,
+    isDarkMode = false,
 }) {
     const [selectedDb, setSelectedDb] = useState('');
     const [isCreatingNewDb, setIsCreatingNewDb] = useState(false);
@@ -179,12 +180,12 @@ export default function IngestionModal({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             {/* Backdrop */}
             <div
-                className="fixed inset-0 bg-tum-black/40 backdrop-blur-sm transition-opacity"
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
                 onClick={() => !isIngesting && onClose()}
             ></div>
 
             {/* Modal Panel */}
-            <div className="relative transform overflow-hidden rounded-2xl bg-white shadow-2xl transition-all flex flex-col max-h-[90vh] sm:w-full sm:max-w-2xl">
+            <div className={`relative transform overflow-hidden rounded-2xl shadow-2xl transition-all flex flex-col max-h-[90vh] sm:w-full sm:max-w-2xl ${isDarkMode ? 'bg-[#2d2d2d]' : 'bg-white'}`}>
 
                 {/* Header */}
                 <div className="bg-gradient-to-r from-tum-blue to-tum-dark-blue px-6 py-4 flex justify-between items-center shrink-0">
@@ -216,7 +217,7 @@ export default function IngestionModal({
                     <>
                         {/* Database Selection */}
                         <div className="mb-6">
-                            <label className="block text-sm font-semibold text-tum-grey-3 mb-2">
+                            <label className={`block text-sm font-semibold mb-2 ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-3'}`}>
                                 Available Knowledge Base
                             </label>
 
@@ -226,7 +227,11 @@ export default function IngestionModal({
                                         value={selectedDb}
                                         onChange={handleDbChange}
                                         disabled={isIngesting}
-                                        className="block w-full appearance-none rounded-xl border border-tum-grey-7 bg-white hover:bg-tum-grey-9 px-4 py-3 pr-8 text-tum-black shadow-sm focus:border-tum-blue focus:outline-none focus:ring-1 focus:ring-tum-blue sm:text-sm transition-all disabled:opacity-60 cursor-pointer"
+                                        className={`block w-full appearance-none rounded-xl border px-4 py-3 pr-8 shadow-sm focus:border-tum-blue focus:outline-none focus:ring-1 focus:ring-tum-blue sm:text-sm transition-all disabled:opacity-60 cursor-pointer
+                                            ${isDarkMode 
+                                                ? 'bg-[#404040] border-[#555] text-white hover:bg-[#4a4a4a]' 
+                                                : 'bg-white border-tum-grey-7 text-tum-black hover:bg-tum-grey-9'
+                                            }`}
                                     >
                                         <option value="">Select a destination collection...</option>
                                         <option value="__create_new__" className="font-bold text-tum-blue">
@@ -240,7 +245,7 @@ export default function IngestionModal({
                                         ))}
                                     </select>
                                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4">
-                                        <svg className="h-4 w-4 text-tum-grey-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg className={`h-4 w-4 ${isDarkMode ? 'text-[#888]' : 'text-tum-grey-4'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
                                         </svg>
                                     </div>
@@ -261,7 +266,11 @@ export default function IngestionModal({
                                             placeholder="Enter new collection name..."
                                             autoFocus
                                             disabled={isIngesting || isCreatingDb}
-                                            className="block w-full rounded-xl border border-tum-blue bg-white px-4 py-3 pl-10 pr-20 text-tum-black shadow-sm focus:border-tum-blue focus:outline-none focus:ring-1 focus:ring-tum-blue sm:text-sm transition-all placeholder:text-tum-grey-4"
+                                            className={`block w-full rounded-xl border border-tum-blue px-4 py-3 pl-10 pr-20 shadow-sm focus:border-tum-blue focus:outline-none focus:ring-1 focus:ring-tum-blue sm:text-sm transition-all
+                                                ${isDarkMode 
+                                                    ? 'bg-[#404040] text-white placeholder:text-[#888]' 
+                                                    : 'bg-white text-tum-black placeholder:text-tum-grey-4'
+                                                }`}
                                         />
                                         <div className="absolute right-2 flex items-center gap-1">
                                             <button
@@ -298,7 +307,7 @@ export default function IngestionModal({
                                     </div>
                                     <p className="text-xs text-tum-blue mt-1.5 ml-1 font-medium flex justify-between">
                                         <span>Creating specific collection for these documents</span>
-                                        <span className="text-tum-grey-4 font-normal">Press Enter to create</span>
+                                        <span className={`font-normal ${isDarkMode ? 'text-[#888]' : 'text-tum-grey-4'}`}>Press Enter to create</span>
                                     </p>
                                 </div>
                             )}
@@ -307,14 +316,15 @@ export default function IngestionModal({
                         {/* Embedding Model Selection */}
                         {embeddingModels.length > 0 && (
                             <div className="mb-6">
-                                <label className="block text-sm font-semibold text-tum-grey-3 mb-2 flex justify-between">
+                                <label className={`block text-sm font-semibold mb-2 flex justify-between ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-3'}`}>
                                     <span>Embedding Model</span>
-                                    <span className="text-xs text-tum-grey-4 bg-tum-grey-8 px-2 py-0.5 rounded-full">Coming Soon</span>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full ${isDarkMode ? 'bg-[#404040] text-[#888]' : 'bg-tum-grey-8 text-tum-grey-4'}`}>Coming Soon</span>
                                 </label>
                                 <div className="relative">
                                     <select
                                         disabled
-                                        className="block w-full appearance-none rounded-xl border border-tum-grey-7 bg-tum-grey-9 px-4 py-3 pr-8 text-tum-grey-4 shadow-sm cursor-not-allowed opacity-75"
+                                        className={`block w-full appearance-none rounded-xl border px-4 py-3 pr-8 shadow-sm cursor-not-allowed opacity-75
+                                            ${isDarkMode ? 'bg-[#404040] border-[#555] text-[#888]' : 'bg-tum-grey-9 border-tum-grey-7 text-tum-grey-4'}`}
                                     >
                                         {embeddingModels.map((model) => (
                                             <option key={model.id} value={model.id} disabled={model.disabled}>
@@ -322,21 +332,15 @@ export default function IngestionModal({
                                             </option>
                                         ))}
                                     </select>
-                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4">
-                                        <svg className="h-4 w-4 text-tum-grey-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
-                                        </svg>
-                                    </div>
                                 </div>
                             </div>
                         )}
 
                         {/* Strategy Selection */}
                         <div className="mb-2">
-                            <label className="block text-sm font-semibold text-tum-grey-3 mb-3">
+                            <label className={`block text-sm font-semibold mb-3 ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-3'}`}>
                                 Ingestion Strategy
                             </label>
-                            {/* Vertical list handles many items better than a grid */}
                             <div className="flex flex-col gap-3">
                                 {strategies.map((strategy) => {
                                     const isSelected = selectedStrategy === strategy.id;
@@ -348,12 +352,14 @@ export default function IngestionModal({
                                             disabled={isIngesting || isDisabled}
                                             className={`group relative flex items-start text-left rounded-xl border p-4 transition-all duration-200 outline-none
                                             ${isSelected
-                                                    ? 'border-tum-blue bg-tum-blue-light-5 shadow-sm ring-1 ring-tum-blue'
-                                                    : isDisabled
-                                                        ? 'border-tum-grey-7 bg-tum-grey-9 opacity-60 cursor-not-allowed'
+                                                ? 'border-tum-blue bg-tum-blue-light-5 shadow-sm ring-1 ring-tum-blue'
+                                                : isDisabled
+                                                    ? `${isDarkMode ? 'border-[#404040] bg-[#333]' : 'border-tum-grey-7 bg-tum-grey-9'} opacity-60 cursor-not-allowed`
+                                                    : isDarkMode
+                                                        ? 'border-[#404040] bg-[#404040] hover:border-tum-blue/50 hover:bg-[#4a4a4a] hover:shadow-sm'
                                                         : 'border-tum-grey-7 bg-white hover:border-tum-blue/50 hover:bg-tum-grey-9 hover:shadow-sm'
-                                                } ${isIngesting ? 'cursor-not-allowed opacity-70' : ''}`
-                                            }
+                                            } ${isIngesting ? 'cursor-not-allowed opacity-70' : ''}`
+                                        }
                                         >
                                             {/* Radio Indicator */}
                                             <div className="flex items-center justify-center shrink-0 mt-0.5 mr-4">
@@ -370,7 +376,7 @@ export default function IngestionModal({
 
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                    <h4 className={`font-bold text-sm ${isSelected ? 'text-tum-blue' : 'text-tum-black'}`}>
+                                                    <h4 className={`font-bold text-sm ${isSelected ? 'text-tum-blue' : isDarkMode ? 'text-white' : 'text-tum-black'}`}>
                                                         {strategy.label}
                                                     </h4>
 
@@ -384,16 +390,16 @@ export default function IngestionModal({
                                                         </span>
                                                     )}
                                                 </div>
-                                                <p className={`text-xs leading-relaxed ${isSelected ? 'text-tum-dark-blue' : 'text-tum-grey-3'}`}>
+                                                <p className={`text-xs leading-relaxed ${isSelected ? 'text-tum-dark-blue' : isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-3'}`}>
                                                     {strategy.description}
                                                 </p>
                                             </div>
 
                                             {/* Icon (Optional, can hide on small screens) */}
                                             <div className={`hidden sm:block ml-4 p-2 rounded-lg shrink-0 transition-colors 
-                                            ${isSelected ? 'text-tum-blue bg-white' : 'text-tum-grey-4 bg-tum-grey-9'}
-                                            ${!isDisabled && !isSelected && 'group-hover:text-tum-blue group-hover:bg-tum-blue-light-5'}
-                                        `}>
+                                                ${isSelected ? 'text-tum-blue bg-white' : 'text-tum-grey-4 bg-tum-grey-9'}
+                                                ${!isDisabled && !isSelected && 'group-hover:text-tum-blue group-hover:bg-tum-blue-light-5'}
+                                            `}>
                                                 {getStrategyIcon(strategy.id)}
                                             </div>
                                         </button>
@@ -404,8 +410,8 @@ export default function IngestionModal({
                     </>
                 </div>
 
-                {/* Footer / Progress */}
-                <div className="bg-tum-grey-9 px-6 py-4 flex flex-col gap-4 border-t border-tum-grey-8 shrink-0">
+                {/* Footer */}
+                <div className={`px-6 py-4 flex flex-col gap-4 border-t shrink-0 ${isDarkMode ? 'bg-[#333] border-[#404040]' : 'bg-tum-grey-9 border-tum-grey-8'}`}>
                     {isIngesting ? (
                         <div className="w-full py-2">
                             <div className="flex justify-between text-xs font-semibold text-tum-blue mb-2">

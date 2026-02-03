@@ -19,7 +19,7 @@ import { removeUploadedFile, removeIngestedFile, getFileContent } from '../../..
 import { previewEmbeddings } from '../../../services/ingestionApi';
 import FileQueueItem from '../content/FileQueueItem';
 
-export default function ConnectedFileQueue() {
+export default function ConnectedFileQueue({ isDarkMode }) {
     // Subscribe to relevant state
     const { uploadQueue, ingestedFiles, selectedDocumentId } = useFileQueue();
     const { isPreviewMode, previewDocumentIds, previewConfig, isLoadingPreview } = usePreview();
@@ -123,7 +123,7 @@ export default function ConnectedFileQueue() {
         <div className="flex-1 overflow-y-auto flex flex-col">
             {/* Files Section (Uploaded/Content) */}
             <div className="flex-1">
-                <h3 className="text-sm font-bold text-tum-black mb-2 uppercase tracking-wide">
+                <h3 className={`text-sm font-bold mb-2 uppercase tracking-wide ${isDarkMode ? 'text-white' : 'text-tum-black'}`}>
                     {isPreviewMode ? 'Preview Files' : 'Files'} ({displayFiles.length})
                     {multiSelectMode && checkedDocumentIds.size > 0 && (
                         <span className="ml-2 text-tum-blue">
@@ -133,7 +133,7 @@ export default function ConnectedFileQueue() {
                 </h3>
 
                 {displayFiles.length === 0 ? (
-                    <p className="text-sm text-tum-black/60 italic">
+                    <p className={`text-sm italic ${isDarkMode ? 'text-white/60' : 'text-tum-black/60'}`}>
                         {isPreviewMode ? 'No files in preview' : 'No files uploaded yet'}
                     </p>
                 ) : (
@@ -150,6 +150,7 @@ export default function ConnectedFileQueue() {
                                 showCheckbox={multiSelectMode && !isPreviewMode}
                                 removableMode={true}
                                 onRemoveFromSelection={getRemoveHandler(doc.documentId)}
+                                isDarkMode={isDarkMode}
                             />
                         ))}
                     </ul>
@@ -158,8 +159,8 @@ export default function ConnectedFileQueue() {
 
             {/* Ingested Files Section */}
             {!isPreviewMode && ingestedFiles.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-tum-grey-7">
-                    <h3 className="text-sm font-bold text-tum-black mb-2 uppercase tracking-wide flex items-center gap-2">
+                <div className={`mt-4 pt-4 border-t ${isDarkMode ? 'border-[#404040]' : 'border-tum-grey-7'}`}>
+                    <h3 className={`text-sm font-bold mb-2 uppercase tracking-wide flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-tum-black'}`}>
                         <span className="text-base">🧠</span>
                         Ingested ({ingestedFiles.length})
                     </h3>
@@ -174,6 +175,7 @@ export default function ConnectedFileQueue() {
                                 showCheckbox={false}
                                 removableMode={true}
                                 onRemoveFromSelection={() => handleRemoveIngestedFile(doc.id)}
+                                isDarkMode={isDarkMode}
                             />
                         ))}
                     </ul>

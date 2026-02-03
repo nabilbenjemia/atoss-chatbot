@@ -38,13 +38,13 @@ function resolveImageUrl(url) {
 /**
  * Single Embedding Display
  */
-function EmbeddingCard({ embedding, embeddingNumber }) {
+function EmbeddingCard({ embedding, embeddingNumber, isDarkMode = false }) {
     const { id, content, metadata } = embedding;
     const images = metadata?.images || [];
     const tables = metadata?.tables || [];
 
     return (
-        <div className="bg-white rounded-xl border border-tum-grey-7 overflow-hidden shadow-sm">
+        <div className={`rounded-xl border overflow-hidden shadow-sm ${isDarkMode ? 'bg-[#2d2d2d] border-[#404040]' : 'bg-white border-tum-grey-7'}`}>
             {/* Header */}
             <div className="bg-gradient-to-r from-tum-blue to-tum-dark-blue px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -68,13 +68,13 @@ function EmbeddingCard({ embedding, embeddingNumber }) {
                 {/* Text Content */}
                 {content && (
                     <div className="mb-4">
-                        <h4 className="text-xs font-semibold text-tum-grey-3 uppercase tracking-wide mb-2 flex items-center gap-2">
+                        <h4 className={`text-xs font-semibold uppercase tracking-wide mb-2 flex items-center gap-2 ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-3'}`}>
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                             Text to be Embedded
                         </h4>
-                        <div className="bg-tum-grey-9 rounded-lg p-4 text-sm text-tum-black font-mono whitespace-pre-wrap max-h-64 overflow-y-auto">
+                        <div className={`rounded-lg p-4 text-sm font-mono whitespace-pre-wrap max-h-64 overflow-y-auto ${isDarkMode ? 'bg-[#404040] text-white' : 'bg-tum-grey-9 text-tum-black'}`}>
                             {content}
                         </div>
                     </div>
@@ -83,7 +83,7 @@ function EmbeddingCard({ embedding, embeddingNumber }) {
                 {/* Images */}
                 {images.length > 0 && (
                     <div className="mb-4">
-                        <h4 className="text-xs font-semibold text-tum-grey-3 uppercase tracking-wide mb-2 flex items-center gap-2">
+                        <h4 className={`text-xs font-semibold uppercase tracking-wide mb-2 flex items-center gap-2 ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-3'}`}>
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
@@ -91,9 +91,9 @@ function EmbeddingCard({ embedding, embeddingNumber }) {
                         </h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {images.map((img, idx) => (
-                                <div key={img.uuid || idx} className="border border-tum-grey-7 rounded-lg overflow-hidden bg-tum-grey-9">
+                                <div key={img.uuid || idx} className={`border rounded-lg overflow-hidden ${isDarkMode ? 'border-[#404040] bg-[#404040]' : 'border-tum-grey-7 bg-tum-grey-9'}`}>
                                     {img.imageUrl && (
-                                        <div className="flex items-center justify-center p-2 bg-white">
+                                        <div className={`flex items-center justify-center p-2 ${isDarkMode ? 'bg-[#2d2d2d]' : 'bg-white'}`}>
                                             <img
                                                 src={resolveImageUrl(img.imageUrl)}
                                                 alt={img.description || `Image ${idx + 1}`}
@@ -104,15 +104,15 @@ function EmbeddingCard({ embedding, embeddingNumber }) {
                                             />
                                         </div>
                                     )}
-                                    <div className="px-3 py-2 bg-tum-grey-9 border-t border-tum-grey-7">
+                                    <div className={`px-3 py-2 border-t ${isDarkMode ? 'bg-[#404040] border-[#555]' : 'bg-tum-grey-9 border-tum-grey-7'}`}>
                                         <div className="flex items-center justify-between text-xs">
-                                            <span className="text-tum-grey-4">Classification:</span>
+                                            <span className={isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-4'}>Classification:</span>
                                             <span className="font-medium text-tum-blue px-2 py-0.5 bg-tum-blue-light-5 rounded">
                                                 {img.classification || 'unknown'}
                                             </span>
                                         </div>
                                         {img.description && (
-                                            <p className="text-xs text-tum-grey-3 mt-1 italic">{img.description}</p>
+                                            <p className={`text-xs mt-1 italic ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-3'}`}>{img.description}</p>
                                         )}
                                     </div>
                                 </div>
@@ -124,22 +124,22 @@ function EmbeddingCard({ embedding, embeddingNumber }) {
                 {/* Tables */}
                 {tables.length > 0 && (
                     <div className="mb-4">
-                        <h4 className="text-xs font-semibold text-tum-grey-3 uppercase tracking-wide mb-2 flex items-center gap-2">
+                        <h4 className={`text-xs font-semibold uppercase tracking-wide mb-2 flex items-center gap-2 ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-3'}`}>
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7-8v8m14-8v8M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
                             </svg>
                             Tables ({tables.length})
                         </h4>
                         {tables.map((table, idx) => (
-                            <div key={table.id || idx} className="border border-tum-grey-7 rounded-lg overflow-hidden mb-2">
+                            <div key={table.id || idx} className={`border rounded-lg overflow-hidden mb-2 ${isDarkMode ? 'border-[#404040]' : 'border-tum-grey-7'}`}>
                                 {table.tableData && (
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-sm">
                                             {table.tableData.headers && (
-                                                <thead className="bg-tum-blue-light-5">
+                                                <thead className={isDarkMode ? 'bg-tum-blue/20' : 'bg-tum-blue-light-5'}>
                                                     <tr>
                                                         {table.tableData.headers.map((header, hIdx) => (
-                                                            <th key={hIdx} className="px-3 py-2 text-left text-tum-blue font-semibold border-b border-tum-grey-7">
+                                                            <th key={hIdx} className={`px-3 py-2 text-left font-semibold border-b ${isDarkMode ? 'text-tum-blue-light border-[#404040]' : 'text-tum-blue border-tum-grey-7'}`}>
                                                                 {header}
                                                             </th>
                                                         ))}
@@ -148,9 +148,9 @@ function EmbeddingCard({ embedding, embeddingNumber }) {
                                             )}
                                             <tbody>
                                                 {table.tableData.rows?.map((row, rIdx) => (
-                                                    <tr key={rIdx} className={rIdx % 2 === 0 ? 'bg-white' : 'bg-tum-grey-9'}>
+                                                    <tr key={rIdx} className={rIdx % 2 === 0 ? (isDarkMode ? 'bg-[#2d2d2d]' : 'bg-white') : (isDarkMode ? 'bg-[#404040]' : 'bg-tum-grey-9')}>
                                                         {row.map((cell, cIdx) => (
-                                                            <td key={cIdx} className="px-3 py-2 text-tum-black border-b border-tum-grey-8">
+                                                            <td key={cIdx} className={`px-3 py-2 border-b ${isDarkMode ? 'text-white border-[#404040]' : 'text-tum-black border-tum-grey-8'}`}>
                                                                 {cell}
                                                             </td>
                                                         ))}
@@ -167,34 +167,29 @@ function EmbeddingCard({ embedding, embeddingNumber }) {
 
                 {/* Metadata */}
                 <div>
-                    <h4 className="text-xs font-semibold text-tum-grey-3 uppercase tracking-wide mb-2 flex items-center gap-2">
+                    <h4 className={`text-xs font-semibold uppercase tracking-wide mb-2 flex items-center gap-2 ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-3'}`}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                         </svg>
                         Metadata
                     </h4>
-                    <div className="bg-tum-blue-light-5 rounded-lg p-3">
+                    <div className={`rounded-lg p-3 ${isDarkMode ? 'bg-tum-blue/10' : 'bg-tum-blue-light-5'}`}>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
                             {Object.entries(metadata || {}).map(([key, value]) => {
-                                // Skip complex objects (images, tables) - they're shown above
-                                // But allow simple arrays like page_numbers
                                 if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
                                     return null;
                                 }
-                                // Skip arrays that contain objects (like images array)
                                 if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
                                     return null;
                                 }
-                                // Skip undefined, null, or empty values
                                 if (value === undefined || value === null || value === '') {
                                     return null;
                                 }
-                                // Format arrays as comma-separated string
                                 const displayValue = Array.isArray(value) ? value.join(', ') : String(value);
                                 return (
                                     <div key={key} className="flex flex-col">
-                                        <span className="text-tum-grey-4 text-xs">{key}</span>
-                                        <span className="text-tum-black font-medium">{displayValue}</span>
+                                        <span className={`text-xs ${isDarkMode ? 'text-[#888]' : 'text-tum-grey-4'}`}>{key}</span>
+                                        <span className={`font-medium ${isDarkMode ? 'text-white' : 'text-tum-black'}`}>{displayValue}</span>
                                     </div>
                                 );
                             })}
@@ -209,19 +204,22 @@ function EmbeddingCard({ embedding, embeddingNumber }) {
 /**
  * Items per page selector
  */
-function ItemsPerPageSelector({ value, onChange, hasVisualContent }) {
+function ItemsPerPageSelector({ value, onChange, hasVisualContent, isDarkMode = false }) {
     const options = hasVisualContent
         ? [1, 2, 3, 5]
         : [1, 3, 5, 10, 20];
 
     return (
         <div className="flex items-center gap-2 text-sm">
-            <label className="text-tum-grey-4">Show:</label>
+            <label className={isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-4'}>Show:</label>
             <select
                 value={value}
                 onChange={(e) => onChange(Number(e.target.value))}
-                className="px-2 py-1 border border-tum-grey-7 rounded text-tum-black bg-white 
-                    focus:outline-none focus:ring-1 focus:ring-tum-blue cursor-pointer"
+                className={`px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-tum-blue cursor-pointer
+                    ${isDarkMode 
+                        ? 'bg-[#404040] border-[#555] text-white' 
+                        : 'bg-white border-tum-grey-7 text-tum-black'
+                    }`}
             >
                 {options.map(opt => (
                     <option key={opt} value={opt}>{opt} per page</option>
@@ -233,17 +231,6 @@ function ItemsPerPageSelector({ value, onChange, hasVisualContent }) {
 
 /**
  * Main EmbeddingPreviewViewer component
- * 
- * @param {Object} props
- * @param {Object} props.preview - Embedding preview data
- * @param {boolean} props.isLoading - Loading state
- * @param {boolean} props.isIngesting - Ingestion in progress state
- * @param {Function} props.onCancel - Cancel handler (null for read-only mode)
- * @param {Function} props.onConfirm - Confirm handler for single file (null for read-only mode)
- * @param {Function} props.onConfirmAll - Confirm handler for all files (multi-file mode)
- * @param {boolean} props.readOnly - Whether to hide action buttons
- * @param {boolean} props.isMultiFile - Whether multiple files are being previewed
- * @param {number} props.totalFilesInPreview - Total number of files in preview (for multi-file)
  */
 export default function EmbeddingPreviewViewer({
     preview,
@@ -255,6 +242,7 @@ export default function EmbeddingPreviewViewer({
     readOnly = false,
     isMultiFile = false,
     totalFilesInPreview = 1,
+    isDarkMode = false,
 }) {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(3);
@@ -293,7 +281,7 @@ export default function EmbeddingPreviewViewer({
         return (
             <div className="flex-1 flex flex-col items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-4 border-tum-blue border-t-transparent mb-4"></div>
-                <p className="text-tum-grey-4 text-sm">Generating embedding preview...</p>
+                <p className={`text-sm ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-4'}`}>Generating embedding preview...</p>
             </div>
         );
     }
@@ -302,8 +290,8 @@ export default function EmbeddingPreviewViewer({
         return (
             <div className="flex-1 flex flex-col items-center justify-center text-center">
                 <div className="text-6xl mb-4">📭</div>
-                <p className="text-lg text-tum-grey-4">No embeddings to preview</p>
-                <p className="text-sm text-tum-grey-5 mt-1">The document may be empty or all content was deleted</p>
+                <p className={`text-lg ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-4'}`}>No embeddings to preview</p>
+                <p className={`text-sm mt-1 ${isDarkMode ? 'text-[#888]' : 'text-tum-grey-5'}`}>The document may be empty or all content was deleted</p>
             </div>
         );
     }
@@ -311,16 +299,19 @@ export default function EmbeddingPreviewViewer({
     return (
         <div className="flex-1 flex flex-col overflow-hidden">
             {/* Top Action Bar */}
-            <div className="bg-gradient-to-r from-tum-blue-light-5 to-tum-blue-light-4 border-b border-tum-grey-7 px-6 py-3 flex items-center justify-between shrink-0">
+            <div className={`border-b px-6 py-3 flex items-center justify-between shrink-0 ${isDarkMode ? 'bg-[#2d2d2d] border-[#404040]' : 'bg-gradient-to-r from-tum-blue-light-5 to-tum-blue-light-4 border-tum-grey-7'}`}>
                 <div className="flex items-center gap-3">
                     {!readOnly ? (
                         <>
                             <button
                                 onClick={onCancel}
                                 disabled={isIngesting}
-                                className={`px-4 py-2 text-sm font-semibold text-tum-black bg-white border border-tum-grey-7 
-                                    rounded-lg transition-colors flex items-center gap-2
-                                    ${isIngesting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-tum-grey-9'}`}
+                                className={`px-4 py-2 text-sm font-semibold border rounded-lg transition-colors flex items-center gap-2
+                                    ${isDarkMode 
+                                        ? 'text-white bg-[#404040] border-[#555] hover:bg-[#4a4a4a]' 
+                                        : 'text-tum-black bg-white border-tum-grey-7 hover:bg-tum-grey-9'
+                                    }
+                                    ${isIngesting ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -345,7 +336,6 @@ export default function EmbeddingPreviewViewer({
                                 {isIngesting ? 'Ingesting...' : 'Confirm & Ingest'}
                             </button>
 
-                            {/* Confirm All button for Multi-File */}
                             {isMultiFile && totalFilesInPreview > 1 && (
                                 <button
                                     onClick={onConfirmAll}
@@ -381,18 +371,19 @@ export default function EmbeddingPreviewViewer({
                         value={itemsPerPage}
                         onChange={setItemsPerPage}
                         hasVisualContent={hasVisualContent}
+                        isDarkMode={isDarkMode}
                     />
                     <div className="text-sm">
                         <span className="font-bold text-tum-blue">{totalItems}</span>
-                        <span className="text-tum-grey-4"> total embedding{totalItems !== 1 ? 's' : ''}</span>
+                        <span className={isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-4'}> total embedding{totalItems !== 1 ? 's' : ''}</span>
                     </div>
                 </div>
             </div>
 
             {/* Summary Bar */}
-            <div className="bg-white border-b border-tum-grey-7 px-6 py-2 flex items-center justify-between text-sm shrink-0">
-                <div className="flex items-center gap-4 text-tum-grey-4">
-                    <span><strong className="text-tum-black">{preview.source}</strong></span>
+            <div className={`border-b px-6 py-2 flex items-center justify-between text-sm shrink-0 ${isDarkMode ? 'bg-[#2d2d2d] border-[#404040]' : 'bg-white border-tum-grey-7'}`}>
+                <div className={`flex items-center gap-4 ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-4'}`}>
+                    <span><strong className={isDarkMode ? 'text-white' : 'text-tum-black'}>{preview.source}</strong></span>
                     <span>•</span>
                     <span>{preview.page_count} page{preview.page_count !== 1 ? 's' : ''}</span>
                     <span>•</span>
@@ -401,19 +392,20 @@ export default function EmbeddingPreviewViewer({
                             preview.strategy === 'chunked_document' ? 'Semantic Chunking' : preview.strategy}
                     </span>
                 </div>
-                <div className="text-tum-grey-4">
+                <div className={isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-4'}>
                     Showing {startIndex + 1}-{endIndex} of {totalItems}
                 </div>
             </div>
 
             {/* Scrollable Content Area */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className={`flex-1 overflow-y-auto p-6 ${isDarkMode ? 'bg-[#212121]' : ''}`}>
                 <div className="max-w-4xl mx-auto flex flex-col gap-6">
                     {currentItems.map((embedding, idx) => (
                         <EmbeddingCard
                             key={embedding.id}
                             embedding={embedding}
                             embeddingNumber={startIndex + idx + 1}
+                            isDarkMode={isDarkMode}
                         />
                     ))}
                 </div>
@@ -425,6 +417,7 @@ export default function EmbeddingPreviewViewer({
                     currentPage={currentPage}
                     totalPages={totalPages}
                     onPageChange={handlePageChange}
+                    isDarkMode={isDarkMode}
                 />
             )}
         </div>

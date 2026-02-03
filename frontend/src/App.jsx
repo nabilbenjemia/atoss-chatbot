@@ -39,7 +39,14 @@ export default function App() {
           }
         />
         <Route path="/profile" element={<UserProfilePage />} />
+        
         {/* Admin routes */}
+        <Route path="/analytics" element={
+          <AdminRoute>
+            <AnalyticsDashboard />
+          </AdminRoute>
+        } />
+        
         <Route path="/admin/ingestion" element={
           <AdminRoute>
             <IngestionPage />

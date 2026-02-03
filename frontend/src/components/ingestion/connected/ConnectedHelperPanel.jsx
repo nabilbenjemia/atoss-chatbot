@@ -23,7 +23,7 @@ import { streamImageDescriptions } from '../../../services/ingestionApi';
 import { Commands } from '../../../hooks/useCommandHistory';
 import { INGESTION_CONFIG } from '../../../config/ingestionConfig';
 
-export default function ConnectedHelperPanel({ commandState, executeCommand }) {
+export default function ConnectedHelperPanel({ commandState, executeCommand, isDarkMode = false }) {
     const { runningHelper, isIngesting } = useUI();
     const { uploadQueue } = useFileQueue();
     const actions = useIngestionActions();
@@ -214,7 +214,7 @@ export default function ConnectedHelperPanel({ commandState, executeCommand }) {
         <div className="flex-1 p-4 overflow-y-auto">
             {/* Local Helpers */}
             <div className="space-y-2 mb-4">
-                <p className="text-xs text-tum-blue font-bold uppercase tracking-wider mb-2">
+                <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-tum-blue-light' : 'text-tum-blue'}`}>
                     Local
                 </p>
                 {localHelpers.map((helper) => (
@@ -226,26 +226,32 @@ export default function ConnectedHelperPanel({ commandState, executeCommand }) {
                             w-full px-3 py-2 text-left text-sm transition-all border
                             ${disabled
                                 ? 'opacity-40 cursor-not-allowed'
-                                : 'hover:bg-tum-blue-light-5 hover:border-tum-blue'}
+                                : isDarkMode
+                                    ? 'hover:bg-[#404040] hover:border-tum-blue'
+                                    : 'hover:bg-tum-blue-light-5 hover:border-tum-blue'}
                             ${runningHelper === helper.id
-                                ? 'bg-tum-blue-light-2 animate-pulse border-tum-blue'
-                                : 'bg-white border-transparent'}
-                            text-tum-black
+                                ? isDarkMode
+                                    ? 'bg-tum-blue/20 animate-pulse border-tum-blue'
+                                    : 'bg-tum-blue-light-2 animate-pulse border-tum-blue'
+                                : isDarkMode
+                                    ? 'bg-[#404040] border-transparent'
+                                    : 'bg-white border-transparent'}
+                            ${isDarkMode ? 'text-white' : 'text-tum-black'}
                         `}
                         title={helper.description}
                     >
                         <span className="mr-2">{helper.icon}</span>
                         {helper.label}
-                        {helper.hasInput && <span className="ml-1 text-xs text-tum-grey-4">...</span>}
+                        {helper.hasInput && <span className={`ml-1 text-xs ${isDarkMode ? 'text-[#888]' : 'text-tum-grey-4'}`}>...</span>}
                     </button>
                 ))}
             </div>
 
-            <hr className="my-3 border-tum-grey-7" />
+            <hr className={`my-3 ${isDarkMode ? 'border-[#404040]' : 'border-tum-grey-7'}`} />
 
             {/* Backend/AI Helpers */}
             <div className="space-y-2">
-                <p className="text-xs text-tum-blue font-bold uppercase tracking-wider mb-2">
+                <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-tum-blue-light' : 'text-tum-blue'}`}>
                     AI Powered
                 </p>
                 {backendHelpers.map((helper) => (
@@ -257,11 +263,17 @@ export default function ConnectedHelperPanel({ commandState, executeCommand }) {
                             w-full px-3 py-2 text-left text-sm transition-all border
                             ${disabled
                                 ? 'opacity-40 cursor-not-allowed'
-                                : 'hover:bg-tum-blue-light-5 hover:border-tum-blue'}
+                                : isDarkMode
+                                    ? 'hover:bg-[#404040] hover:border-tum-blue'
+                                    : 'hover:bg-tum-blue-light-5 hover:border-tum-blue'}
                             ${runningHelper === helper.id
-                                ? 'bg-tum-blue-light-2 animate-pulse border-tum-blue'
-                                : 'bg-white border-transparent'}
-                            text-tum-black
+                                ? isDarkMode
+                                    ? 'bg-tum-blue/20 animate-pulse border-tum-blue'
+                                    : 'bg-tum-blue-light-2 animate-pulse border-tum-blue'
+                                : isDarkMode
+                                    ? 'bg-[#404040] border-transparent'
+                                    : 'bg-white border-transparent'}
+                            ${isDarkMode ? 'text-white' : 'text-tum-black'}
                         `}
                         title={helper.description}
                     >
@@ -272,8 +284,8 @@ export default function ConnectedHelperPanel({ commandState, executeCommand }) {
             </div>
 
             {/* Helper hint */}
-            <div className="mt-6 p-3 bg-tum-blue-light-5 border-l-4 border-tum-blue">
-                <p className="text-xs text-tum-black">
+            <div className={`mt-6 p-3 border-l-4 border-tum-blue ${isDarkMode ? 'bg-tum-blue/10' : 'bg-tum-blue-light-5'}`}>
+                <p className={`text-xs ${isDarkMode ? 'text-white' : 'text-tum-black'}`}>
                     💡 Helpers apply to all pages. Changes can be undone.
                 </p>
             </div>

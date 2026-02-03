@@ -12,7 +12,7 @@ import axios from 'axios';
 import { generateLocalPreview, isLocalStrategy } from '../hooks/useLocalStrategy';
 
 // Ingestion service URL
-const INGESTION_URL = import.meta.env.VITE_INGESTION_URL || 'http://localhost:4005';
+const INGESTION_URL = import.meta.env.VITE_INGESTION_URL || 'http://localhost:4006';
 
 // Create axios instance for ingestion service
 const ingestionApi = axios.create({
@@ -198,7 +198,7 @@ export const generateImageDescriptions = async (documentId, images) => {
  */
 export const streamImageDescriptions = async (documentId, images, callbacks = {}) => {
     const { onStart, onDescription, onError, onDone } = callbacks;
-    const baseUrl = import.meta.env.VITE_INGESTION_URL || 'http://localhost:4005';
+    const baseUrl = import.meta.env.VITE_INGESTION_URL || 'http://localhost:4006';
 
     return new Promise((resolve, reject) => {
         // Use fetch with POST to get SSE stream

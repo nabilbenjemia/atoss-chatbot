@@ -89,14 +89,14 @@ services:
       context: ./backend/ingestion
       dockerfile: Dockerfile
     ports:
-      - "4005:4005"
+      - "4006:4006"
     env_file:
       - ./backend/ingestion/.env
     environment:
       - LLM_SERVICE_URL=http://llm:8000
-    depends_on:
-      llm:
-        condition: service_healthy
+    #depends_on:
+    #  llm:
+    #    condition: service_healthy
     networks:
       - atoss-network
     restart: unless-stopped

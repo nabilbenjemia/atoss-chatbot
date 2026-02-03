@@ -47,7 +47,7 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Internal server error', details: err.message });
 });
 
-const PORT = process.env.PORT || 4005;
+const PORT = process.env.PORT || 4006;
 
 app.listen(PORT, () => {
     console.log(`🚀 Ingestion service running on port ${PORT}`);

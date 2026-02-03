@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Plot from 'react-plotly.js';
 import { toast } from 'react-toastify';
-
+import { getCurrentUser, userAPI } from '../services/api'
+import Header from '../components/Header'; 
 const CONVERSATION_API = import.meta.env.VITE_CONVERSATION_API || 'http://localhost:4004';
 
 const AnalyticsDashboard = () => {
@@ -11,8 +12,38 @@ const AnalyticsDashboard = () => {
     const [error, setError] = useState(null);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+    const [theme, setTheme] = useState('auto'); 
 
-    const userId = localStorage.getItem('userId');
+    const currentUser = getCurrentUser();
+    const userId = currentUser?.id;
+    const role = currentUser?.role;
+
+    // Determine if dark mode should be applied - MUST BE BEFORE EARLY RETURNS
+    const isDarkMode = theme === 'dark';
+
+    // Load user preferences for theme
+    useEffect(() => {
+        const loadPreferences = async () => {
+            try {
+                const response = await userAPI.getProfile();
+                if (response.success && response.data.preferences) {
+                    const userTheme = response.data.preferences.theme;
+                    if (userTheme === 'auto') {
+                        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                        setTheme(prefersDark ? 'dark' : 'light');
+                    } else {
+                        setTheme(userTheme);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load preferences:', error);
+            }
+        };
+
+        if (userId) {
+            loadPreferences();
+        }
+    }, [userId]);
 
     useEffect(() => {
         fetchDashboardData();
@@ -89,16 +120,39 @@ const AnalyticsDashboard = () => {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-screen bg-tum-white">
-                <div className="text-tum-grey-1 text-xl">Loading analytics...</div>
+            <div className={`h-screen flex flex-col overflow-hidden ${isDarkMode ? 'bg-[#212121]' : 'bg-white'}`}>
+                <div className="flex-shrink-0 h-14">
+                    <Header role={role} isDarkMode={isDarkMode} />
+                </div>
+                <div className="flex-1 flex items-center justify-center">
+                    <div className={`text-xl ${isDarkMode ? 'text-white' : 'text-tum-grey-1'}`}>Loading analytics...</div>
+                </div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="flex items-center justify-center h-screen bg-tum-white">
-                <div className="text-tum-red text-xl">Error: {error}</div>
+            <div className={`h-screen flex flex-col overflow-hidden ${isDarkMode ? 'bg-[#212121]' : 'bg-white'}`}>
+                <div className="flex-shrink-0 h-14">
+                    <Header role={role} isDarkMode={isDarkMode} />
+                </div>
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="text-tum-red text-xl">Error: {error}</div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!dashboardData) {
+        return (
+            <div className={`h-screen flex flex-col overflow-hidden ${isDarkMode ? 'bg-[#212121]' : 'bg-white'}`}>
+                <div className="flex-shrink-0 h-14">
+                    <Header role={role} isDarkMode={isDarkMode} />
+                </div>
+                <div className="flex-1 flex items-center justify-center">
+                    <div className={`text-xl ${isDarkMode ? 'text-white' : 'text-tum-grey-1'}`}>No data available</div>
+                </div>
             </div>
         );
     }
@@ -135,103 +189,201 @@ const AnalyticsDashboard = () => {
     }] : [];
 
     return (
-        <div className="min-h-screen bg-tum-white text-tum-grey-1 p-6">
-            <div className="max-w-7xl mx-auto">
-                {/* Header */}
-                <div className="mb-8">
-                    <div className="flex justify-between items-center mb-4">
-                        <div>
-                            <h1 className="text-3xl font-bold mb-2 text-tum-grey-1">Analytics Dashboard</h1>
-                            <p className="text-tum-grey-4">Query analysis and insights</p>
+        <div className={`h-screen flex flex-col overflow-hidden ${isDarkMode ? 'bg-[#212121] text-white' : 'bg-white text-tum-grey-1'}`}>
+            {/* Header - fixed height, consistent with ChatbotPage */}
+            <div className="flex-shrink-0 h-14">
+                <Header role={role} isDarkMode={isDarkMode} />
+            </div>
+            
+            {/* Main dashboard area */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+                <div className="max-w-7xl mx-auto p-6">
+                    {/* Header */}
+                    <div className="mb-8">
+                        <div className="flex justify-between items-center mb-4">
+                            <div>
+                                <h1 className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-tum-grey-1'}`}>Analytics Dashboard</h1>
+                                <p className={`${isDarkMode ? 'text-white' : 'text-tum-grey-4'}`}>Query analysis and insights</p>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={downloadCSV}
+                                    className="bg-tum-green hover:bg-tum-green-dark text-tum-white px-6 py-2 rounded-lg transition-colors"
+                                >
+                                    Download CSV
+                                </button>
+                                <button
+                                    onClick={processQueries}
+                                    disabled={processing}
+                                    className="bg-tum-blue-brand hover:bg-tum-dark-blue disabled:bg-tum-grey-4 text-tum-white px-6 py-2 rounded-lg transition-colors"
+                                >
+                                    {processing ? 'Processing...' : 'Process New Queries'}
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={downloadCSV}
-                                className="bg-tum-green hover:bg-tum-green-dark text-tum-white px-6 py-2 rounded-lg transition-colors"
-                            >
-                                Download CSV
-                            </button>
-                            <button
-                                onClick={processQueries}
-                                disabled={processing}
-                                className="bg-tum-blue-brand hover:bg-tum-dark-blue disabled:bg-tum-grey-4 text-tum-white px-6 py-2 rounded-lg transition-colors"
-                            >
-                                {processing ? 'Processing...' : 'Process New Queries'}
-                            </button>
+                        
+                        {/* Date Range Filters */}
+                        <div className={`flex gap-4 items-center p-4 rounded-xl border shadow-lg
+                            ${isDarkMode 
+                                ? 'bg-tum-grey-2 border-tum-grey-4'
+                                : 'bg-tum-blue-light-5 border-tum-blue-light-2'
+                            }`
+                        }>
+                            <div className="flex items-center gap-2">
+                                <label className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm font-medium`}>From:</label>
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className={`px-3 py-2 rounded-xl border focus:border-tum-blue-brand focus:ring-2 focus:ring-tum-blue-brand focus:outline-none
+                                        ${isDarkMode 
+                                            ? 'bg-tum-grey-3 text-white border-tum-grey-4'
+                                            : 'bg-tum-white text-tum-grey-1 border-tum-blue-light-2'
+                                        }`
+                                    }
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <label className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm font-medium`}>To:</label>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className={`px-3 py-2 rounded-xl border focus:border-tum-blue-brand focus:ring-2 focus:ring-tum-blue-brand focus:outline-none
+                                        ${isDarkMode 
+                                            ? 'bg-tum-grey-3 text-white border-tum-grey-4'
+                                            : 'bg-tum-white text-tum-grey-1 border-tum-blue-light-2'
+                                        }`
+                                    }
+                                />
+                            </div>
+                            {(startDate || endDate) && (
+                                <button
+                                    onClick={() => { setStartDate(''); setEndDate(''); }}
+                                    className={`text-tum-blue-brand hover:text-tum-white text-sm font-medium transition-colors ${isDarkMode ? '' : ''}`}
+                                >
+                                    Clear filters
+                                </button>
+                            )}
                         </div>
                     </div>
-                    
-                    {/* Date Range Filters */}
-                    <div className="flex gap-4 items-center bg-tum-blue-light-5 p-4 rounded-xl border border-tum-blue-light-2 shadow-lg">
-                        <div className="flex items-center gap-2">
-                            <label className="text-tum-grey-3 text-sm font-medium">From:</label>
-                            <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="bg-tum-white text-tum-grey-1 px-3 py-2 rounded-xl border border-tum-blue-light-2 focus:border-tum-blue-brand focus:ring-2 focus:ring-tum-blue-brand focus:outline-none"
-                            />
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <label className="text-tum-grey-3 text-sm font-medium">To:</label>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="bg-tum-white text-tum-grey-1 px-3 py-2 rounded-xl border border-tum-blue-light-2 focus:border-tum-blue-brand focus:ring-2 focus:ring-tum-blue-brand focus:outline-none"
-                            />
-                        </div>
-                        {(startDate || endDate) && (
-                            <button
-                                onClick={() => { setStartDate(''); setEndDate(''); }}
-                                className="text-tum-blue-brand hover:text-tum-dark-blue text-sm font-medium transition-colors"
-                            >
-                                Clear filters
-                            </button>
-                        )}
-                    </div>
-                </div>
 
-                {/* Overall Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-tum-blue-light-4 rounded-xl p-6 border border-tum-blue-light-2 shadow-lg">
-                        <div className="text-tum-grey-3 text-sm mb-2 font-medium">Processed Queries <span className="text-xs font-normal">(1 word queries skipped)</span></div>
-                        <div className="text-4xl font-bold text-tum-dark-blue">{overall?.totalQueries || 0}</div>
+                    {/* Overall Stats Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
+                            <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>Processed Queries <span className="text-[10px] font-normal">(1 word queries skipped)</span></div>
+                            <div className={`text-4xl font-bold ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>{overall?.totalQueries || 0}</div>
+                        </div>
+                        <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
+                            <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>Total Queries <span className="text-[10px] font-normal">(including 1 word queries)</span></div>
+                            <div className={`text-4xl font-bold ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>{overall?.totalQueriesIncludingOneWord || 0}</div>
+                        </div>
+                        <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
+                            <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>Total Users</div>
+                            <div className={`text-4xl font-bold ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>{overall?.uniqueUsers || 0}</div>
+                        </div>
+                        <div className={`${isDarkMode ? 'bg-tum-green-6 border-tum-green-3 text-white' : 'bg-tum-green-5 border-tum-green-2'} rounded-xl p-6 border shadow-lg`}>
+                            <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>🟢 Active Now (15min)</div>
+                            <div className="text-4xl font-bold text-tum-green">{overall?.activeUsersNow || 0}</div>
+                        </div>
                     </div>
-                    <div className="bg-tum-blue-light-4 rounded-xl p-6 border border-tum-blue-light-2 shadow-lg">
-                        <div className="text-tum-grey-3 text-sm mb-2 font-medium">Total Queries <span className="text-xs font-normal">(including 1 word queries)</span></div>
-                        <div className="text-4xl font-bold text-tum-dark-blue">{overall?.totalQueriesIncludingOneWord || 0}</div>
+                    {/* Charts Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                        {/* Top Keywords Chart */}
+                        <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
+                            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>Top Keywords</h2>
+                            {keywords && keywords.length > 0 ? (
+                                <Plot
+                                    data={keywordData}
+                                    layout={{
+                                        paper_bgcolor: 'rgba(0,0,0,0)',
+                                        plot_bgcolor: 'rgba(0,0,0,0)',
+                                        font: { color: isDarkMode ? '#FFFFFF' : '#20252A' },
+                                        xaxis: {
+                                            gridcolor: isDarkMode ? '#444' : '#C2D7EF',
+                                            title: {
+                                                text: 'Keywords',
+                                                font: { color: isDarkMode ? '#FFFFFF' : '#20252A' }
+                                            },
+                                            tickfont: { color: isDarkMode ? '#FFFFFF' : '#20252A' }
+                                        },
+                                        yaxis: {
+                                            gridcolor: isDarkMode ? '#444' : '#C2D7EF',
+                                            title: {
+                                                text: 'Frequency',
+                                                font: { color: isDarkMode ? '#FFFFFF' : '#20252A' }
+                                            },
+                                            tickfont: { color: isDarkMode ? '#FFFFFF' : '#20252A' }
+                                        },
+                                        margin: { t: 20, b: 80, l: 60, r: 20 },
+                                        height: 350
+                                    }}
+                                    config={{ displayModeBar: false }}
+                                    style={{ width: '100%' }}
+                                    useResizeHandler={true}
+                                />
+                            ) : (
+                                <div className="text-tum-grey-4 text-center py-10">No keyword data available</div>
+                            )}
+                        </div>
+
+                        {/* Category Distribution Chart */}
+                        <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
+                            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>Query Categories</h2>
+                            {categories && categories.length > 0 ? (
+                                <Plot
+                                    data={categoryData}
+                                    layout={{
+                                        paper_bgcolor: 'rgba(0,0,0,0)',
+                                        plot_bgcolor: 'rgba(0,0,0,0)',
+                                        font: { color: isDarkMode ? '#FFFFFF' : '#20252A' },
+                                        showlegend: true,
+                                        legend: {
+                                            orientation: 'v',
+                                            x: 1.15,
+                                            y: 0.5,
+                                            font: { color: isDarkMode ? '#FFFFFF' : '#20252A' }
+                                        },
+                                        margin: { t: 30, b: 30, l: 30, r: 220 },
+                                        height: 350
+                                    }}
+                                    config={{ displayModeBar: false }}
+                                    style={{ width: '100%' }}
+                                    useResizeHandler={true}
+                                />
+                            ) : (
+                                <div className="text-tum-grey-4 text-center py-10">No category data available</div>
+                            )}
+                        </div>
                     </div>
-                    <div className="bg-tum-blue-light-4 rounded-xl p-6 border border-tum-blue-light-2 shadow-lg">
-                        <div className="text-tum-grey-3 text-sm mb-2 font-medium">Total Users</div>
-                        <div className="text-4xl font-bold text-tum-dark-blue">{overall?.uniqueUsers || 0}</div>
-                    </div>
-                    <div className="bg-tum-green-5 rounded-xl p-6 border border-tum-green-2 shadow-lg">
-                        <div className="text-tum-grey-3 text-sm mb-2 font-medium">🟢 Active Now (15min)</div>
-                        <div className="text-4xl font-bold text-tum-green">{overall?.activeUsersNow || 0}</div>
-                    </div>
-                </div>
-                {/* Charts Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                    {/* Top Keywords Chart */}
-                    <div className="bg-tum-blue-light-4 rounded-xl p-6 border border-tum-blue-light-2 shadow-lg">
-                        <h2 className="text-xl font-semibold mb-4 text-tum-dark-blue">Top Keywords</h2>
-                        {keywords && keywords.length > 0 ? (
+
+                    {/* Timeline Chart - Full Width */}
+                    <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
+                        <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>
+                            Queries Over Time
+                            {!startDate && !endDate && <span className={`${isDarkMode ? 'text-white' : 'text-tum-grey-4'} text-sm ml-2`}>(Last 7 Days)</span>}
+                            {(startDate || endDate) && (
+                                <span className={`${isDarkMode ? 'text-white' : 'text-tum-grey-4'} text-sm ml-2`}>
+                                    ({startDate || '...'} to {endDate || 'now'})
+                                </span>
+                            )}
+                        </h2>
+                        {timeline && timeline.length > 0 ? (
                             <Plot
-                                data={keywordData}
+                                data={timelineData}
                                 layout={{
                                     paper_bgcolor: 'rgba(0,0,0,0)',
                                     plot_bgcolor: 'rgba(0,0,0,0)',
-                                    font: { color: '#20252A' },
+                                    font: { color: isDarkMode ? '#FFFFFF' : '#20252A' },
                                     xaxis: {
                                         gridcolor: '#C2D7EF',
-                                        title: 'Keywords'
+                                        title: 'Date'
                                     },
                                     yaxis: {
                                         gridcolor: '#C2D7EF',
-                                        title: 'Frequency'
+                                        title: 'Number of Queries'
                                     },
-                                    margin: { t: 20, b: 80, l: 60, r: 20 },
+                                    margin: { t: 20, b: 60, l: 50, r: 20 },
                                     height: 350
                                 }}
                                 config={{ displayModeBar: false }}
@@ -239,83 +391,22 @@ const AnalyticsDashboard = () => {
                                 useResizeHandler={true}
                             />
                         ) : (
-                            <div className="text-tum-grey-4 text-center py-10">No keyword data available</div>
+                            <div className="text-tum-grey-4 text-center py-10">No timeline data available</div>
                         )}
                     </div>
 
-                    {/* Category Distribution Chart */}
-                    <div className="bg-tum-blue-light-4 rounded-xl p-6 border border-tum-blue-light-2 shadow-lg">
-                        <h2 className="text-xl font-semibold mb-4 text-tum-dark-blue">Query Categories</h2>
-                        {categories && categories.length > 0 ? (
-                            <Plot
-                                data={categoryData}
-                                layout={{
-                                    paper_bgcolor: 'rgba(0,0,0,0)',
-                                    plot_bgcolor: 'rgba(0,0,0,0)',
-                                    font: { color: '#20252A' },
-                                    showlegend: true,
-                                    legend: {
-                                        orientation: 'v',
-                                        x: 1.15,
-                                        y: 0.5
-                                    },
-                                    margin: { t: 30, b: 30, l: 30, r: 220 },
-                                    height: 350
-                                }}
-                                config={{ displayModeBar: false }}
-                                style={{ width: '100%' }}
-                                useResizeHandler={true}
-                            />
-                        ) : (
-                            <div className="text-tum-grey-4 text-center py-10">No category data available</div>
-                        )}
+                    {/* Info Box */}
+                    <div className={`mt-6 rounded-xl p-4 shadow-lg border
+                        ${isDarkMode 
+                            ? 'bg-tum-grey-2 border-tum-grey-4 text-white'
+                            : 'bg-tum-blue-light-5 border-tum-blue-light-2'
+                        }`
+                    }>
+                        <p className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm`}>
+                            <strong>Note:</strong> Analytics are powered by a small LLM that classifies queries into keywords and categories. 
+                            Click "Process New Queries" to analyze recent chat messages.
+                        </p>
                     </div>
-                </div>
-
-                {/* Timeline Chart - Full Width */}
-                <div className="bg-tum-blue-light-4 rounded-xl p-6 border border-tum-blue-light-2 shadow-lg">
-                    <h2 className="text-xl font-semibold mb-4 text-tum-dark-blue">
-                        Queries Over Time
-                        {!startDate && !endDate && <span className="text-tum-grey-4 text-sm ml-2">(Last 7 Days)</span>}
-                        {(startDate || endDate) && (
-                            <span className="text-tum-grey-4 text-sm ml-2">
-                                ({startDate || '...'} to {endDate || 'now'})
-                            </span>
-                        )}
-                    </h2>
-                    {timeline && timeline.length > 0 ? (
-                        <Plot
-                            data={timelineData}
-                            layout={{
-                                paper_bgcolor: 'rgba(0,0,0,0)',
-                                plot_bgcolor: 'rgba(0,0,0,0)',
-                                font: { color: '#20252A' },
-                                xaxis: {
-                                    gridcolor: '#C2D7EF',
-                                    title: 'Date'
-                                },
-                                yaxis: {
-                                    gridcolor: '#C2D7EF',
-                                    title: 'Number of Queries'
-                                },
-                                margin: { t: 20, b: 60, l: 50, r: 20 },
-                                height: 350
-                            }}
-                            config={{ displayModeBar: false }}
-                            style={{ width: '100%' }}
-                            useResizeHandler={true}
-                        />
-                    ) : (
-                        <div className="text-tum-grey-4 text-center py-10">No timeline data available</div>
-                    )}
-                </div>
-
-                {/* Info Box */}
-                <div className="mt-6 bg-tum-blue-light-5 border border-tum-blue-light-2 rounded-xl p-4 shadow-lg">
-                    <p className="text-sm text-tum-grey-3">
-                        <strong>Note:</strong> Analytics are powered by a small LLM that classifies queries into keywords and categories. 
-                        Click "Process New Queries" to analyze recent chat messages.
-                    </p>
                 </div>
             </div>
         </div>
