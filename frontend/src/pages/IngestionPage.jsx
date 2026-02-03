@@ -32,6 +32,7 @@ import {
 
 // External hooks
 import useBackendConfig from '../hooks/useBackendConfig';
+import useUserPreferences from '../hooks/useUserPreferences';
 import useCommandHistory, { Commands, serializeCommand, getCommandDescription } from '../hooks/useCommandHistory';
 
 // Utility functions
@@ -94,14 +95,15 @@ function IngestionPageLayout() {
 
     const currentUser = getCurrentUser();
     const userId = currentUser?.id;
-    const userRole = currentUser?.role; 
+    const userRole = currentUser?.role;
+
+    // User preferences (theme, language)
+    const { isDarkMode, language } = useUserPreferences(userId);
     
     // Local UI state for title editing
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editingTitleValue, setEditingTitleValue] = useState('');
     const [showCacheManagement, setShowCacheManagement] = useState(false);
-    // Theme state
-    const [theme, setTheme] = useState('auto');
 
     // Ref to track which document the current command history belongs to
     // This prevents saving history to wrong file during file switches
@@ -147,38 +149,113 @@ function IngestionPageLayout() {
         clearLastAction,
     } = useCommandHistory(null);
 
-    // Load user preferences for theme
-    useEffect(() => {
-        const loadPreferences = async () => {
-            try {
-                const response = await userAPI.getProfile();
-                if (response.success && response.data.preferences) {
-                    const userTheme = response.data.preferences.theme;
-                    // Handle 'auto' theme - use system preference
-                    if (userTheme === 'auto') {
-                        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                        setTheme(prefersDark ? 'dark' : 'light');
-                    } else {
-                        setTheme(userTheme);
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to load preferences:', error);
-            }
-        };
-
-        if (userId) {
-            loadPreferences();
-        }
-    }, [userId]);
-
-    // Determine if dark mode should be applied
-    const isDarkMode = theme === 'dark';
+    // Translations for IngestionPage
+    const ingestionTranslations = {
+        en: {
+            documentIngestion: 'Document Ingestion',
+            expandSidebar: 'Expand sidebar',
+            collapseSidebar: 'Collapse sidebar',
+            multiSelect: 'Multi-Select',
+            exitMultiSelect: 'Exit multi-select',
+            enableMultiSelect: 'Enable multi-select',
+            backToChat: 'Back to Chat',
+            manageCache: 'Manage Cache',
+            selectDocument: 'Select a document',
+            pageOf: 'Page',
+            of: 'of',
+            loadingConfig: 'Loading configuration...',
+            pleaseLogIn: 'Please log in to access this page',
+            adminRequired: 'Admin access required',
+            noDocumentsSelected: 'No documents selected',
+            couldNotLoadDocument: 'Could not load document content',
+            noItemsMatched: 'No items matched the pattern',
+            itemsMatchedDeleted: 'item(s) matched and deleted',
+            missingDocumentOrDb: 'Missing document or target database',
+            missingTargetDb: 'Missing target database',
+            noFilesToIngest: 'No files to ingest',
+            cacheCleared: 'Cache cleared successfully',
+            ingestionFailed: 'Ingestion failed',
+            documentIngestedSuccess: 'Document ingested successfully to',
+            allIngestionsFailed: 'All ingestions failed',
+            ingested: 'ingested',
+            skipped: 'skipped (duplicates)',
+            failed: 'failed',
+            successfullyIngested: 'Successfully ingested',
+            file: 'file(s) to',
+            allAlreadyIngested: 'All',
+            alreadyIngested: 'file(s) were already ingested with the same content/strategy/db',
+            helpers: 'Helpers',
+            documents: 'Documents',
+            clickToEditFilename: 'Click to edit filename',
+            undo: 'Undo',
+            redo: 'Redo',
+            previewFailed: 'Preview failed',
+            helperFailed: 'Helper failed',
+            logoRemoved: 'logo(s)',
+            logoRemovedFrom: 'removed from',
+            imageDescriptionsGenerated: 'image description(s)',
+            generatedFor: 'generated for',
+            itemsRemovedFrom: 'item(s)',
+            removedFrom: 'removed from',
+            noItemsFound: 'No',
+            foundInSelectedFiles: 'found in selected files',
+        },
+        de: {
+            documentIngestion: 'Dokumenten-Erfassung',
+            expandSidebar: 'Seitenleiste erweitern',
+            collapseSidebar: 'Seitenleiste einklappen',
+            multiSelect: 'Mehrfachauswahl',
+            exitMultiSelect: 'Mehrfachauswahl beenden',
+            enableMultiSelect: 'Mehrfachauswahl aktivieren',
+            backToChat: 'Zurück zum Chat',
+            manageCache: 'Cache verwalten',
+            selectDocument: 'Dokument auswählen',
+            pageOf: 'Seite',
+            of: 'von',
+            loadingConfig: 'Konfiguration wird geladen...',
+            pleaseLogIn: 'Bitte melden Sie sich an, um auf diese Seite zuzugreifen',
+            adminRequired: 'Administratorzugriff erforderlich',
+            noDocumentsSelected: 'Keine Dokumente ausgewählt',
+            couldNotLoadDocument: 'Dokumentinhalt konnte nicht geladen werden',
+            noItemsMatched: 'Keine Elemente entsprechen dem Muster',
+            itemsMatchedDeleted: 'Element(e) gefunden und gelöscht',
+            missingDocumentOrDb: 'Dokument oder Zieldatenbank fehlt',
+            missingTargetDb: 'Zieldatenbank fehlt',
+            noFilesToIngest: 'Keine Dateien zum Erfassen',
+            cacheCleared: 'Cache erfolgreich geleert',
+            ingestionFailed: 'Erfassung fehlgeschlagen',
+            documentIngestedSuccess: 'Dokument erfolgreich erfasst in',
+            allIngestionsFailed: 'Alle Erfassungen fehlgeschlagen',
+            ingested: 'erfasst',
+            skipped: 'übersprungen (Duplikate)',
+            failed: 'fehlgeschlagen',
+            successfullyIngested: 'Erfolgreich erfasst',
+            file: 'Datei(en) in',
+            allAlreadyIngested: 'Alle',
+            alreadyIngested: 'Datei(en) wurden bereits mit gleichem Inhalt/Strategie/DB erfasst',
+            helpers: 'Hilfsfunktionen',
+            documents: 'Dokumente',
+            clickToEditFilename: 'Klicken zum Bearbeiten des Dateinamens',
+            undo: 'Rückgängig',
+            redo: 'Wiederholen',
+            previewFailed: 'Vorschau fehlgeschlagen',
+            helperFailed: 'Hilfsfunktion fehlgeschlagen',
+            logoRemoved: 'Logo(s)',
+            logoRemovedFrom: 'entfernt aus',
+            imageDescriptionsGenerated: 'Bildbeschreibung(en)',
+            generatedFor: 'erstellt für',
+            itemsRemovedFrom: 'Element(e)',
+            removedFrom: 'entfernt aus',
+            noItemsFound: 'Keine',
+            foundInSelectedFiles: 'in ausgewählten Dateien gefunden',
+        },
+    };
+    const t = ingestionTranslations[language] || ingestionTranslations.en;
 
     // Show toast notification when undo/redo happens
     useEffect(() => {
         if (lastAction) {
-            const actionType = lastAction.type === 'undo' ? 'Undo' : 'Redo';
+            const actionType = lastAction.type === 'undo' ? t.undo : t.redo;
             const description = getCommandDescription(lastAction.command);
             toast.info(`${actionType}: ${description}`, {
                 position: 'bottom-center',
@@ -211,13 +288,13 @@ function IngestionPageLayout() {
     // Auth check - AdminRoute already handles this, but keep as safety check
     useEffect(() => {
         if (!isAuthenticated()) {
-            toast.error('Please log in to access this page');
+            toast.error(t.pleaseLogIn);
             navigate('/');
             return;
         }
         const user = getCurrentUser();
         if (!user || user.role !== 'Admin') {
-            toast.error('Admin access required');
+            toast.error(t.adminRequired);
             navigate('/chatbot');
         }
     }, [navigate]);
@@ -314,7 +391,7 @@ function IngestionPageLayout() {
             : [selectedDocumentId];
 
         if (documentIdsToPreview.length === 0 || !documentIdsToPreview[0]) {
-            toast.error('No documents selected');
+            toast.error(t.noDocumentsSelected);
             return;
         }
 
@@ -323,7 +400,7 @@ function IngestionPageLayout() {
         const firstDocContent = getFileContent(firstDocId);
 
         if (!firstDocContent) {
-            toast.error('Could not load document content');
+            toast.error(t.couldNotLoadDocument);
             return;
         }
 
@@ -343,7 +420,7 @@ function IngestionPageLayout() {
             }
         } catch (error) {
             console.error('Preview generation failed:', error);
-            toast.error(`Preview failed: ${error.message}`);
+            toast.error(`${t.previewFailed}: ${error.message}`);
             actions.failPreview(rightSidebarCollapsed);
         }
     }, [multiSelectMode, checkedDocumentIds, selectedDocumentId, rightSidebarCollapsed, actions]);
@@ -364,9 +441,9 @@ function IngestionPageLayout() {
 
         if (matchingIds.length > 0) {
             executeCommand(Commands.batchDelete(matchingIds));
-            toast.success(`${matchingIds.length} item(s) matched and deleted`);
+            toast.success(`${matchingIds.length} ${t.itemsMatchedDeleted}`);
         } else {
-            toast.info('No items matched the pattern');
+            toast.info(t.noItemsMatched);
         }
         actions.closeModal();
     }, [commandDocumentState, executeCommand, actions]);
@@ -528,26 +605,26 @@ function IngestionPageLayout() {
             let helperLabel;
             let actionVerb;
             if (pendingHelper.id === 'remove_logos') {
-                helperLabel = 'logo(s)';
-                actionVerb = 'removed from';
+                helperLabel = t.logoRemoved;
+                actionVerb = t.logoRemovedFrom;
             } else if (pendingHelper.id === 'ai_image_descriptions') {
-                helperLabel = 'image description(s)';
-                actionVerb = 'generated for';
+                helperLabel = t.imageDescriptionsGenerated;
+                actionVerb = t.generatedFor;
             } else {
-                helperLabel = 'item(s)';
-                actionVerb = 'removed from';
+                helperLabel = t.itemsRemovedFrom;
+                actionVerb = t.removedFrom;
             }
 
             if (totalAffected > 0) {
                 toast.success(`${totalAffected} ${helperLabel} ${actionVerb} ${filesProcessed} file(s)`);
             } else {
-                toast.info(`No ${helperLabel} found in selected files`);
+                toast.info(`${t.noItemsFound} ${helperLabel} ${t.foundInSelectedFiles}`);
             }
 
             actions.completeHelper();
         } catch (error) {
             console.error('Helper failed:', error);
-            toast.error('Helper failed: ' + error.message);
+            toast.error(t.helperFailed + ': ' + error.message);
             actions.failHelper();
         }
 
@@ -557,7 +634,7 @@ function IngestionPageLayout() {
     // Confirm and ingest (single file)
     const handleConfirmIngestion = useCallback(async () => {
         if (!commandDocumentState || !previewConfig.targetDb) {
-            toast.error('Missing document or target database');
+            toast.error(t.missingDocumentOrDb);
             return;
         }
 
@@ -611,13 +688,13 @@ function IngestionPageLayout() {
                     rightSidebarCollapsed
                 );
 
-                toast.success(`Document ingested successfully to ${previewConfig.targetDb}`);
+                toast.success(`${t.documentIngestedSuccess} ${previewConfig.targetDb}`);
             } else {
                 throw new Error(result.error || 'Ingestion failed');
             }
         } catch (error) {
             console.error('Ingestion failed:', error);
-            toast.error(`Ingestion failed: ${error.message}`);
+            toast.error(`${t.ingestionFailed}: ${error.message}`);
             actions.failIngestion();
         }
     }, [commandDocumentState, selectedDocumentId, previewConfig, embeddingPreview, rightSidebarCollapsed, actions]);
@@ -625,13 +702,13 @@ function IngestionPageLayout() {
     // Confirm and ingest all files in preview
     const handleConfirmIngestionAll = useCallback(async () => {
         if (!previewConfig.targetDb) {
-            toast.error('Missing target database');
+            toast.error(t.missingTargetDb);
             return;
         }
 
         const documentIds = Array.from(previewDocumentIds);
         if (documentIds.length === 0) {
-            toast.error('No files to ingest');
+            toast.error(t.noFilesToIngest);
             return;
         }
 
@@ -724,19 +801,19 @@ function IngestionPageLayout() {
 
             if (failCount > 0 || skipCount > 0) {
                 const parts = [];
-                parts.push(`${successCount} ingested`);
-                if (skipCount > 0) parts.push(`${skipCount} skipped (duplicates)`);
-                if (failCount > 0) parts.push(`${failCount} failed`);
+                parts.push(`${successCount} ${t.ingested}`);
+                if (skipCount > 0) parts.push(`${skipCount} ${t.skipped}`);
+                if (failCount > 0) parts.push(`${failCount} ${t.failed}`);
                 toast.warning(parts.join(', '));
             } else {
-                toast.success(`Successfully ingested ${successCount} file(s) to ${previewConfig.targetDb}`);
+                toast.success(`${t.successfullyIngested} ${successCount} ${t.file} ${previewConfig.targetDb}`);
             }
         } else if (skipCount > 0 && failCount === 0) {
             actions.failIngestion();
-            toast.info(`All ${skipCount} file(s) were already ingested with the same content/strategy/db`);
+            toast.info(`${t.allAlreadyIngested} ${skipCount} ${t.alreadyIngested}`);
         } else {
             actions.failIngestion();
-            toast.error('All ingestions failed');
+            toast.error(t.allIngestionsFailed);
         }
     }, [previewDocumentIds, previewConfig, rightSidebarCollapsed, actions]);
 
@@ -745,7 +822,7 @@ function IngestionPageLayout() {
         // Reset UI state when cache is cleared
         actions.clearAllFiles();
         resetCommandDocument(null);
-        toast.success('Cache cleared successfully');
+        toast.success(t.cacheCleared);
     }, [actions, resetCommandDocument]);
 
     // Keyboard shortcuts for undo/redo
@@ -782,6 +859,7 @@ function IngestionPageLayout() {
                 <Header 
                     role={userRole}
                     isDarkMode={isDarkMode}
+                    language={language}
                 />
             </div>
 
@@ -799,7 +877,7 @@ function IngestionPageLayout() {
                     {/* Header with toggle */}
                     <div className={`p-4 flex items-center ${leftSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
                         {!leftSidebarCollapsed && (
-                            <h2 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-tum-blue'}`}>Document Ingestion</h2>
+                            <h2 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-tum-blue'}`}>{t.documentIngestion}</h2>
                         )}
                         <button
                             onClick={() => actions.toggleLeftSidebar()}
@@ -808,7 +886,7 @@ function IngestionPageLayout() {
                                     ? 'bg-[#404040] border-[#555] hover:bg-[#4a4a4a] text-white' 
                                     : 'bg-white/50 border-tum-grey-7 hover:bg-white text-tum-black'
                                 }`}
-                            title={leftSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                            title={leftSidebarCollapsed ? t.expandSidebar : t.collapseSidebar}
                         >
                             <span className="text-sm font-bold">
                                 {leftSidebarCollapsed ? '»' : '«'}
@@ -838,9 +916,9 @@ function IngestionPageLayout() {
                                                     : 'bg-tum-grey-9 text-tum-grey-3 hover:bg-tum-grey-8'
                                             } 
                                             ${isPreviewMode ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                        title={multiSelectMode ? 'Exit multi-select' : 'Enable multi-select'}
+                                        title={multiSelectMode ? t.exitMultiSelect : t.enableMultiSelect}
                                     >
-                                        {multiSelectMode ? '✓ Multi-Select' : '☐ Multi-Select'}
+                                        {multiSelectMode ? `✓ ${t.multiSelect}` : `☐ ${t.multiSelect}`}
                                     </button>
                                 </div>
                             )}
@@ -862,7 +940,7 @@ function IngestionPageLayout() {
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                                     </svg>
-                                    Back to Chat
+                                    {t.backToChat}
                                 </button>
 
                                 {/* Cache Management Button */}
@@ -880,7 +958,7 @@ function IngestionPageLayout() {
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
-                                    Manage Cache
+                                    {t.manageCache}
                                 </button>
                             </div>
                         </div>
@@ -889,7 +967,7 @@ function IngestionPageLayout() {
                     {/* Collapsed state icon */}
                     {leftSidebarCollapsed && (
                         <div className="flex flex-col items-center pt-4">
-                            <span className="text-2xl mb-2" title="Documents">📄</span>
+                            <span className="text-2xl mb-2" title={t.documents}>📄</span>
                             <span className={`text-xs ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-3'}`}>
                                 {uploadQueue.length > 0 && `${uploadQueue.length}`}
                             </span>
@@ -945,14 +1023,14 @@ function IngestionPageLayout() {
                                                     setEditingTitleValue(commandDocumentState.filename);
                                                     setIsEditingTitle(true);
                                                 }}
-                                                title="Click to edit filename"
+                                                title={t.clickToEditFilename}
                                             >
                                                 {commandDocumentState.filename}
                                             </h1>
                                         )
                                     ) : (
                                         <h1 className={`text-xl font-bold px-3 py-2 -mx-3 -my-2 ${isDarkMode ? 'text-[#888]' : 'text-tum-grey-4'}`}>
-                                            Select a document
+                                            {t.selectDocument}
                                         </h1>
                                     )}
                                 </div>
@@ -962,7 +1040,7 @@ function IngestionPageLayout() {
                             <div className="flex items-center justify-between">
                                 {commandDocumentState && (
                                     <p className={`text-sm ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-4'}`}>
-                                        Page {currentPage} of {totalPages}
+                                        {t.pageOf} {currentPage} {t.of} {totalPages}
                                     </p>
                                 )}
                                 {!commandDocumentState && <div />}
@@ -983,7 +1061,7 @@ function IngestionPageLayout() {
                     {/* Content Viewer or Preview Viewer */}
                     {configLoading ? (
                         <div className="flex-1 flex items-center justify-center">
-                            <div className={isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-4'}>Loading configuration...</div>
+                            <div className={isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-4'}>{t.loadingConfig}</div>
                         </div>
                     ) : isPreviewMode ? (
                         <EmbeddingPreviewViewer
@@ -1032,14 +1110,14 @@ function IngestionPageLayout() {
                                         ? 'bg-[#404040] border-[#555] hover:bg-[#4a4a4a]' 
                                         : 'bg-tum-blue-light-5 border-tum-grey-7 hover:bg-tum-blue-light-3'
                                     }`}
-                                title={rightSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                                title={rightSidebarCollapsed ? t.expandSidebar : t.collapseSidebar}
                             >
                                 <span className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-tum-blue'}`}>
                                     {rightSidebarCollapsed ? '«' : '»'}
                                 </span>
                             </button>
                             {!rightSidebarCollapsed && (
-                                <h3 className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-tum-blue'}`}>Helpers</h3>
+                                <h3 className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-tum-blue'}`}>{t.helpers}</h3>
                             )}
                         </div>
 
@@ -1055,7 +1133,7 @@ function IngestionPageLayout() {
                         {/* Collapsed state icon */}
                         {rightSidebarCollapsed && (
                             <div className="flex flex-col items-center pt-4">
-                                <span className="text-2xl" title="Helpers">🛠️</span>
+                                <span className="text-2xl" title={t.helpers}>🛠️</span>
                             </div>
                         )}
                     </div>

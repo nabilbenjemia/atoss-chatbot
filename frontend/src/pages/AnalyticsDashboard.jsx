@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Plot from 'react-plotly.js';
 import { toast } from 'react-toastify';
-import { getCurrentUser, userAPI } from '../services/api'
+import { getCurrentUser } from '../services/api';
+import useUserPreferences from '../hooks/useUserPreferences';
 import Header from '../components/Header'; 
 const CONVERSATION_API = import.meta.env.VITE_CONVERSATION_API || 'http://localhost:4004';
 
@@ -12,38 +13,92 @@ const AnalyticsDashboard = () => {
     const [error, setError] = useState(null);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    const [theme, setTheme] = useState('auto'); 
 
     const currentUser = getCurrentUser();
     const userId = currentUser?.id;
     const role = currentUser?.role;
 
-    // Determine if dark mode should be applied - MUST BE BEFORE EARLY RETURNS
-    const isDarkMode = theme === 'dark';
+    // User preferences (theme, language)
+    const { isDarkMode, language } = useUserPreferences(userId);
 
-    // Load user preferences for theme
-    useEffect(() => {
-        const loadPreferences = async () => {
-            try {
-                const response = await userAPI.getProfile();
-                if (response.success && response.data.preferences) {
-                    const userTheme = response.data.preferences.theme;
-                    if (userTheme === 'auto') {
-                        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                        setTheme(prefersDark ? 'dark' : 'light');
-                    } else {
-                        setTheme(userTheme);
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to load preferences:', error);
-            }
-        };
-
-        if (userId) {
-            loadPreferences();
-        }
-    }, [userId]);
+    // Translations
+    const translations = {
+        en: {
+            loadingAnalytics: 'Loading analytics...',
+            noDataAvailable: 'No data available',
+            analyticsDashboard: 'Analytics Dashboard',
+            queryAnalysisInsights: 'Query analysis and insights',
+            downloadCSV: 'Download CSV',
+            processNewQueries: 'Process New Queries',
+            processing: 'Processing...',
+            from: 'From:',
+            to: 'To:',
+            clearFilters: 'Clear filters',
+            processedQueries: 'Processed Queries',
+            oneWordSkipped: '(1 word queries skipped)',
+            totalQueries: 'Total Queries',
+            includingOneWord: '(including 1 word queries)',
+            totalUsers: 'Total Users',
+            activeNow: '🟢 Active Now (15min)',
+            topKeywords: 'Top Keywords',
+            keywords: 'Keywords',
+            frequency: 'Frequency',
+            noKeywordData: 'No keyword data available',
+            queryCategories: 'Query Categories',
+            noCategoryData: 'No category data available',
+            queriesOverTime: 'Queries Over Time',
+            last7Days: '(Last 7 Days)',
+            date: 'Date',
+            numberOfQueries: 'Number of Queries',
+            noTimelineData: 'No timeline data available',
+            note: 'Note:',
+            analyticsNote: 'Analytics are powered by a small LLM that classifies queries into keywords and categories. Click "Process New Queries" to analyze recent chat messages.',
+            noNewQueries: 'No new queries to process',
+            processedCount: 'Successfully processed',
+            query: 'query',
+            queries: 'queries',
+            errorProcessing: 'Error processing queries:',
+            errorDownloadingCSV: 'Error downloading CSV:',
+        },
+        de: {
+            loadingAnalytics: 'Analytics werden geladen...',
+            noDataAvailable: 'Keine Daten verfügbar',
+            analyticsDashboard: 'Analytics-Dashboard',
+            queryAnalysisInsights: 'Abfrageanalyse und Erkenntnisse',
+            downloadCSV: 'CSV herunterladen',
+            processNewQueries: 'Neue Abfragen verarbeiten',
+            processing: 'Wird verarbeitet...',
+            from: 'Von:',
+            to: 'Bis:',
+            clearFilters: 'Filter löschen',
+            processedQueries: 'Verarbeitete Abfragen',
+            oneWordSkipped: '(1-Wort-Abfragen übersprungen)',
+            totalQueries: 'Gesamte Abfragen',
+            includingOneWord: '(inkl. 1-Wort-Abfragen)',
+            totalUsers: 'Gesamtbenutzer',
+            activeNow: '🟢 Jetzt aktiv (15 Min)',
+            topKeywords: 'Top-Schlüsselwörter',
+            keywords: 'Schlüsselwörter',
+            frequency: 'Häufigkeit',
+            noKeywordData: 'Keine Schlüsselwortdaten verfügbar',
+            queryCategories: 'Abfragekategorien',
+            noCategoryData: 'Keine Kategoriedaten verfügbar',
+            queriesOverTime: 'Abfragen im Zeitverlauf',
+            last7Days: '(Letzte 7 Tage)',
+            date: 'Datum',
+            numberOfQueries: 'Anzahl der Abfragen',
+            noTimelineData: 'Keine Zeitverlaufsdaten verfügbar',
+            note: 'Hinweis:',
+            analyticsNote: 'Analytics werden von einem kleinen LLM unterstützt, das Abfragen in Schlüsselwörter und Kategorien einteilt. Klicken Sie auf "Neue Abfragen verarbeiten", um aktuelle Chat-Nachrichten zu analysieren.',
+            noNewQueries: 'Keine neuen Abfragen zu verarbeiten',
+            processedCount: 'Erfolgreich verarbeitet',
+            query: 'Abfrage',
+            queries: 'Abfragen',
+            errorProcessing: 'Fehler beim Verarbeiten der Abfragen:',
+            errorDownloadingCSV: 'Fehler beim Herunterladen der CSV:',
+        },
+    };
+    const t = translations[language] || translations.en;
 
     useEffect(() => {
         fetchDashboardData();
@@ -80,15 +135,15 @@ const AnalyticsDashboard = () => {
             
             // Show appropriate notification based on result
             if (result.processed === 0) {
-                toast.info('No new queries to process');
+                toast.info(t.noNewQueries);
             } else {
-                toast.success(`Successfully processed ${result.processed} ${result.processed === 1 ? 'query' : 'queries'}`);
+                toast.success(`${t.processedCount} ${result.processed} ${result.processed === 1 ? t.query : t.queries}`);
             }
             
             await fetchDashboardData(); // Wait for refresh to complete
         } catch (err) {
             console.error('Error processing queries:', err);
-            toast.error('Error processing queries: ' + err.message);
+            toast.error(t.errorProcessing + ' ' + err.message);
         } finally {
             setProcessing(false);
         }
@@ -114,7 +169,7 @@ const AnalyticsDashboard = () => {
             window.URL.revokeObjectURL(csvUrl);
         } catch (err) {
             console.error('Error downloading CSV:', err);
-            alert('Error downloading CSV: ' + err.message);
+            alert(t.errorDownloadingCSV + ' ' + err.message);
         }
     };
 
@@ -122,10 +177,10 @@ const AnalyticsDashboard = () => {
         return (
             <div className={`h-screen flex flex-col overflow-hidden ${isDarkMode ? 'bg-[#212121]' : 'bg-white'}`}>
                 <div className="flex-shrink-0 h-14">
-                    <Header role={role} isDarkMode={isDarkMode} />
+                    <Header role={role} isDarkMode={isDarkMode} language={language} />
                 </div>
                 <div className="flex-1 flex items-center justify-center">
-                    <div className={`text-xl ${isDarkMode ? 'text-white' : 'text-tum-grey-1'}`}>Loading analytics...</div>
+                    <div className={`text-xl ${isDarkMode ? 'text-white' : 'text-tum-grey-1'}`}>{t.loadingAnalytics}</div>
                 </div>
             </div>
         );
@@ -135,7 +190,7 @@ const AnalyticsDashboard = () => {
         return (
             <div className={`h-screen flex flex-col overflow-hidden ${isDarkMode ? 'bg-[#212121]' : 'bg-white'}`}>
                 <div className="flex-shrink-0 h-14">
-                    <Header role={role} isDarkMode={isDarkMode} />
+                    <Header role={role} isDarkMode={isDarkMode} language={language} />
                 </div>
                 <div className="flex-1 flex items-center justify-center">
                     <div className="text-tum-red text-xl">Error: {error}</div>
@@ -148,10 +203,10 @@ const AnalyticsDashboard = () => {
         return (
             <div className={`h-screen flex flex-col overflow-hidden ${isDarkMode ? 'bg-[#212121]' : 'bg-white'}`}>
                 <div className="flex-shrink-0 h-14">
-                    <Header role={role} isDarkMode={isDarkMode} />
+                    <Header role={role} isDarkMode={isDarkMode} language={language} />
                 </div>
                 <div className="flex-1 flex items-center justify-center">
-                    <div className={`text-xl ${isDarkMode ? 'text-white' : 'text-tum-grey-1'}`}>No data available</div>
+                    <div className={`text-xl ${isDarkMode ? 'text-white' : 'text-tum-grey-1'}`}>{t.noDataAvailable}</div>
                 </div>
             </div>
         );
@@ -192,7 +247,7 @@ const AnalyticsDashboard = () => {
         <div className={`h-screen flex flex-col overflow-hidden ${isDarkMode ? 'bg-[#212121] text-white' : 'bg-white text-tum-grey-1'}`}>
             {/* Header - fixed height, consistent with ChatbotPage */}
             <div className="flex-shrink-0 h-14">
-                <Header role={role} isDarkMode={isDarkMode} />
+                <Header role={role} isDarkMode={isDarkMode} language={language} />
             </div>
             
             {/* Main dashboard area */}
@@ -202,22 +257,22 @@ const AnalyticsDashboard = () => {
                     <div className="mb-8">
                         <div className="flex justify-between items-center mb-4">
                             <div>
-                                <h1 className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-tum-grey-1'}`}>Analytics Dashboard</h1>
-                                <p className={`${isDarkMode ? 'text-white' : 'text-tum-grey-4'}`}>Query analysis and insights</p>
+                                <h1 className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-tum-grey-1'}`}>{t.analyticsDashboard}</h1>
+                                <p className={`${isDarkMode ? 'text-white' : 'text-tum-grey-4'}`}>{t.queryAnalysisInsights}</p>
                             </div>
                             <div className="flex gap-3">
                                 <button
                                     onClick={downloadCSV}
                                     className="bg-tum-green hover:bg-tum-green-dark text-tum-white px-6 py-2 rounded-lg transition-colors"
                                 >
-                                    Download CSV
+                                    {t.downloadCSV}
                                 </button>
                                 <button
                                     onClick={processQueries}
                                     disabled={processing}
                                     className="bg-tum-blue-brand hover:bg-tum-dark-blue disabled:bg-tum-grey-4 text-tum-white px-6 py-2 rounded-lg transition-colors"
                                 >
-                                    {processing ? 'Processing...' : 'Process New Queries'}
+                                    {processing ? t.processing : t.processNewQueries}
                                 </button>
                             </div>
                         </div>
@@ -230,7 +285,7 @@ const AnalyticsDashboard = () => {
                             }`
                         }>
                             <div className="flex items-center gap-2">
-                                <label className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm font-medium`}>From:</label>
+                                <label className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm font-medium`}>{t.from}</label>
                                 <input
                                     type="date"
                                     value={startDate}
@@ -244,7 +299,7 @@ const AnalyticsDashboard = () => {
                                 />
                             </div>
                             <div className="flex items-center gap-2">
-                                <label className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm font-medium`}>To:</label>
+                                <label className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm font-medium`}>{t.to}</label>
                                 <input
                                     type="date"
                                     value={endDate}
@@ -262,7 +317,7 @@ const AnalyticsDashboard = () => {
                                     onClick={() => { setStartDate(''); setEndDate(''); }}
                                     className={`text-tum-blue-brand hover:text-tum-white text-sm font-medium transition-colors ${isDarkMode ? '' : ''}`}
                                 >
-                                    Clear filters
+                                    {t.clearFilters}
                                 </button>
                             )}
                         </div>
@@ -271,19 +326,19 @@ const AnalyticsDashboard = () => {
                     {/* Overall Stats Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                         <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
-                            <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>Processed Queries <span className="text-[10px] font-normal">(1 word queries skipped)</span></div>
+                            <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>{t.processedQueries} <span className="text-[10px] font-normal">{t.oneWordSkipped}</span></div>
                             <div className={`text-4xl font-bold ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>{overall?.totalQueries || 0}</div>
                         </div>
                         <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
-                            <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>Total Queries <span className="text-[10px] font-normal">(including 1 word queries)</span></div>
+                            <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>{t.totalQueries} <span className="text-[10px] font-normal">{t.includingOneWord}</span></div>
                             <div className={`text-4xl font-bold ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>{overall?.totalQueriesIncludingOneWord || 0}</div>
                         </div>
                         <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
-                            <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>Total Users</div>
+                            <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>{t.totalUsers}</div>
                             <div className={`text-4xl font-bold ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>{overall?.uniqueUsers || 0}</div>
                         </div>
                         <div className={`${isDarkMode ? 'bg-tum-green-6 border-tum-green-3 text-white' : 'bg-tum-green-5 border-tum-green-2'} rounded-xl p-6 border shadow-lg`}>
-                            <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>🟢 Active Now (15min)</div>
+                            <div className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm mb-2 font-medium`}>{t.activeNow}</div>
                             <div className="text-4xl font-bold text-tum-green">{overall?.activeUsersNow || 0}</div>
                         </div>
                     </div>
@@ -291,7 +346,7 @@ const AnalyticsDashboard = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                         {/* Top Keywords Chart */}
                         <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
-                            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>Top Keywords</h2>
+                            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>{t.topKeywords}</h2>
                             {keywords && keywords.length > 0 ? (
                                 <Plot
                                     data={keywordData}
@@ -302,7 +357,7 @@ const AnalyticsDashboard = () => {
                                         xaxis: {
                                             gridcolor: isDarkMode ? '#444' : '#C2D7EF',
                                             title: {
-                                                text: 'Keywords',
+                                                text: t.keywords,
                                                 font: { color: isDarkMode ? '#FFFFFF' : '#20252A' }
                                             },
                                             tickfont: { color: isDarkMode ? '#FFFFFF' : '#20252A' }
@@ -310,7 +365,7 @@ const AnalyticsDashboard = () => {
                                         yaxis: {
                                             gridcolor: isDarkMode ? '#444' : '#C2D7EF',
                                             title: {
-                                                text: 'Frequency',
+                                                text: t.frequency,
                                                 font: { color: isDarkMode ? '#FFFFFF' : '#20252A' }
                                             },
                                             tickfont: { color: isDarkMode ? '#FFFFFF' : '#20252A' }
@@ -323,13 +378,13 @@ const AnalyticsDashboard = () => {
                                     useResizeHandler={true}
                                 />
                             ) : (
-                                <div className="text-tum-grey-4 text-center py-10">No keyword data available</div>
+                                <div className="text-tum-grey-4 text-center py-10">{t.noKeywordData}</div>
                             )}
                         </div>
 
                         {/* Category Distribution Chart */}
                         <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
-                            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>Query Categories</h2>
+                            <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>{t.queryCategories}</h2>
                             {categories && categories.length > 0 ? (
                                 <Plot
                                     data={categoryData}
@@ -352,7 +407,7 @@ const AnalyticsDashboard = () => {
                                     useResizeHandler={true}
                                 />
                             ) : (
-                                <div className="text-tum-grey-4 text-center py-10">No category data available</div>
+                                <div className="text-tum-grey-4 text-center py-10">{t.noCategoryData}</div>
                             )}
                         </div>
                     </div>
@@ -360,8 +415,8 @@ const AnalyticsDashboard = () => {
                     {/* Timeline Chart - Full Width */}
                     <div className={`${isDarkMode ? 'bg-tum-grey-2 border-tum-grey-4 text-white' : 'bg-tum-blue-light-4 border-tum-blue-light-2'} rounded-xl p-6 border shadow-lg`}>
                         <h2 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-tum-blue' : 'text-tum-dark-blue'}`}>
-                            Queries Over Time
-                            {!startDate && !endDate && <span className={`${isDarkMode ? 'text-white' : 'text-tum-grey-4'} text-sm ml-2`}>(Last 7 Days)</span>}
+                            {t.queriesOverTime}
+                            {!startDate && !endDate && <span className={`${isDarkMode ? 'text-white' : 'text-tum-grey-4'} text-sm ml-2`}>{t.last7Days}</span>}
                             {(startDate || endDate) && (
                                 <span className={`${isDarkMode ? 'text-white' : 'text-tum-grey-4'} text-sm ml-2`}>
                                     ({startDate || '...'} to {endDate || 'now'})
@@ -377,11 +432,11 @@ const AnalyticsDashboard = () => {
                                     font: { color: isDarkMode ? '#FFFFFF' : '#20252A' },
                                     xaxis: {
                                         gridcolor: '#C2D7EF',
-                                        title: 'Date'
+                                        title: t.date
                                     },
                                     yaxis: {
                                         gridcolor: '#C2D7EF',
-                                        title: 'Number of Queries'
+                                        title: t.numberOfQueries
                                     },
                                     margin: { t: 20, b: 60, l: 50, r: 20 },
                                     height: 350
@@ -391,7 +446,7 @@ const AnalyticsDashboard = () => {
                                 useResizeHandler={true}
                             />
                         ) : (
-                            <div className="text-tum-grey-4 text-center py-10">No timeline data available</div>
+                            <div className="text-tum-grey-4 text-center py-10">{t.noTimelineData}</div>
                         )}
                     </div>
 
@@ -403,8 +458,7 @@ const AnalyticsDashboard = () => {
                         }`
                     }>
                         <p className={`${isDarkMode ? 'text-white' : 'text-tum-grey-3'} text-sm`}>
-                            <strong>Note:</strong> Analytics are powered by a small LLM that classifies queries into keywords and categories. 
-                            Click "Process New Queries" to analyze recent chat messages.
+                            <strong>{t.note}</strong> {t.analyticsNote}
                         </p>
                     </div>
                 </div>

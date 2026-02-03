@@ -4,7 +4,8 @@ import Sidebar from '../components/Sidebar'
 import MessageInput from '../components/MessageInput'
 import Conversation from '../components/Conversation'
 import Header from '../components/Header'
-import { getCurrentUser, userAPI } from '../services/api'
+import { getCurrentUser } from '../services/api'
+import useUserPreferences from '../hooks/useUserPreferences'
 
 const CONVERSATION_API = import.meta.env.VITE_CONVERSATION_URL || 'http://localhost:4004';
 
@@ -19,8 +20,8 @@ export default function ChatbotPage() {
     const [messages, setMessages] = useState([]);
     const [conversationTitles, setConversationTitles] = useState([]);
 
-    // Theme state
-    const [theme, setTheme] = useState('auto');
+    // User preferences (theme, language)
+    const { isDarkMode, language } = useUserPreferences(userId);
 
     // NEW: Streaming states
     const [isStreaming, setIsStreaming] = useState(false);
@@ -95,31 +96,6 @@ export default function ChatbotPage() {
         }
     };
 
-    // Load user preferences for theme
-    useEffect(() => {
-        const loadPreferences = async () => {
-            try {
-                const response = await userAPI.getProfile();
-                if (response.success && response.data.preferences) {
-                    const userTheme = response.data.preferences.theme;
-                    // Handle 'auto' theme - use system preference
-                    if (userTheme === 'auto') {
-                        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                        setTheme(prefersDark ? 'dark' : 'light');
-                    } else {
-                        setTheme(userTheme);
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to load preferences:', error);
-            }
-        };
-
-        if (userId) {
-            loadPreferences();
-        }
-    }, [userId]);
-
     // Redirect to login if user is not authenticated
     useEffect(() => {
         if (!userId) {
@@ -127,9 +103,6 @@ export default function ChatbotPage() {
             navigate('/');
         }
     }, [userId, navigate]);
-
-    // Determine if dark mode should be applied
-    const isDarkMode = theme === 'dark';
 
     const fetchMessages = useCallback(async () => {
         try {
@@ -290,6 +263,7 @@ export default function ChatbotPage() {
                 <Header 
                     role={userRole}
                     isDarkMode={isDarkMode}
+                    language={language}
                 />
             </div>
 

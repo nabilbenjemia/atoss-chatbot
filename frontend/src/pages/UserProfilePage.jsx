@@ -468,7 +468,7 @@ export default function UserProfilePage() {
   return (
     <div className={`min-h-screen py-8 ${isDarkMode ? 'bg-[#212121]' : 'bg-gray-50'}`}>
       {/* Add the header at the top */}
-      <Header role={role} isDarkMode={isDarkMode} />
+      <Header role={role} isDarkMode={isDarkMode} language={language} />
 
       <div className="max-w-4xl mx-auto px-4 pt-10">
         {/* Header section: remove the back to chat button */}

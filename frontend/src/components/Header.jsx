@@ -1,8 +1,26 @@
 import { Link, useLocation } from "react-router-dom";
 
-export default function Header({ role, isDarkMode }) {
+const headerTranslations = {
+  en: {
+    profile: 'Profile',
+    tutorials: 'Tutorials',
+    backToChatbot: '← Back to Chatbot',
+    analytics: 'Analytics',
+    manageKnowledge: 'Manage Knowledge',
+  },
+  de: {
+    profile: 'Profil',
+    tutorials: 'Tutorials',
+    backToChatbot: '← Zurück zum Chatbot',
+    analytics: 'Analytics',
+    manageKnowledge: 'Wissensdatenbank verwalten',
+  },
+};
+
+export default function Header({ role, isDarkMode, language = 'en' }) {
   const location = useLocation();
   const path = location.pathname;
+  const t = headerTranslations[language] || headerTranslations.en;
 
   const headerLink =
     `px-4 py-1.5 text-sm font-medium rounded-full border transition
@@ -14,22 +32,35 @@ export default function Header({ role, isDarkMode }) {
 
   if (path === "/chatbot") {
     leftButtons = [
-      <Link key="profile" to="/profile" className={headerLink}>Profile</Link>,
-      <Link key="tutorials" to="/learning" className={headerLink}>Tutorials</Link>
+      <Link key="profile" to="/profile" className={headerLink}>{t.profile}</Link>,
+      <Link key="tutorials" to="/learning" className={headerLink}>{t.tutorials}</Link>
     ];
   } else if (path === "/profile") {
     leftButtons = [
-      <Link key="chatbot" to="/chatbot" className={headerLink}>← Back to Chatbot</Link>,
-      <Link key="tutorials" to="/learning" className={headerLink}>Tutorials</Link>
+      <Link key="chatbot" to="/chatbot" className={headerLink}>{t.backToChatbot}</Link>,
+      <Link key="tutorials" to="/learning" className={headerLink}>{t.tutorials}</Link>
     ];
   } else if (path === "/learning") {
     leftButtons = [
-      <Link key="chatbot" to="/chatbot" className={headerLink}>← Back to Chatbot</Link>,
-      <Link key="profile" to="/profile" className={headerLink}>Profile</Link>
+      <Link key="chatbot" to="/chatbot" className={headerLink}>{t.backToChatbot}</Link>,
+      <Link key="profile" to="/profile" className={headerLink}>{t.profile}</Link>
     ];
+  } else if (path === "/analytics" || path === "/admin/ingestion") {
+    leftButtons = [
+      <Link key="chatbot" to="/chatbot" className={headerLink}>{t.backToChatbot}</Link>,
+      <Link key="profile" to="/profile" className={headerLink}>{t.profile}</Link>,
+      <Link key="tutorials" to="/learning" className={headerLink}>{t.tutorials}</Link>
+    ];
+    if (role === "Admin") {
+      leftButtons = leftButtons.concat(
+        path === "/analytics"
+          ? [<Link key="ingest" to="/admin/ingestion" className="px-4 py-1.5 text-sm font-medium rounded-full border transition bg-red-600 text-white border-red-600 hover:bg-red-700 hover:text-white">{t.manageKnowledge}</Link>]
+          : [<Link key="analytics" to="/analytics" className="px-4 py-1.5 text-sm font-medium rounded-full border transition bg-red-600 text-white border-red-600 hover:bg-red-700 hover:text-white">{t.analytics}</Link>]
+      );
+    }
   } else {
     leftButtons = [
-      <Link key="chatbot" to="/chatbot" className={headerLink}>← Back to Chatbot</Link>,
+      <Link key="chatbot" to="/chatbot" className={headerLink}>{t.backToChatbot}</Link>,
     ];
   }
 
@@ -41,14 +72,14 @@ export default function Header({ role, isDarkMode }) {
         to="/analytics"
         className="px-4 py-1.5 text-sm font-medium rounded-full border transition bg-red-600 text-white border-red-600 hover:bg-red-700 hover:text-white"
       >
-        Analytics
+        {t.analytics}
       </Link>,
       <Link
         key="ingest"
         to="/admin/ingestion"
         className="px-4 py-1.5 text-sm font-medium rounded-full border transition bg-red-600 text-white border-red-600 hover:bg-red-700 hover:text-white"
       >
-        Manage Knowledge
+        {t.manageKnowledge}
       </Link>
     ]);
   }
