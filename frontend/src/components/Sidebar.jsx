@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-<<<<<<< HEAD
 import * as assets from '../assets';
-=======
-import { tum_klinikum_logo, tum_logo_darkmode, new_chat_logo, search_logo, minimize_logo, maximize_logo, profile_photo_mock, expand_down_logo, expand_up_logo, delete_logo } from '../assets';
->>>>>>> e0932842ef7066aadf9b7f271982a64b74b05873
 import { authAPI, getCurrentUser, userAPI } from '../services/api';
 
 export default function Sidebar({ conversationTitles, setConversationTitles, setConversationId, conversationId, userId, onNewChat, isDarkMode = false }) {

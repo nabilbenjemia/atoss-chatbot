@@ -22,6 +22,7 @@ export default function ConnectedContentViewer({
     // Command history is passed in because it's shared with header for undo/redo
     commandState,
     executeCommand,
+    isDarkMode = false,
 }) {
     const { currentPage } = useDocument();
     const actions = useIngestionActions();
@@ -83,7 +84,7 @@ export default function ConnectedContentViewer({
     if (!doc) {
         return (
             <div className="flex-1 flex items-center justify-center">
-                <div className="text-center text-tum-grey-4">
+                <div className={`text-center ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-4'}`}>
                     <div className="text-6xl mb-4">📄</div>
                     <p className="text-lg">Upload a document to get started</p>
                     <p className="text-sm mt-2">
@@ -98,7 +99,7 @@ export default function ConnectedContentViewer({
     if (totalPages === 0) {
         return (
             <div className="flex-1 flex items-center justify-center">
-                <div className="text-center text-tum-grey-4">
+                <div className={`text-center ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-4'}`}>
                     <div className="text-6xl mb-4">📭</div>
                     <p className="text-lg">No content extracted</p>
                     <p className="text-sm mt-2">
@@ -119,6 +120,7 @@ export default function ConnectedContentViewer({
                         onDeleteItem={handleDeleteItem}
                         onClassChange={handleClassChange}
                         availableClasses={availableClasses}
+                        isDarkMode={isDarkMode}
                     />
                 </div>
             </div>
@@ -127,6 +129,7 @@ export default function ConnectedContentViewer({
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={handlePageChange}
+                isDarkMode={isDarkMode}
             />
         </div>
     );

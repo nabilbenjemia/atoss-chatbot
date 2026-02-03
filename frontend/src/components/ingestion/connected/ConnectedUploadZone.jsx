@@ -25,7 +25,7 @@ import {
     getAllowedTypesText,
 } from '../../../config/ingestionConfig';
 
-export default function ConnectedUploadZone() {
+export default function ConnectedUploadZone({ isDarkMode }) {
     const { isDragging, isIngesting } = useUI();
     const { isPreviewMode } = usePreview();
     const { selectedDocumentId } = useFileQueue();
@@ -153,11 +153,13 @@ export default function ConnectedUploadZone() {
         <div
             className={`
                 border-2 border-dashed p-6 text-center cursor-pointer transition-all
-                bg-white
+                ${isDarkMode ? 'bg-[#404040]' : 'bg-white'}
                 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
                 ${isDragging
-                    ? 'border-tum-blue bg-tum-blue-light-2'
-                    : 'border-tum-grey-7 hover:border-tum-blue hover:bg-tum-blue-light-5'}
+                    ? `border-tum-blue ${isDarkMode ? 'bg-tum-blue/20' : 'bg-tum-blue-light-2'}`
+                    : isDarkMode
+                        ? 'border-[#555] hover:border-tum-blue hover:bg-[#4a4a4a]'
+                        : 'border-tum-grey-7 hover:border-tum-blue hover:bg-tum-blue-light-5'}
             `}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -175,10 +177,10 @@ export default function ConnectedUploadZone() {
             />
 
             <div className="text-3xl mb-2">📁</div>
-            <p className="text-sm text-tum-black font-medium">
+            <p className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-tum-black'}`}>
                 {isDragging ? 'Drop files here' : 'Drop files or click to upload'}
             </p>
-            <p className="text-xs text-tum-grey-4 mt-1">
+            <p className={`text-xs mt-1 ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-4'}`}>
                 PDF files, max {getFileSizeLimitText()}
             </p>
         </div>

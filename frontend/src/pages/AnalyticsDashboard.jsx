@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Plot from 'react-plotly.js';
 import { toast } from 'react-toastify';
 import { getCurrentUser, userAPI } from '../services/api'
-import Header from '../components/Header'; // Add this import
-
+import Header from '../components/Header'; 
 const CONVERSATION_API = import.meta.env.VITE_CONVERSATION_API || 'http://localhost:4004';
 
 const AnalyticsDashboard = () => {
@@ -16,19 +15,19 @@ const AnalyticsDashboard = () => {
     const [theme, setTheme] = useState('auto'); 
 
     const currentUser = getCurrentUser();
-    console.log('currentUser:', currentUser);
     const userId = currentUser?.id;
-    const role = currentUser?.role; // Add this line
+    const role = currentUser?.role;
+
+    // Determine if dark mode should be applied - MUST BE BEFORE EARLY RETURNS
+    const isDarkMode = theme === 'dark';
 
     // Load user preferences for theme
     useEffect(() => {
         const loadPreferences = async () => {
             try {
                 const response = await userAPI.getProfile();
-                console.log('userAPI.getProfile response:', response);
                 if (response.success && response.data.preferences) {
                     const userTheme = response.data.preferences.theme;
-                    console.log('userTheme:', userTheme);
                     if (userTheme === 'auto') {
                         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
                         setTheme(prefersDark ? 'dark' : 'light');
@@ -41,7 +40,6 @@ const AnalyticsDashboard = () => {
             }
         };
 
-        console.log('userId in useEffect:', userId);
         if (userId) {
             loadPreferences();
         }
@@ -122,16 +120,39 @@ const AnalyticsDashboard = () => {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-screen bg-tum-white">
-                <div className="text-tum-grey-1 text-xl">Loading analytics...</div>
+            <div className={`h-screen flex flex-col overflow-hidden ${isDarkMode ? 'bg-[#212121]' : 'bg-white'}`}>
+                <div className="flex-shrink-0 h-14">
+                    <Header role={role} isDarkMode={isDarkMode} />
+                </div>
+                <div className="flex-1 flex items-center justify-center">
+                    <div className={`text-xl ${isDarkMode ? 'text-white' : 'text-tum-grey-1'}`}>Loading analytics...</div>
+                </div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="flex items-center justify-center h-screen bg-tum-white">
-                <div className="text-tum-red text-xl">Error: {error}</div>
+            <div className={`h-screen flex flex-col overflow-hidden ${isDarkMode ? 'bg-[#212121]' : 'bg-white'}`}>
+                <div className="flex-shrink-0 h-14">
+                    <Header role={role} isDarkMode={isDarkMode} />
+                </div>
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="text-tum-red text-xl">Error: {error}</div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!dashboardData) {
+        return (
+            <div className={`h-screen flex flex-col overflow-hidden ${isDarkMode ? 'bg-[#212121]' : 'bg-white'}`}>
+                <div className="flex-shrink-0 h-14">
+                    <Header role={role} isDarkMode={isDarkMode} />
+                </div>
+                <div className="flex-1 flex items-center justify-center">
+                    <div className={`text-xl ${isDarkMode ? 'text-white' : 'text-tum-grey-1'}`}>No data available</div>
+                </div>
             </div>
         );
     }
@@ -167,19 +188,13 @@ const AnalyticsDashboard = () => {
         marker: { size: 8, color: '#3070B3' }
     }] : [];
 
-    // Determine if dark mode should be applied
-    const isDarkMode = theme === 'dark';
-
-    //TODO remove logs
-    console.log("theme {}", theme);
-    console.log("isDarkMode {}", isDarkMode);
-
     return (
-        <div className={`h-screen flex flex-col overflow-hidden ${isDarkMode ? 'bg-[#212121] text-white' : 'bg-tum-white text-tum-grey-1'}`}>
-            {/* Header - fixed height */}
+        <div className={`h-screen flex flex-col overflow-hidden ${isDarkMode ? 'bg-[#212121] text-white' : 'bg-white text-tum-grey-1'}`}>
+            {/* Header - fixed height, consistent with ChatbotPage */}
             <div className="flex-shrink-0 h-14">
                 <Header role={role} isDarkMode={isDarkMode} />
             </div>
+            
             {/* Main dashboard area */}
             <div className="flex-1 min-h-0 overflow-y-auto">
                 <div className="max-w-7xl mx-auto p-6">

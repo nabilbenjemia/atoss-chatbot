@@ -35,7 +35,7 @@ import useBackendConfig from '../hooks/useBackendConfig';
 import useCommandHistory, { Commands, serializeCommand, getCommandDescription } from '../hooks/useCommandHistory';
 
 // Utility functions
-import { getCurrentUser, isAuthenticated } from '../services/api';
+import { getCurrentUser, isAuthenticated, userAPI } from '../services/api';
 import {
     getUploadedFiles,
     getIngestedFiles,
@@ -70,6 +70,8 @@ import {
     HelperFileSelectModal,
 } from '../components/ingestion';
 
+import Header from '../components/Header';
+
 /**
  * Main IngestionPage Component
  * Wrapped with IngestionProvider for state management
@@ -90,10 +92,16 @@ function IngestionPageLayout() {
     const navigate = useNavigate();
     const { config: backendConfig, loading: configLoading, refetch: refetchConfig } = useBackendConfig();
 
+    const currentUser = getCurrentUser();
+    const userId = currentUser?.id;
+    const userRole = currentUser?.role; 
+    
     // Local UI state for title editing
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editingTitleValue, setEditingTitleValue] = useState('');
     const [showCacheManagement, setShowCacheManagement] = useState(false);
+    // Theme state
+    const [theme, setTheme] = useState('auto');
 
     // Ref to track which document the current command history belongs to
     // This prevents saving history to wrong file during file switches
@@ -138,6 +146,34 @@ function IngestionPageLayout() {
         lastAction,
         clearLastAction,
     } = useCommandHistory(null);
+
+    // Load user preferences for theme
+    useEffect(() => {
+        const loadPreferences = async () => {
+            try {
+                const response = await userAPI.getProfile();
+                if (response.success && response.data.preferences) {
+                    const userTheme = response.data.preferences.theme;
+                    // Handle 'auto' theme - use system preference
+                    if (userTheme === 'auto') {
+                        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                        setTheme(prefersDark ? 'dark' : 'light');
+                    } else {
+                        setTheme(userTheme);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load preferences:', error);
+            }
+        };
+
+        if (userId) {
+            loadPreferences();
+        }
+    }, [userId]);
+
+    // Determine if dark mode should be applied
+    const isDarkMode = theme === 'dark';
 
     // Show toast notification when undo/redo happens
     useEffect(() => {
@@ -740,255 +776,291 @@ function IngestionPageLayout() {
     const totalPages = commandDocumentState?.pages?.length || 0;
 
     return (
-        <div className="flex h-screen bg-tum-blue-light-5 overflow-hidden font-display">
-            {/* Left Panel - File Queue */}
-            <div
-                className={`
-                    ${leftSidebarCollapsed ? 'w-12' : 'w-56 lg:w-64'} 
-                    bg-tum-blue-light-4 flex flex-col border-r border-tum-grey-7 rounded-r-2xl
-                    transition-all duration-300 ease-in-out flex-shrink-0
-                `}
-            >
-                {/* Header with toggle */}
-                <div className={`p-4 flex items-center ${leftSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
-                    {!leftSidebarCollapsed && (
-                        <h2 className="text-lg font-bold text-tum-blue">Document Ingestion</h2>
-                    )}
-                    <button
-                        onClick={() => actions.toggleLeftSidebar()}
-                        className="w-8 h-8 bg-tum-white/50 border border-tum-grey-7
-                            flex items-center justify-center rounded-lg
-                            hover:bg-tum-white transition-colors"
-                        title={leftSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                    >
-                        <span className="text-sm text-tum-black font-bold">
-                            {leftSidebarCollapsed ? '»' : '«'}
-                        </span>
-                    </button>
-                </div>
-
-                {!leftSidebarCollapsed && (
-                    <div className="px-4 pb-4 flex flex-col flex-1 overflow-hidden pt-4">
-                        {/* Upload Zone */}
-                        <ConnectedUploadZone
-                            resetCommandDocument={resetCommandDocument}
-                        />
-
-                        {/* Multi-select toggle (disabled in preview mode) */}
-                        {!isPreviewMode && (
-                            <div className="mt-3 flex items-center justify-between">
-                                <button
-                                    onClick={() => actions.toggleMultiSelect()}
-                                    disabled={isPreviewMode}
-                                    className={`text-xs px-2 py-1 rounded transition-colors ${multiSelectMode
-                                        ? 'bg-tum-blue text-white'
-                                        : 'bg-tum-grey-9 text-tum-grey-3 hover:bg-tum-grey-8'
-                                        } ${isPreviewMode ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    title={multiSelectMode ? 'Exit multi-select' : 'Enable multi-select'}
-                                >
-                                    {multiSelectMode ? '✓ Multi-Select' : '☐ Multi-Select'}
-                                </button>
-                            </div>
-                        )}
-
-                        {/* File Queue */}
-                        <div className="mt-3 flex-1 overflow-y-auto">
-                            <ConnectedFileQueue />
-                        </div>
-
-                        {/* Bottom Actions */}
-                        <div className="mt-3 pt-3 border-t border-tum-grey-7 space-y-2">
-                            {/* Back to Chat Button */}
-                            <button
-                                onClick={() => navigate('/chatbot')}
-                                className="w-full text-xs px-3 py-2 bg-tum-blue text-white 
-                                    rounded-lg hover:bg-tum-blue-dark transition-colors
-                                    flex items-center justify-center gap-2"
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                </svg>
-                                Back to Chat
-                            </button>
-
-                            {/* Cache Management Button */}
-                            <button
-                                onClick={() => setShowCacheManagement(true)}
-                                disabled={isPreviewMode}
-                                className={`w-full text-xs px-3 py-2 bg-tum-grey-9 text-tum-grey-3 
-                                    rounded-lg hover:bg-tum-grey-8 hover:text-tum-black transition-colors
-                                    flex items-center justify-center gap-2
-                                    ${isPreviewMode ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                                Manage Cache
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Collapsed state icon */}
-                {leftSidebarCollapsed && (
-                    <div className="flex flex-col items-center pt-4">
-                        <span className="text-2xl mb-2" title="Documents">📄</span>
-                        <span className="text-xs text-tum-grey-3">
-                            {uploadQueue.length > 0 && `${uploadQueue.length}`}
-                        </span>
-                    </div>
-                )}
+        <div className={`h-screen flex flex-col overflow-hidden font-display ${isDarkMode ? 'bg-[#212121]' : 'bg-tum-blue-light-5'}`}>
+            {/* Header - fixed height, consistent with ChatbotPage */}
+            <div className="flex-shrink-0 h-14">
+                <Header 
+                    role={userRole}
+                    isDarkMode={isDarkMode}
+                />
             </div>
 
-            {/* Main Content Area */}
-            <main className="flex-1 flex flex-col overflow-hidden">
-                {/* Header / Save Bar - hidden in preview mode, different for embedding mode */}
-                {!isPreviewMode && contentType !== CONTENT_TYPE.EMBEDDING && (
-                    <div className="bg-white border-b border-tum-grey-7 px-6 py-4">
-                        {/* Title row */}
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex-1">
-                                {commandDocumentState ? (
-                                    isEditingTitle ? (
-                                        <input
-                                            type="text"
-                                            value={editingTitleValue}
-                                            onChange={(e) => setEditingTitleValue(e.target.value)}
-                                            onBlur={() => {
-                                                const trimmed = editingTitleValue.trim();
-                                                if (trimmed && trimmed !== commandDocumentState.filename) {
-                                                    executeCommand(Commands.renameDocument(trimmed, commandDocumentState.filename));
-                                                    actions.updateFilename(selectedDocumentId, trimmed);
-                                                }
-                                                setIsEditingTitle(false);
-                                            }}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    e.target.blur();
-                                                } else if (e.key === 'Escape') {
-                                                    setEditingTitleValue(commandDocumentState.filename);
-                                                    setIsEditingTitle(false);
-                                                }
-                                            }}
-                                            autoFocus
-                                            className="w-full text-xl font-bold text-tum-black bg-white border border-tum-blue 
-                                                px-3 py-2 focus:outline-none focus:ring-1 focus:ring-tum-blue"
-                                        />
-                                    ) : (
-                                        <h1
-                                            className="text-xl font-bold text-tum-black cursor-text hover:bg-tum-blue-light-5 
-                                                px-3 py-2 -mx-3 -my-2 transition-colors border border-transparent hover:border-tum-grey-7"
-                                            onClick={() => {
-                                                setEditingTitleValue(commandDocumentState.filename);
-                                                setIsEditingTitle(true);
-                                            }}
-                                            title="Click to edit filename"
-                                        >
-                                            {commandDocumentState.filename}
-                                        </h1>
-                                    )
-                                ) : (
-                                    <h1 className="text-xl font-bold text-tum-grey-4 px-3 py-2 -mx-3 -my-2">
-                                        Select a document
-                                    </h1>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Actions row */}
-                        <div className="flex items-center justify-between">
-                            {commandDocumentState && (
-                                <p className="text-sm text-tum-grey-4">
-                                    Page {currentPage} of {totalPages}
-                                </p>
-                            )}
-                            {!commandDocumentState && <div />}
-
-                            <SaveBar
-                                canUndo={canUndo}
-                                canRedo={canRedo}
-                                onUndo={undo}
-                                onRedo={redo}
-                                onIngest={() => actions.openModal(MODAL_TYPES.INGEST)}
-                                canIngest={!!commandDocumentState && !isIngesting && !isPreviewMode}
-                            />
-                        </div>
-                    </div>
-                )}
-
-                {/* Content Viewer or Preview Viewer */}
-                {configLoading ? (
-                    <div className="flex-1 flex items-center justify-center">
-                        <div className="text-tum-grey-4">Loading configuration...</div>
-                    </div>
-                ) : isPreviewMode ? (
-                    <EmbeddingPreviewViewer
-                        preview={embeddingPreview}
-                        isLoading={isLoadingPreview}
-                        isIngesting={isIngesting}
-                        onCancel={() => actions.exitPreviewMode(rightSidebarCollapsed)}
-                        onConfirm={handleConfirmIngestion}
-                        onConfirmAll={handleConfirmIngestionAll}
-                        isMultiFile={previewDocumentIds.size > 1}
-                        totalFilesInPreview={previewDocumentIds.size}
-                    />
-                ) : contentType === CONTENT_TYPE.EMBEDDING && storedEmbeddings ? (
-                    <EmbeddingPreviewViewer
-                        preview={storedEmbeddings}
-                        isLoading={false}
-                        readOnly={true}
-                    />
-                ) : (
-                    <ConnectedContentViewer
-                        commandState={commandDocumentState}
-                        executeCommand={executeCommand}
-                    />
-                )}
-            </main>
-
-            {/* Right Panel - Helpers (hidden in preview mode and embedding mode) */}
-            {!isPreviewMode && contentType !== CONTENT_TYPE.EMBEDDING && (
+            {/* Main area: three-panel layout - takes remaining space */}
+            <div className={`flex flex-1 min-h-0 overflow-hidden`}>
+                {/* Left Panel - File Queue */}
                 <div
                     className={`
-                        ${rightSidebarCollapsed ? 'w-12' : 'w-56 lg:w-64'} 
-                        bg-white border-l border-tum-grey-7 flex flex-col
+                        ${leftSidebarCollapsed ? 'w-12' : 'w-56 lg:w-64'} 
+                        ${isDarkMode ? 'bg-[#2d2d2d] border-[#404040]' : 'bg-tum-blue-light-4 border-tum-grey-7'}
+                        flex flex-col border-r 
                         transition-all duration-300 ease-in-out flex-shrink-0
                     `}
                 >
                     {/* Header with toggle */}
-                    <div className={`p-4 flex items-center ${rightSidebarCollapsed ? 'justify-center' : 'justify-between'} border-b border-tum-grey-7`}>
+                    <div className={`p-4 flex items-center ${leftSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+                        {!leftSidebarCollapsed && (
+                            <h2 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-tum-blue'}`}>Document Ingestion</h2>
+                        )}
                         <button
-                            onClick={() => actions.toggleRightSidebar()}
-                            className="w-8 h-8 bg-tum-blue-light-5 border border-tum-grey-7
-                                flex items-center justify-center
-                                hover:bg-tum-blue-light-3 transition-colors"
-                            title={rightSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                            onClick={() => actions.toggleLeftSidebar()}
+                            className={`w-8 h-8 border flex items-center justify-center transition-colors
+                                ${isDarkMode 
+                                    ? 'bg-[#404040] border-[#555] hover:bg-[#4a4a4a] text-white' 
+                                    : 'bg-white/50 border-tum-grey-7 hover:bg-white text-tum-black'
+                                }`}
+                            title={leftSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                         >
-                            <span className="text-sm text-tum-blue font-bold">
-                                {rightSidebarCollapsed ? '«' : '»'}
+                            <span className="text-sm font-bold">
+                                {leftSidebarCollapsed ? '»' : '«'}
                             </span>
                         </button>
-                        {!rightSidebarCollapsed && (
-                            <h3 className="text-sm font-semibold text-tum-blue">Helpers</h3>
-                        )}
                     </div>
 
-                    {/* Content: Helpers */}
-                    {!rightSidebarCollapsed && (
-                        <ConnectedHelperPanel
-                            commandState={commandDocumentState}
-                            executeCommand={executeCommand}
-                        />
+                    {!leftSidebarCollapsed && (
+                        <div className="px-4 pb-4 flex flex-col flex-1 overflow-hidden pt-4">
+                            {/* Upload Zone */}
+                            <ConnectedUploadZone
+                                resetCommandDocument={resetCommandDocument}
+                                isDarkMode={isDarkMode}
+                            />
+
+                            {/* Multi-select toggle (disabled in preview mode) */}
+                            {!isPreviewMode && (
+                                <div className="mt-3 flex items-center justify-between">
+                                    <button
+                                        onClick={() => actions.toggleMultiSelect()}
+                                        disabled={isPreviewMode}
+                                        className={`text-xs px-2 py-1 rounded transition-colors 
+                                            ${multiSelectMode
+                                                ? 'bg-tum-blue text-white'
+                                                : isDarkMode 
+                                                    ? 'bg-[#404040] text-[#b0b0b0] hover:bg-[#4a4a4a]' 
+                                                    : 'bg-tum-grey-9 text-tum-grey-3 hover:bg-tum-grey-8'
+                                            } 
+                                            ${isPreviewMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        title={multiSelectMode ? 'Exit multi-select' : 'Enable multi-select'}
+                                    >
+                                        {multiSelectMode ? '✓ Multi-Select' : '☐ Multi-Select'}
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* File Queue */}
+                            <div className="mt-3 flex-1 overflow-y-auto">
+                                <ConnectedFileQueue isDarkMode={isDarkMode} />
+                            </div>
+
+                            {/* Bottom Actions */}
+                            <div className={`mt-3 pt-3 border-t space-y-2 ${isDarkMode ? 'border-[#404040]' : 'border-tum-grey-7'}`}>
+                                {/* Back to Chat Button */}
+                                <button
+                                    onClick={() => navigate('/chatbot')}
+                                    className="w-full text-xs px-3 py-2 bg-tum-blue text-white 
+                                        rounded-lg hover:bg-tum-blue-dark transition-colors
+                                        flex items-center justify-center gap-2"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                    </svg>
+                                    Back to Chat
+                                </button>
+
+                                {/* Cache Management Button */}
+                                <button
+                                    onClick={() => setShowCacheManagement(true)}
+                                    disabled={isPreviewMode}
+                                    className={`w-full text-xs px-3 py-2 rounded-lg transition-colors
+                                        flex items-center justify-center gap-2
+                                        ${isDarkMode 
+                                            ? 'bg-[#404040] text-[#b0b0b0] hover:bg-[#4a4a4a] hover:text-white' 
+                                            : 'bg-tum-grey-9 text-tum-grey-3 hover:bg-tum-grey-8 hover:text-tum-black'
+                                        }
+                                        ${isPreviewMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Manage Cache
+                                </button>
+                            </div>
+                        </div>
                     )}
 
                     {/* Collapsed state icon */}
-                    {rightSidebarCollapsed && (
+                    {leftSidebarCollapsed && (
                         <div className="flex flex-col items-center pt-4">
-                            <span className="text-2xl" title="Helpers">🛠️</span>
+                            <span className="text-2xl mb-2" title="Documents">📄</span>
+                            <span className={`text-xs ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-3'}`}>
+                                {uploadQueue.length > 0 && `${uploadQueue.length}`}
+                            </span>
                         </div>
                     )}
                 </div>
-            )}
+
+                {/* Main Content Area */}
+                <main className="flex-1 flex flex-col overflow-hidden">
+                    {/* Header / Save Bar - hidden in preview mode, different for embedding mode */}
+                    {!isPreviewMode && contentType !== CONTENT_TYPE.EMBEDDING && (
+                        <div className={`border-b px-6 py-4 ${isDarkMode ? 'bg-[#2d2d2d] border-[#404040]' : 'bg-white border-tum-grey-7'}`}>
+                            {/* Title row */}
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex-1">
+                                    {commandDocumentState ? (
+                                        isEditingTitle ? (
+                                            <input
+                                                type="text"
+                                                value={editingTitleValue}
+                                                onChange={(e) => setEditingTitleValue(e.target.value)}
+                                                onBlur={() => {
+                                                    const trimmed = editingTitleValue.trim();
+                                                    if (trimmed && trimmed !== commandDocumentState.filename) {
+                                                        executeCommand(Commands.renameDocument(trimmed, commandDocumentState.filename));
+                                                        actions.updateFilename(selectedDocumentId, trimmed);
+                                                    }
+                                                    setIsEditingTitle(false);
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.target.blur();
+                                                    } else if (e.key === 'Escape') {
+                                                        setEditingTitleValue(commandDocumentState.filename);
+                                                        setIsEditingTitle(false);
+                                                    }
+                                                }}
+                                                autoFocus
+                                                className={`w-full text-xl font-bold border px-3 py-2 focus:outline-none focus:ring-1 focus:ring-tum-blue
+                                                    ${isDarkMode 
+                                                        ? 'text-white bg-[#404040] border-[#555]' 
+                                                        : 'text-tum-black bg-white border-tum-blue'
+                                                    }`}
+                                            />
+                                        ) : (
+                                            <h1
+                                                className={`text-xl font-bold cursor-text px-3 py-2 -mx-3 -my-2 transition-colors border border-transparent
+                                                    ${isDarkMode 
+                                                        ? 'text-white hover:bg-[#404040] hover:border-[#555]' 
+                                                        : 'text-tum-black hover:bg-tum-blue-light-5 hover:border-tum-grey-7'
+                                                    }`}
+                                                onClick={() => {
+                                                    setEditingTitleValue(commandDocumentState.filename);
+                                                    setIsEditingTitle(true);
+                                                }}
+                                                title="Click to edit filename"
+                                            >
+                                                {commandDocumentState.filename}
+                                            </h1>
+                                        )
+                                    ) : (
+                                        <h1 className={`text-xl font-bold px-3 py-2 -mx-3 -my-2 ${isDarkMode ? 'text-[#888]' : 'text-tum-grey-4'}`}>
+                                            Select a document
+                                        </h1>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Actions row */}
+                            <div className="flex items-center justify-between">
+                                {commandDocumentState && (
+                                    <p className={`text-sm ${isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-4'}`}>
+                                        Page {currentPage} of {totalPages}
+                                    </p>
+                                )}
+                                {!commandDocumentState && <div />}
+
+                                <SaveBar
+                                    canUndo={canUndo}
+                                    canRedo={canRedo}
+                                    onUndo={undo}
+                                    onRedo={redo}
+                                    onIngest={() => actions.openModal(MODAL_TYPES.INGEST)}
+                                    canIngest={!!commandDocumentState && !isIngesting && !isPreviewMode}
+                                    isDarkMode={isDarkMode}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Content Viewer or Preview Viewer */}
+                    {configLoading ? (
+                        <div className="flex-1 flex items-center justify-center">
+                            <div className={isDarkMode ? 'text-[#b0b0b0]' : 'text-tum-grey-4'}>Loading configuration...</div>
+                        </div>
+                    ) : isPreviewMode ? (
+                        <EmbeddingPreviewViewer
+                            preview={embeddingPreview}
+                            isLoading={isLoadingPreview}
+                            isIngesting={isIngesting}
+                            onCancel={() => actions.exitPreviewMode(rightSidebarCollapsed)}
+                            onConfirm={handleConfirmIngestion}
+                            onConfirmAll={handleConfirmIngestionAll}
+                            isMultiFile={previewDocumentIds.size > 1}
+                            totalFilesInPreview={previewDocumentIds.size}
+                            isDarkMode={isDarkMode}
+                        />
+                    ) : contentType === CONTENT_TYPE.EMBEDDING && storedEmbeddings ? (
+                        <EmbeddingPreviewViewer
+                            preview={storedEmbeddings}
+                            isLoading={false}
+                            readOnly={true}
+                            isDarkMode={isDarkMode}
+                        />
+                    ) : (
+                        <ConnectedContentViewer
+                            commandState={commandDocumentState}
+                            executeCommand={executeCommand}
+                            isDarkMode={isDarkMode}
+                        />
+                    )}
+                </main>
+
+                {/* Right Panel - Helpers (hidden in preview mode and embedding mode) */}
+                {!isPreviewMode && contentType !== CONTENT_TYPE.EMBEDDING && (
+                    <div
+                        className={`
+                            ${rightSidebarCollapsed ? 'w-12' : 'w-56 lg:w-64'} 
+                            ${isDarkMode ? 'bg-[#2d2d2d] border-[#404040]' : 'bg-white border-tum-grey-7'}
+                            border-l flex flex-col
+                            transition-all duration-300 ease-in-out flex-shrink-0
+                        `}
+                    >
+                        {/* Header with toggle */}
+                        <div className={`p-4 flex items-center ${rightSidebarCollapsed ? 'justify-center' : 'justify-between'} border-b ${isDarkMode ? 'border-[#404040]' : 'border-tum-grey-7'}`}>
+                            <button
+                                onClick={() => actions.toggleRightSidebar()}
+                                className={`w-8 h-8 border flex items-center justify-center transition-colors
+                                    ${isDarkMode 
+                                        ? 'bg-[#404040] border-[#555] hover:bg-[#4a4a4a]' 
+                                        : 'bg-tum-blue-light-5 border-tum-grey-7 hover:bg-tum-blue-light-3'
+                                    }`}
+                                title={rightSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                            >
+                                <span className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-tum-blue'}`}>
+                                    {rightSidebarCollapsed ? '«' : '»'}
+                                </span>
+                            </button>
+                            {!rightSidebarCollapsed && (
+                                <h3 className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-tum-blue'}`}>Helpers</h3>
+                            )}
+                        </div>
+
+                        {/* Content: Helpers */}
+                        {!rightSidebarCollapsed && (
+                            <ConnectedHelperPanel
+                                commandState={commandDocumentState}
+                                executeCommand={executeCommand}
+                                isDarkMode={isDarkMode}
+                            />
+                        )}
+
+                        {/* Collapsed state icon */}
+                        {rightSidebarCollapsed && (
+                            <div className="flex flex-col items-center pt-4">
+                                <span className="text-2xl" title="Helpers">🛠️</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
 
             {/* Ingestion Modal */}
             <IngestionModal
@@ -999,6 +1071,7 @@ function IngestionPageLayout() {
                 backendConfig={backendConfig}
                 isIngesting={isIngesting}
                 progress={ingestionProgress}
+                isDarkMode={isDarkMode}
             />
 
             {/* Regex Input Modal */}
@@ -1006,19 +1079,22 @@ function IngestionPageLayout() {
                 isOpen={activeModal === MODAL_TYPES.REGEX}
                 onClose={handleCloseModal}
                 onConfirm={handleRegexConfirm}
+                isDarkMode={isDarkMode}
             />
 
             {/* Cache Management Modal */}
             {showCacheManagement && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div
-                        className="fixed inset-0 bg-tum-black/40 backdrop-blur-sm"
+                        className="fixed inset-0 bg-black/50 backdrop-blur-sm"
                         onClick={() => setShowCacheManagement(false)}
                     />
-                    <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden">
+                    <div className={`relative rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden
+                        ${isDarkMode ? 'bg-[#2d2d2d]' : 'bg-white'}`}>
                         <CacheManagement
                             onClose={() => setShowCacheManagement(false)}
                             onCacheCleared={handleCacheCleared}
+                            isDarkMode={isDarkMode}
                         />
                     </div>
                 </div>
@@ -1033,6 +1109,7 @@ function IngestionPageLayout() {
                 helper={pendingHelper}
                 currentDocumentId={selectedDocumentId}
                 currentFilename={commandDocumentState?.filename}
+                isDarkMode={isDarkMode}
             />
         </div>
     );

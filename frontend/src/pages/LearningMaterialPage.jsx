@@ -276,6 +276,7 @@ const LearningMaterialPage = () => {
                 video={selectedVideo}
                 onClose={closeVideoPlayer}
                 apiBaseUrl={API_BASE_URL}
+                isDarkMode={isDarkMode}
             />
 
             {/* Upload/Edit Modal */}

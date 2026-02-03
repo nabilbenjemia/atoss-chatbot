@@ -27,7 +27,7 @@ const AdminVideoCard = ({ video, onVideoClick, onEdit, onDelete, apiBaseUrl, isD
     }, [showOptions]);
 
     return (
-        <div className={`rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer h-72 flex flex-col relative ${isDarkMode ? 'bg-tum-grey-2' : 'bg-white'}`}>
+        <div className={`rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer h-72 flex flex-col relative ${isDarkMode ? 'bg-[#2f2f2f]' : 'bg-white'}`}>
             {/* Three dots menu */}
             <div className="absolute top-2 right-2 z-20" ref={dropdownRef}>
                 <button

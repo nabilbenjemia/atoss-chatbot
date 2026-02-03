@@ -8,7 +8,7 @@ const VideoCard = ({ video, onVideoClick, apiBaseUrl, isDarkMode }) => {
     };
 
     return (
-        <div className={`rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer h-72 flex flex-col ${isDarkMode ? 'bg-tum-grey-2' : 'bg-white'}`}>
+        <div className={`rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer h-72 flex flex-col ${isDarkMode ? 'bg-[#2f2f2f]' : 'bg-white'}`}>
             {/* Thumbnail - smaller height */}
             <div className="relative">
                 <img
