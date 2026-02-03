@@ -45,7 +45,7 @@ export default function Header({ role, isDarkMode }) {
       </Link>,
       <Link
         key="ingest"
-        to="/ingest"
+        to="/admin/ingestion"
         className="px-4 py-1.5 text-sm font-medium rounded-full border transition bg-red-600 text-white border-red-600 hover:bg-red-700 hover:text-white"
       >
         Manage Knowledge
