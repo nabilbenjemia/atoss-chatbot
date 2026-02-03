@@ -8,6 +8,6 @@ RUN npm ci --only=production
 
 COPY . .
 
-EXPOSE 4005
+EXPOSE 4006
 
 CMD ["node", "index.js"]
