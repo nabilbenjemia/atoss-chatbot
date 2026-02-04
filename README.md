@@ -41,24 +41,70 @@ ollama pull qwen3:4b-instruct
 
 ## 🚀 Quick Start (Docker - Recommended)
 
-The easiest way to run all services:
+Docker Compose profiles are available for different environments:
+
+### 🍎 macOS (Apple Silicon / Intel)
+
+On macOS, the LLM service runs **on your host machine** (not in Docker) for better performance with Metal acceleration.
 
 ```bash
-# Start all services
-docker-compose up -d
+# Step 1: Start core services + ingestion (in Docker)
+docker-compose --profile macos up -d
 
-# View logs
-docker-compose logs -f
+# Step 2: Run LLM service manually on host (separate terminal)
+cd backend/llm
+source .venv/bin/activate
+python main.py
 
-# Stop all services
-docker-compose down
+# Step 3: Make sure Ollama is running on host
+ollama serve  # If not already running
 ```
 
-This will automatically:
-- Start MongoDB
-- Start Ollama and pull the model
-- Start all backend services (LLM, Authentication, Conversation)
-- Start the frontend
+**Why this setup?** macOS Docker doesn't support GPU passthrough. Running the LLM on the host allows Ollama to use Metal acceleration on Apple Silicon.
+
+### 🖥️ Windows/Linux with NVIDIA GPU
+
+For machines with NVIDIA GPUs, all services including Ollama run in Docker with GPU acceleration.
+
+**Prerequisites:**
+- NVIDIA GPU with CUDA support
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed
+- Docker Desktop with WSL2 backend (Windows) or Docker Engine (Linux)
+
+```bash
+# Start all services with GPU support
+docker-compose --profile gpu up -d
+
+# View logs (Ollama takes ~90s to pull model on first run)
+docker-compose --profile gpu logs -f
+
+# Stop all services
+docker-compose --profile gpu down
+```
+
+### 🐳 Docker Profile Summary
+
+| Profile | Command | LLM Location | GPU Support |
+|---------|---------|--------------|-------------|
+| `macos` | `docker-compose --profile macos up -d` | Host machine | Metal (host) |
+| `gpu` | `docker-compose --profile gpu up -d` | Docker container | NVIDIA CUDA |
+
+### Core Services (Always Started)
+
+These services start with **any** profile:
+- **Frontend** (port 5173) - React UI
+- **Authentication** (port 4003) - User auth
+- **Conversation** (port 4004) - Chat management
+- **User** (port 4001) - User profiles
+- **Learning Material** (port 4005) - Course content
+
+### Profile-Specific Services
+
+| Service | `macos` Profile | `gpu` Profile |
+|---------|-----------------|---------------|
+| Ingestion (4006) | ✅ Connects to `host.docker.internal:8000` | ✅ Connects to `llm:8000` |
+| LLM (8000) | ❌ Run manually on host | ✅ In Docker |
+| Ollama (11434) | ❌ Run manually on host | ✅ In Docker with GPU |
 
 ### 🌐 Access the App
 
@@ -120,6 +166,9 @@ npm run dev
 | Frontend | 5173 | React + Vite | User interface |
 | Conversation | 4004 | Node.js/Express | Chat & message management |
 | Authentication | 4003 | Node.js/Express | User auth & sessions |
+| User | 4001 | Node.js/Express | User profiles & preferences |
+| Learning Material | 4005 | Node.js/Express | Course content management |
+| Ingestion | 4006 | Node.js/Express | Document upload & processing |
 | LLM Server | 8000 | Python/FastAPI | RAG + Ollama integration |
 | Ollama | 11434 | Ollama | Local LLM inference |
 
@@ -211,15 +260,33 @@ JWT_SECRET=your-secret-key
 
 ## Docker Compose Services
 
-The `docker-compose.yml` orchestrates all services:
+The `docker-compose.yml` uses **profiles** to support different environments:
 
-| Service | Image/Build | Description |
-|---------|-------------|-------------|
-| frontend | `./frontend` | React app served via nginx |
-| llm | `./backend/llm` | FastAPI RAG server |
-| authentication | `./backend/authentication` | Auth microservice |
-| conversation | `./backend/conversation` | Chat microservice |
-| ollama | `ollama/ollama:latest` | Local LLM inference (GPU support) |
+### Core Services (No Profile Required)
+
+| Service | Port | Description |
+|---------|------|-------------|
+| frontend | 5173 | React app served via nginx |
+| authentication | 4003 | Auth microservice |
+| conversation | 4004 | Chat microservice |
+| user | 4001 | User profile service |
+| learning-material | 4005 | Course content service |
+
+### macOS Profile (`--profile macos`)
+
+| Service | Port | Description |
+|---------|------|-------------|
+| ingestion | 4006 | Document ingestion (connects to host LLM) |
+
+> **Note:** LLM and Ollama run manually on host for Metal acceleration.
+
+### GPU Profile (`--profile gpu`)
+
+| Service | Port | Description |
+|---------|------|-------------|
+| ingestion-gpu | 4006 | Document ingestion (connects to Docker LLM) |
+| llm | 8000 | FastAPI RAG server |
+| ollama | 11434 | Ollama with NVIDIA GPU support |
 
 ---
 
