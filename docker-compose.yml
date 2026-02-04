@@ -1,4 +1,7 @@
 services:
+  # ===========================================
+  # CORE SERVICES (always started with any profile)
+  # ===========================================
   frontend:
     build:
       context: ./frontend
@@ -6,39 +9,10 @@ services:
     ports:
       - "5173:80"
     depends_on:
-      # - llm
       - authentication
       - conversation
-      - ingestion
     networks:
       - atoss-network
-
-  llm:
-    build:
-      context: ./backend/llm
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    env_file:
-      - ./backend/llm/.env
-    environment:
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - HF_HOME=/root/.cache/huggingface
-    volumes:
-      - ~/.cache/huggingface:/root/.cache/huggingface  # Mount host HF cache
-      - ./backend/llm/chroma_db_snowflake_600chunks_300overlapping:/app/chroma_db_snowflake_600chunks_300overlapping
-    depends_on:
-      ollama:
-        condition: service_healthy
-    networks:
-      - atoss-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/health\")' || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 180s
 
   authentication:
     build:
@@ -61,8 +35,6 @@ services:
     env_file:
       - ./backend/conversation/.env
     depends_on:
-      # llm:
-      #   condition: service_healthy
       authentication:
         condition: service_started
     networks:
@@ -84,23 +56,6 @@ services:
       - atoss-network
     restart: unless-stopped
 
-  ingestion:
-    build:
-      context: ./backend/ingestion
-      dockerfile: Dockerfile
-    ports:
-      - "4006:4006"
-    env_file:
-      - ./backend/ingestion/.env
-    environment:
-      - LLM_SERVICE_URL=http://llm:8000
-    #depends_on:
-    #  llm:
-    #    condition: service_healthy
-    networks:
-      - atoss-network
-    restart: unless-stopped
-
   learning-material:
     build:
       context: ./backend/learning-material
@@ -116,15 +71,72 @@ services:
         condition: service_started
     networks:
       - atoss-network
+    restart: unless-stopped
+
+  # ===========================================
+  # macOS PROFILE (LLM runs manually on host)
+  # Start with: docker-compose --profile macos up -d
+  # ===========================================
+  ingestion:
+    build:
+      context: ./backend/ingestion
+      dockerfile: Dockerfile
+    profiles:
+      - macos
+    ports:
+      - "4006:4006"
+    env_file:
+      - ./backend/ingestion/.env
+    environment:
+      - LLM_SERVICE_URL=http://host.docker.internal:8000  # macOS: LLM runs on host
+    networks:
+      - atoss-network
+    restart: unless-stopped
+
+  # ===========================================
+  # GPU PROFILE (Windows/Linux with NVIDIA GPU)
+  # Start with: docker-compose --profile gpu up -d
+  # ===========================================
+  ingestion-gpu:
+    build:
+      context: ./backend/ingestion
+      dockerfile: Dockerfile
+    profiles:
+      - gpu
+    ports:
+      - "4006:4006"
+    env_file:
+      - ./backend/ingestion/.env
+    environment:
+      - LLM_SERVICE_URL=http://llm:8000  # GPU: LLM runs in Docker
+    depends_on:
+      llm:
+        condition: service_healthy
+    networks:
+      - atoss-network
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles:
+      - gpu
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+      - ./init-ollama.sh:/usr/local/bin/init-ollama.sh:ro
+    env_file:
+      - ./backend/llm/.env
+    networks:
+      - atoss-network
     entrypoint: ["/bin/sh", "/usr/local/bin/init-ollama.sh"]
-    # GPU support - uncomment for NVIDIA GPUs on Linux
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     healthcheck:
       test: ["CMD-SHELL", "ollama list || exit 1"]
       interval: 10s
@@ -133,32 +145,34 @@ services:
       start_period: 90s
     restart: unless-stopped
 
-  #ollama:
-  #  image: ollama/ollama:latest
-  #  ports:
-  #    - "11434:11434"
-  #  volumes:
-  #    - ollama_data:/root/.ollama
-  #    - ./init-ollama.sh:/usr/local/bin/init-ollama.sh:ro
-  #  env_file:
-  #    - ./backend/llm/.env
-  #  networks:
-  #    - atoss-network
-  #  entrypoint: ["/bin/sh", "/usr/local/bin/init-ollama.sh"]
-  #  deploy:
-  #    resources:
-  #      reservations:
-  #      devices:
-  #        - driver: nvidia
-  #          count: all
-  #          capabilities: [gpu]
-  #  healthcheck:
-  #    test: ["CMD-SHELL", "ollama list || exit 1"]
-  #    interval: 10s
-  #    timeout: 10s
-  #    retries: 12
-  #    start_period: 90s
-  #  restart: unless-stopped
+  llm:
+    build:
+      context: ./backend/llm
+      dockerfile: Dockerfile
+    profiles:
+      - gpu
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/llm/.env
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - HF_HOME=/root/.cache/huggingface
+    volumes:
+      - hf_cache:/root/.cache/huggingface
+      - ./backend/llm/chroma_db_snowflake_600chunks_300overlapping:/app/chroma_db_snowflake_600chunks_300overlapping
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - atoss-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/health\")' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 180s
   
 networks:
   atoss-network:
