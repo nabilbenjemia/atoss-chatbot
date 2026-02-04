@@ -386,12 +386,22 @@ class VectorStoreManager:
             True  # show_progress
         )
         
-        # Get or create collection
-        _, collection = await asyncio.to_thread(
-            self._get_or_create_collection,
-            collection_id,
-            {"strategy": strategy}
-        )
+        # Check if this is the default collection path
+        collection_path = self._get_collection_path(collection_id)
+        default_path = os.path.normpath(os.path.abspath(settings.CHROMA_PERSIST_DIRECTORY))
+        ingestion_path = os.path.normpath(os.path.abspath(str(collection_path)))
+        
+        if ingestion_path == default_path and self._is_loaded and self._default_collection:
+            # Use default collection to avoid multiple clients on same files
+            logger.info("[Ingest] Using default collection (same path)")
+            collection = self._default_collection
+        else:
+            # Get or create a separate collection
+            _, collection = await asyncio.to_thread(
+                self._get_or_create_collection,
+                collection_id,
+                {"strategy": strategy}
+            )
         
         # Add to ChromaDB
         logger.info("[Ingest] Adding %d documents to ChromaDB...", len(ids))
@@ -403,7 +413,6 @@ class VectorStoreManager:
             documents=texts
         )
         
-        collection_path = self._get_collection_path(collection_id)
         logger.info(
             "[Ingest] Successfully ingested %d documents to '%s'",
             len(ids), collection_id
@@ -440,6 +449,44 @@ class VectorStoreManager:
         """Clear the collection cache to free resources."""
         self._collection_cache.clear()
         logger.info("Collection cache cleared")
+
+    async def reload(self) -> bool:
+        """
+        Reload the default vector store to pick up newly ingested documents.
+        
+        This is called after ingestion to ensure the RAG chain uses the latest data.
+        ChromaDB PersistentClient instances cache data - we need to fully close
+        all clients and reopen to see changes.
+        """
+        logger.info("Reloading default vector store...")
+        
+        # Log cached clients being cleared
+        if self._collection_cache:
+            logger.info("Clearing %d cached collections", len(self._collection_cache))
+        
+        # Clear collection cache - allows garbage collection of clients
+        self._collection_cache.clear()
+        
+        # Close default client
+        if self._default_client:
+            logger.info("Closing default client...")
+        
+        self._default_client = None
+        self._default_collection = None
+        self._is_loaded = False
+        
+        # Force garbage collection to ensure ChromaDB releases file handles
+        import gc
+        gc.collect()
+        
+        # Small delay to ensure file handles are released
+        await asyncio.sleep(0.1)
+        
+        # Reload
+        result = await self.load()
+        doc_count = self._default_collection.count() if self._default_collection else 0
+        logger.info("Vector store reloaded, documents: %d", doc_count)
+        return result
 
     def unload(self):
         """Unload all vector stores and clear cache"""

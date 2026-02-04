@@ -236,6 +236,7 @@ class IngestionController:
         """
         from models.vectorstore import vectorstore_manager
         from services.image_storage_service import image_storage_service
+        from config.settings import settings
         
         try:
             # Count images before processing
@@ -262,6 +263,29 @@ class IngestionController:
             if total_images > 0:
                 result["totalImages"] = total_images
                 result["migratedImages"] = len(url_mapping) if total_images > 0 else 0
+            
+            # Reload the default vector store if we ingested to the default collection
+            # This ensures the RAG chain uses the newly ingested documents
+            import os
+            from pathlib import Path
+            
+            default_collection_path = settings.CHROMA_PERSIST_DIRECTORY
+            chroma_base = Path(settings.CHROMA_DB_DIRECTORY)
+            ingested_collection_path = str(chroma_base / collection_id)
+            
+            # Normalize paths for comparison
+            default_normalized = os.path.normpath(os.path.abspath(default_collection_path))
+            ingested_normalized = os.path.normpath(os.path.abspath(ingested_collection_path))
+            
+            logger.info(f"[Ingest] Path comparison - Default: {default_normalized}")
+            logger.info(f"[Ingest] Path comparison - Ingested: {ingested_normalized}")
+            logger.info(f"[Ingest] Path comparison - Match: {default_normalized == ingested_normalized}")
+            
+            # Always reload after successful ingestion to ensure fresh data
+            # This is safer than path comparison which can fail due to relative paths
+            logger.info(f"[Ingest] Reloading default vector store after ingestion...")
+            await vectorstore_manager.reload()
+            logger.info(f"[Ingest] Default vector store reloaded successfully with {vectorstore_manager._default_collection.count() if vectorstore_manager._default_collection else 0} documents")
             
             return result
             

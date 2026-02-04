@@ -3,6 +3,7 @@ RAG Chain Service
 Implements the Retrieval-Augmented Generation chain for question answering
 """
 
+import json
 import logging
 from typing import Optional, AsyncIterator, List, Any
 
@@ -32,6 +33,42 @@ class RAGChainService:
             cls._instance = super().__new__(cls)
         return cls._instance
 
+    def _extract_image_path(self, metadata: dict) -> str:
+        """
+        Extract image path from document metadata.
+        
+        Supports multiple formats:
+        1. image_path: Direct string path (legacy)
+        2. images: JSON array with imageUrl fields (new format from ingestion)
+        
+        Returns the first image path found, or empty string if none.
+        """
+        # Try direct image_path first (legacy format)
+        if metadata.get("image_path"):
+            return metadata["image_path"]
+        
+        # Try images array (new format from ingestion service)
+        images_data = metadata.get("images")
+        if not images_data:
+            return ""
+        
+        try:
+            # Parse JSON if it's a string (ChromaDB stores arrays as JSON strings)
+            if isinstance(images_data, str):
+                images = json.loads(images_data)
+            else:
+                images = images_data
+            
+            # Get the first image's URL
+            if images and isinstance(images, list) and len(images) > 0:
+                first_image = images[0]
+                if isinstance(first_image, dict):
+                    return first_image.get("imageUrl", "")
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.debug(f"Failed to parse images metadata: {e}")
+        
+        return ""
+
     def _format_docs(self, docs: List[Any]) -> str:
         """Format retrieved documents into a context string"""
         if not docs:
@@ -42,7 +79,11 @@ class RAGChainService:
             source = doc.metadata.get("source", "Unknown")
             # Support both "page" (old) and "page_num" (new) metadata keys
             page = doc.metadata.get("page_num") or doc.metadata.get("page", "?")
-            image_path = doc.metadata.get("image_path", "")
+            image_path = self._extract_image_path(doc.metadata)
+            
+            # Debug: Log extracted image path
+            if image_path:
+                logger.info(f"[RAG] Extracted image_path: {image_path} from page {page}")
             
             source_info = f"{source} (Seite {page})"
             if image_path:
@@ -51,6 +92,9 @@ class RAGChainService:
             content = doc.page_content.replace("\n", " ").strip()
 
             context_str += f"--- Zitat aus: {source_info} ---\n{content}\n\n"
+        
+        # Debug: Log final context being sent to LLM
+        logger.debug(f"[RAG] Formatted context:\n{context_str[:500]}...")
 
         return context_str
 

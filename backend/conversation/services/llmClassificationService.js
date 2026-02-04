@@ -5,7 +5,8 @@ const axios = require('axios');
  */
 class LLMClassificationService {
     constructor() {
-        this.ollamaUrl = process.env.OLLAMA_BASE_URL || 'http://ollama:11434';
+        // Use OLLAMA_BASE_URL from env, fallback to host.docker.internal for macOS Docker, then localhost
+        this.ollamaUrl = process.env.OLLAMA_BASE_URL || 'http://host.docker.internal:11434';
         this.model = 'qwen3:4b-instruct'; // Smaller model for classification
     }
 

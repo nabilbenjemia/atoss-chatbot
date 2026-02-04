@@ -34,6 +34,8 @@ services:
       - "4004:4004"
     env_file:
       - ./backend/conversation/.env
+    environment:
+      - CHATBOT_SERVICE_URL=http://host.docker.internal:8000  # macOS: LLM runs on host
     depends_on:
       authentication:
         condition: service_started
