@@ -95,8 +95,106 @@ The server will start at `http://localhost:8000`
 | `/api/chat/stream` | POST | Stream chat response (SSE) |
 | `/api/chat/generate` | POST | Generate complete response |
 | `/api/chat/status` | GET | Check server status |
+| `/api/config/switch-db` | POST | Switch active vector database |
+| `/api/config/current-db` | GET | Get current database info |
+| `/api/config/available-dbs` | GET | List available databases |
+| `/api/ingestion/collection` | POST | Create new vector database |
 | `/health` | GET | Health check endpoint |
 | `/docs` | GET | Swagger API documentation |
+
+## Vector Database Management
+
+The LLM server supports multiple ChromaDB vector databases. You can switch between databases at runtime without restarting the server.
+
+### List Available Databases
+
+```bash
+curl http://localhost:8000/api/config/available-dbs
+```
+
+Response:
+```json
+{
+  "success": true,
+  "databases": [
+    {"name": "tum_docs", "active": true},
+    {"name": "test3", "active": false},
+    {"name": "production", "active": false}
+  ],
+  "count": 3,
+  "currentDb": "tum_docs"
+}
+```
+
+### Check Current Database
+
+```bash
+curl http://localhost:8000/api/config/current-db
+```
+
+Response:
+```json
+{
+  "loaded": true,
+  "dbName": "tum_docs",
+  "documentCount": 150,
+  "collectionName": "tum_docs"
+}
+```
+
+### Switch to a Different Database
+
+```bash
+curl -X POST http://localhost:8000/api/config/switch-db \
+  -H "Content-Type: application/json" \
+  -d '{"dbName": "test3"}'
+```
+
+Response:
+```json
+{
+  "success": true,
+  "dbName": "test3",
+  "documentCount": 42,
+  "message": "Switched to 'test3' with 42 documents"
+}
+```
+
+**Security Notes:**
+- Database names must be alphanumeric with underscores/hyphens only
+- Rate limited to one switch per 5 seconds
+- Path traversal attempts are blocked
+
+### Create a New Database
+
+```bash
+curl -X POST http://localhost:8000/api/ingestion/collection \
+  -H "Content-Type: application/json" \
+  -d '{"collectionId": "my_new_db", "description": "My custom knowledge base"}'
+```
+
+Response:
+```json
+{
+  "success": true,
+  "collectionId": "my_new_db",
+  "message": "Collection 'my_new_db' created successfully"
+}
+```
+
+### Database Storage Location
+
+All vector databases are stored under the `CHROMA_DB_DIRECTORY` path (default: `./resources/chroma_db/`):
+
+```
+resources/chroma_db/
+├── tum_docs/           # Default database
+│   └── chroma.sqlite3
+├── test3/              # Another database
+│   └── chroma.sqlite3
+└── my_new_db/          # Newly created
+    └── chroma.sqlite3
+```
 
 ## Configuration
 

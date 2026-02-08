@@ -42,6 +42,10 @@ class VectorStoreManager:
     - Each collection_id maps to a separate ChromaDB directory
     - Inside each directory, uses CHROMA_COLLECTION_NAME as the collection name
     - This allows isolated backup/deletion of collections
+    
+    Thread Safety:
+    - Uses asyncio.Lock to prevent concurrent modifications during switch operations
+    - Read operations (search) can proceed concurrently when not switching
     """
 
     _instance: Optional["VectorStoreManager"] = None
@@ -50,9 +54,13 @@ class VectorStoreManager:
     _default_client: Optional[chromadb.PersistentClient] = None
     _default_collection: Optional[Collection] = None
     _is_loaded: bool = False
+    _current_db_name: Optional[str] = None  # Track current DB name
     
     # Cache of opened collections for ingestion
     _collection_cache: Dict[str, tuple] = {}
+    
+    # Lock for thread-safe switching
+    _switch_lock: Optional[asyncio.Lock] = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -65,7 +73,14 @@ class VectorStoreManager:
             self._default_client = None
             self._default_collection = None
             self._is_loaded = False
+            self._current_db_name = None
             self._collection_cache = {}
+            self._switch_lock = None  # Created lazily to ensure event loop exists
+
+    @property
+    def current_db_name(self) -> Optional[str]:
+        """Get the name of the currently loaded vector database."""
+        return self._current_db_name
 
     async def load(self) -> bool:
         """Load the default ChromaDB vector store for RAG queries"""
@@ -105,6 +120,8 @@ class VectorStoreManager:
                 )
 
             self._is_loaded = True
+            # Extract DB name from path (last directory component)
+            self._current_db_name = Path(persist_directory).name
             logger.info("Vector store loaded successfully")
             return True
 
@@ -487,6 +504,71 @@ class VectorStoreManager:
         doc_count = self._default_collection.count() if self._default_collection else 0
         logger.info("Vector store reloaded, documents: %d", doc_count)
         return result
+
+    async def switch_collection(self, db_name: str) -> bool:
+        """
+        Switch to a different vector database by name.
+        
+        Unloads the current vector store and loads the new one.
+        Collection name is the same across all DBs (CHROMA_COLLECTION_NAME).
+        
+        Thread-safe: Uses asyncio.Lock to prevent concurrent switches
+        and ensure consistent state during the switch operation.
+        
+        Args:
+            db_name: The database directory name (e.g., "test3", "production")
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        # Lazy init lock (must be created in async context)
+        if self._switch_lock is None:
+            self._switch_lock = asyncio.Lock()
+        
+        async with self._switch_lock:
+            logger.info("Switching to vector database: %s", db_name)
+            
+            # Build path: CHROMA_DB_DIRECTORY / db_name
+            chroma_base = Path(settings.CHROMA_DB_DIRECTORY)
+            db_path = chroma_base / db_name
+            
+            if not db_path.exists():
+                logger.error("Vector database not found: %s", db_path)
+                return False
+            
+            # Run blocking ChromaDB operations in thread pool
+            try:
+                success = await asyncio.to_thread(
+                    self._switch_collection_sync, db_name, str(db_path)
+                )
+                return success
+            except Exception as e:
+                logger.error("Failed to switch to '%s': %s", db_name, e)
+                self._is_loaded = False
+                return False
+
+    def _switch_collection_sync(self, db_name: str, db_path: str) -> bool:
+        """
+        Synchronous implementation of collection switch.
+        Called from thread pool to avoid blocking the event loop.
+        """
+        # Unload current
+        self._default_client = None
+        self._default_collection = None
+        self._is_loaded = False
+        self._collection_cache.clear()
+        
+        logger.info("Loading vector store from: %s", db_path)
+        self._default_client = chromadb.PersistentClient(path=db_path)
+        self._default_collection = self._default_client.get_collection(
+            name=settings.CHROMA_COLLECTION_NAME
+        )
+        self._is_loaded = True
+        self._current_db_name = db_name
+        
+        doc_count = self._default_collection.count()
+        logger.info("Switched to '%s', documents: %d", db_name, doc_count)
+        return True
 
     def unload(self):
         """Unload all vector stores and clear cache"""

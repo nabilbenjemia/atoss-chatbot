@@ -21,6 +21,7 @@ import uvicorn
 from config.settings import settings
 from routes.chat_routes import router as chat_router
 from routes.ingestion_routes import router as ingestion_router
+from routes.feature_toggle_routes import router as feature_toggle_router
 from services.startup_service import startup_service
 
 # Add the llm directory to the path for imports
@@ -118,6 +119,7 @@ logger.info(f"Serving document images from: {static_images_path}")
 # Include routers
 app.include_router(chat_router)
 app.include_router(ingestion_router)
+app.include_router(feature_toggle_router)
 
 
 @app.get("/")
