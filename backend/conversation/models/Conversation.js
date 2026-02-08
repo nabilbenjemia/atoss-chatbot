@@ -1,5 +1,8 @@
 const mongoose = require('mongoose');
 
+/**
+ * Conversation Model - represents a chat conversation between user and AI
+ */
 const conversationSchema = new mongoose.Schema({
     title: {
         type: String,

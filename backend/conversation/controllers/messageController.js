@@ -3,6 +3,10 @@ const conversationService = require('../services/conversationService');
 const mongoose = require('mongoose');
 const Conversation = require('../models/Conversation');
 
+/**
+ * Message Controller - handles HTTP requests for message management
+ */
+
 /** POST /api/conversations/:conversationId/messages */
 const createMessage = async (req, res) => {
   try {
@@ -24,11 +28,8 @@ const createMessage = async (req, res) => {
     if (!sender || !content) {
       return res.status(400).json({ error: "sender and content are required" });
     }
-
-    // TODO call genai service to get title if first message
     
     if (conversation.title === "Untitled") {
-      // Simulate GenAI title choices
       const suggestedTitle = "Conv at " + new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString();
       await conversationService.updateConversationTitle(conversationId, suggestedTitle);
     }

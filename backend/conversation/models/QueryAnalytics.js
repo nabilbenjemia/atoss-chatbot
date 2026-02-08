@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 
-// Model for storing analyzed query keywords
+/**
+ * QueryAnalytics Model - stores analyzed query keywords and categories for analytics
+ */
 const queryAnalyticsSchema = new mongoose.Schema({
     messageId: {
         type: mongoose.Schema.Types.ObjectId,

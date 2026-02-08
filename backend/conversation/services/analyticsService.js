@@ -4,7 +4,7 @@ const Conversation = require('../models/Conversation');
 const llmClassificationService = require('./llmClassificationService');
 
 /**
- * Analytics service for processing and aggregating query data
+ * Analytics Service - processes and aggregates query data for insights
  */
 class AnalyticsService {
     

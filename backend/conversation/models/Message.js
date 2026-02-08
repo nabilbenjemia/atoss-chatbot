@@ -1,5 +1,8 @@
 const mongoose = require('mongoose');
 
+/**
+ * Message Model - represents individual messages within conversations
+ */
 const messageSchema = new mongoose.Schema({
     conversationId: {
         type: mongoose.Schema.Types.ObjectId,

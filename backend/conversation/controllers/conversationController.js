@@ -1,22 +1,26 @@
 const conversationService = require('../services/conversationService');
 const messageService = require('../services/messageService');
 
+/**
+ * Conversation Controller - handles HTTP requests for conversation management
+ */
+
 //POST /api/conversations
 const createConversation = async (req, res) => {
   try {
     const { userId } = req.body;
-    console.log('Received request from:', { userId }); // Debug log
+    console.log('Received request from:', { userId }); 
 
     if (!userId) {
       return res.status(400).json({ error: "userId is required" });
     }
 
     const conversation = await conversationService.createConversation({ userId, title: "Untitled" });
-    console.log('Created conversation:', conversation); // Debug log
+    console.log('Created conversation:', conversation); 
 
     res.status(201).json(conversation);
   } catch (error) {
-    console.error('Error creating conversation:', error); // Log the actual error
+    console.error('Error creating conversation:', error); 
     res.status(500).json({ error: "Failed to create conversation", details: error.message });
   }
 };
@@ -163,10 +167,10 @@ const streamMessage = async (req, res) => {
 /** POST /api/conversations/:conversationId/messages/batch */
 const createMessageBatch = async (req, res) => {
     try {
-        const { conversationId } = req.params;  // ADD: Get conversationId from params
+        const { conversationId } = req.params;  
         const { userMessage, aiMessage, userId, isNewConversation } = req.body;
 
-        let convId = conversationId;  // FIX: Use conversationId from params
+        let convId = conversationId;  
 
         // Create conversation if new
         if (isNewConversation || conversationId === 'new') {
@@ -181,7 +185,6 @@ const createMessageBatch = async (req, res) => {
         const conversation = await conversationService.getConversationById(convId);
         if (conversation && conversation.title === "Untitled") {
             // Extract first 30 chars from user message as title
-            // TODO: Implement AI-based title generation from userMessage
             const suggestedTitle = userMessage.substring(0, 30) + "...";
             await conversationService.updateConversationTitle(convId, suggestedTitle);
         }
@@ -216,6 +219,6 @@ module.exports = {
   getUserConversations,
   updateConversationTitle,
   deleteConversation,
-  streamMessage,        // NEW
-  createMessageBatch,   // NEW
+  streamMessage,
+  createMessageBatch,
 };

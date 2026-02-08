@@ -1,6 +1,10 @@
 const analyticsService = require('../services/analyticsService');
 
 /**
+ * Analytics Controller - handles HTTP requests for conversation analytics and query insights
+ */
+
+/**
  * Trigger analysis of unprocessed queries
  */
 const processQueries = async (req, res) => {
@@ -66,7 +70,6 @@ const getQueriesOverTime = async (req, res) => {
 };
 
 /**
- *
  * Get overall statistics
  */
 const getOverallStats = async (req, res) => {
@@ -81,7 +84,8 @@ const getOverallStats = async (req, res) => {
 };
 
 /**
- * Get dashboard data (all stats in one call)*/
+ * Get dashboard data (all stats in one call)
+ */
 const getDashboardData = async (req, res) => {
     try {
         const { userId, startDate, endDate } = req.query;

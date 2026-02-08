@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 /**
- * Service for LLM-powered keyword extraction and categorization
+ * LLM Classification Service - handles keyword extraction and categorization using Ollama
  */
 class LLMClassificationService {
     constructor() {
@@ -11,7 +11,6 @@ class LLMClassificationService {
 
     /**
      * Extract keywords and category from user query using small LLM
-     * @param {string} query 
      */
     async analyzeQuery(query) {
         try {

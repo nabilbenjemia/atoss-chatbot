@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const analyticsController = require('../controllers/analyticsController');
 
+/**
+ * Analytics Routes - endpoints for query analytics and statistics
+ */
+
 // Process unanalyzed queries
 router.post('/process', analyticsController.processQueries);
 

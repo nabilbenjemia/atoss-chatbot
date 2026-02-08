@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const conversationController = require('../controllers/conversationController');
 
+/**
+ * Conversation Routes - endpoints for conversation management and chat streaming
+ */
+
 // Conversation routes
 router.post('/', conversationController.createConversation);
 router.get('/user/:userId', conversationController.getUserConversations);
