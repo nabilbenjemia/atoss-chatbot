@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     # ChromaDB Configuration
     CHROMA_DB_DIRECTORY: str = "./resources/chroma_db"  # Parent directory containing all collections
-    CHROMA_PERSIST_DIRECTORY: str = "./resources/chroma_db/test3"  # Default collection
+    CHROMA_PERSIST_DIRECTORY: str = "./resources/chroma_db/test"  # Default collection
     CHROMA_COLLECTION_NAME: str = "tum_docs"
 
     # RAG Configuration

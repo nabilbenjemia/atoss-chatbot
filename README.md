@@ -48,7 +48,10 @@ Docker Compose profiles are available for different environments:
 On macOS, the LLM service runs **on your host machine** (not in Docker) for better performance with Metal acceleration.
 
 ```bash
-# Step 1: Start core services + ingestion (in Docker)
+# Step 1: Build Docker images (first time or after code changes)
+docker-compose --profile macos build
+
+# Step 2: Start core services + ingestion (in Docker)
 docker-compose --profile macos up -d
 
 # Step 2: Run LLM service manually on host (separate terminal)
@@ -72,6 +75,9 @@ For machines with NVIDIA GPUs, all services including Ollama run in Docker with 
 - Docker Desktop with WSL2 backend (Windows) or Docker Engine (Linux)
 
 ```bash
+# Build Docker images (first time or after code changes)
+docker-compose --profile gpu build
+
 # Start all services with GPU support
 docker-compose --profile gpu up -d
 
