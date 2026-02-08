@@ -2,11 +2,19 @@
 
 This document describes the Authentication Microservice and API Gateway implementation for the ATOSS.GPT project.
 
-## Architecture Overview
+## Overview
 
-The backend consists of:
-- **Authentication Microservice**: Handles user authentication, JWT token generation, and user credential management
-- **API Gateway**: Routes requests to appropriate microservices (`/auth/*`, `/users/*`, `/chat/*`, `/learning/*`)
+This service provides two main functions:
+- **Authentication Microservice**: Handles user authentication, JWT token generation, email verification, and user credential management
+- **API Gateway**: Acts as the central entry point, routing requests to appropriate microservices and providing centralized authentication
+
+## Architecture
+
+The service acts as both an authentication provider and API gateway:
+- Handles all `/auth/*` routes locally
+- Proxies other routes (`/users/*`, `/chat/*`, `/api/conversations/*`, `/api/videos/*`) to respective microservices
+- Provides centralized JWT token validation for protected routes
+- Manages user sessions and credentials
 
 ## Project Structure
 
@@ -17,39 +25,77 @@ backend/authentication/
 ├── controllers/
 │   └── AuthController.js    # HTTP request handlers for authentication
 ├── gateway/
-│   └── apiGateway.js        # API Gateway routing logic
+│   └── apiGateway.js        # API Gateway routing configuration
 ├── middleware/
-│   ├── authMiddleware.js    # Authentication middleware for protected routes
-│   └── gatewayMiddleware.js # Gateway authentication middleware
+│   ├── authMiddleware.js    # JWT token verification middleware
+│   └── gatewayMiddleware.js # Gateway-level authentication middleware
 ├── models/
-│   ├── UserCredentials.js   # User credentials database schema
-│   ├── Role.js              # Role enumeration (Staff, Admin)
+│   ├── UserCredentials.js   # User authentication data schema
+│   ├── Role.js              # User role enumeration
 │   └── Department.js        # Department enumeration
 ├── routes/
-│   └── authRoutes.js        # Authentication route definitions
+│   └── authRoutes.js        # Authentication API routes
 ├── services/
-│   └── AuthService.js       # Core authentication business logic
-├── index.js                 # Main server entry point
-└── package.json
+│   ├── AuthService.js       # Core authentication business logic
+│   └── EmailService.js      # Email verification service
+├── utils/
+│   └── validation.js        # Email and password validation utilities
+├── ATOSS_GPT_Auth.postman_collection.json  # Postman API testing collection
+├── EMAIL_VERIFICATION_SETUP.md             # Email configuration guide
+├── POSTMAN_TESTING_GUIDE.md                # API testing instructions
+└── index.js                 # Main application entry point
 ```
 
-## Setup Instructions
+## Features
 
-### 1. Install Dependencies
+### Authentication
+- User registration with email verification
+- JWT token-based authentication
+- Refresh token support
+- Password validation and security
+- TUM email domain validation (@tum.de, @mytum.de)
 
-```bash
-cd backend
-npm install
-```
+### Email Verification
+- Automated verification emails on registration
+- Email verification required before login
+- Resend verification email functionality
+- HTML email templates with branding
 
-### 2. Environment Configuration
+### User Management
+- Role-based access control (Staff, Admin)
+- Department assignment
+- User profile management
+- Password updates
+- Account deletion
 
-Create a `.env` file in the `backend/` directory with the following variables:
+### API Gateway
+- Centralized routing to microservices
+- Authentication protection for protected routes
+- Request proxying with error handling
+- Health monitoring
+
+## API Gateway Routing
+
+The API Gateway routes requests based on URL paths:
+
+- `/auth/*` → Authentication Microservice (handled locally)
+- `/users/*` → User Service
+- `/chat/*` → LLM Service
+- `/api/conversations/*` → Conversation Service
+- `/api/analytics/*` → Conversation Service  
+- `/api/videos/*` → Learning Material Service
+
+## Environment Configuration
+
+Create a `.env` file in the `backend/authentication` directory with the following variables:
 
 ```env
+# Server Configuration
 PORT=4000
+NODE_ENV=development
+FRONTEND_URL=http://localhost:5173
 
-# MongoDB Configuration
+# Database Configuration
 MONGODB_URI=mongodb://localhost:27017/atoss_gpt_auth
 
 # JWT Configuration
@@ -57,276 +103,187 @@ JWT_SECRET=your-super-secret-jwt-key-change-in-production
 JWT_EXPIRATION=24h
 REFRESH_TOKEN_SECRET=your-super-secret-refresh-key-change-in-production
 
-# Microservice URLs
-USER_SERVICE_URL=http://localhost:4001
-CHATBOT_SERVICE_URL=http://localhost:4002
-LEARNING_SERVICE_URL=http://localhost:4003
+# Email Configuration (for verification)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+EMAIL_FROM=noreply@atoss-gpt.com
+APP_URL=http://localhost:5173
+
+# Microservice URLs (for gateway routing)
+USER_SERVICE_URL=http://user:4001
+CHATBOT_SERVICE_URL=http://llm:8000
+CONVERSATION_SERVICE_URL=http://conversation:4004
+LEARNING_MATERIAL_SERVICE_URL=http://learning-material:4005
 ```
 
-### 3. Start MongoDB
+## Installation & Setup
 
-Ensure MongoDB is running on your system:
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
 
-```bash
-# macOS (using Homebrew)
-brew services start mongodb-community
+2. **Configure Environment**:
+   - Copy `.env.example` to `.env`
+   - Update configuration values
 
-# Linux
-sudo systemctl start mongod
+3. **Configure Email** (Optional):
+   - See `EMAIL_VERIFICATION_SETUP.md` for detailed instructions
+   - Without email config, verification links are logged to console
 
-# Or use Docker
-docker run -d -p 27017:27017 --name mongodb mongo
-```
+4. **Start the Service**:
+   ```bash
+   # Development
+   npm run dev
 
-### 4. Start the Server
-
-```bash
-# Development mode (with auto-reload)
-npm run dev
-
-# Production mode
-npm start
-```
-
-The server will start on port 4000 (or the port specified in `.env`).
+   # Production
+   npm start
+   ```
 
 ## API Endpoints
 
-### Authentication Endpoints
-
-All authentication endpoints are prefixed with `/auth`.
+### Public Endpoints (No Authentication Required)
 
 #### POST `/auth/register`
-Register a new user.
-
-**Request Body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "securePassword123",
-  "role": "Staff",
-  "department": "Department 1"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Registration successful",
-  "data": {
-    "id": "user-id",
-    "email": "user@example.com",
-    "role": "Staff",
-    "department": "Department 1"
-  }
-}
-```
+Register a new user account.
 
 #### POST `/auth/login`
 Authenticate user and receive JWT token.
 
-**Request Body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "securePassword123"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Login successful",
-  "data": {
-    "token": "jwt-access-token",
-    "refreshToken": "jwt-refresh-token",
-    "user": {
-      "id": "user-id",
-      "email": "user@example.com",
-      "role": "Staff",
-      "department": "Department 1"
-    }
-  }
-}
-```
-
-#### POST `/auth/logout`
-Logout user and invalidate tokens.
-
-**Headers:**
-```
-Authorization: Bearer <jwt-token>
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Logout successful"
-}
-```
-
 #### POST `/auth/refresh`
 Refresh access token using refresh token.
-
-**Request Body:**
-```json
-{
-  "refreshToken": "jwt-refresh-token"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "token": "new-jwt-access-token"
-  }
-}
-```
 
 #### GET `/auth/verify`
 Verify JWT token validity.
 
-**Headers:**
-```
-Authorization: Bearer <jwt-token>
-```
+#### POST `/auth/verify-email`
+Verify email address using token from email.
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "user-id",
-    "email": "user@example.com",
-    "role": "Staff",
-    "department": "Department 1"
-  }
-}
-```
+#### POST `/auth/resend-verification`
+Resend verification email.
 
-### API Gateway Routes
+### Protected Endpoints (Authentication Required)
 
-The API Gateway routes requests to appropriate microservices:
+#### POST `/auth/logout`
+Invalidate user session.
 
-- `/auth/*` → Authentication Microservice (local)
-- `/users/*` → User Service (proxied)
-- `/chat/*` → Chatbot Service (proxied)
-- `/learning/*` → Learning Service (proxied)
+#### GET `/auth/user/:userId`
+Get user profile by ID.
 
-### Health Check
+#### PATCH `/auth/user/:userId/role`
+Update user role.
 
-#### GET `/api/health`
-Check API Gateway health status.
+#### PATCH `/auth/user/:userId/department`
+Update user department.
 
-**Response:**
-```json
-{
-  "status": "ok",
-  "service": "API Gateway",
-  "timestamp": "2024-01-01T00:00:00.000Z"
-}
-```
+#### PATCH `/auth/user/:userId/password`
+Update user password.
 
-## Authentication Flow
+#### DELETE `/auth/user/:userId`
+Delete user account.
 
-1. **Registration**: User registers with email, password, role, and department
-2. **Login**: User provides credentials and receives JWT access token and refresh token
-3. **Protected Routes**: Include `Authorization: Bearer <token>` header in requests
-4. **Token Refresh**: Use refresh token to obtain new access token when expired
-5. **Logout**: Invalidates tokens stored in database
+For detailed API documentation with request/response examples, see `POSTMAN_TESTING_GUIDE.md`.
 
 ## Data Models
 
 ### UserCredentials
-
-Based on the UML diagram, the UserCredentials model includes:
-
-- `id`: UUID (unique identifier)
-- `email`: String (unique, lowercase)
-- `passwordHash`: String (bcrypt hashed)
-- `role`: Enum (Staff, Admin)
-- `department`: Enum (Department 1, Department 2, Department 3)
-- `token`: String (current JWT token)
-- `refreshToken`: String (refresh token)
-- `lastLogin`: Date
-- `createdAt`: Date
-- `updatedAt`: Date
+Stores user authentication data including credentials, tokens, and verification status.
 
 ### Role Enumeration
-
-- `Staff`: Regular staff member
-- `Admin`: Administrator with elevated privileges
+- `Staff`: Standard user role
+- `Admin`: Administrator role with elevated privileges
 
 ### Department Enumeration
-
 - `Department 1`
 - `Department 2`
 - `Department 3`
 
-## Integration with User Service
-
-The Authentication Service communicates with the User Service to verify user existence during login. The verification endpoint should be:
-
-```
-GET /users/{userId}/verify
-```
-
-Expected response:
-```json
-{
-  "exists": true
-}
-```
-
-If the User Service is unavailable, authentication will proceed with a warning (fallback mechanism).
-
 ## Security Features
 
-- Password hashing using bcrypt (10 salt rounds)
-- JWT token-based authentication
-- Refresh token mechanism for token renewal
-- Token invalidation on logout
-- Protected route middleware
-- CORS enabled for cross-origin requests
+- **Password Hashing**: bcrypt with salt rounds
+- **JWT Tokens**: Secure token generation with expiration
+- **Email Validation**: TUM domain restriction
+- **Password Strength**: Minimum requirements enforced
+- **Token Verification**: Middleware protection for routes
+- **Request Validation**: Input sanitization and validation
 
-## Error Handling
+## Email Verification
 
-All endpoints return consistent error responses:
+Email verification is integrated into the registration process:
 
-```json
-{
-  "success": false,
-  "message": "Error description"
-}
+1. User registers with TUM email address
+2. Verification email sent automatically
+3. User clicks verification link in email
+4. Email marked as verified in database
+5. User can now log in successfully
+
+For detailed email setup instructions, see `EMAIL_VERIFICATION_SETUP.md`.
+
+## Testing
+
+### Postman Collection
+- Import `ATOSS_GPT_Auth.postman_collection.json` into Postman
+- Follow the testing guide in `POSTMAN_TESTING_GUIDE.md`
+- Use the provided test sequences for complete API validation
+
+### Health Check
+```bash
+curl http://localhost:4000/api/health
 ```
 
-Common HTTP status codes:
-- `200`: Success
-- `201`: Created
-- `400`: Bad Request (validation errors)
-- `401`: Unauthorized (authentication required)
-- `404`: Not Found
-- `500`: Internal Server Error
-- `502`: Bad Gateway (service unavailable)
+## Development
 
-## Development Notes
+### Running in Development Mode
+```bash
+npm run dev
+```
 
-- The API Gateway uses `express-http-proxy` for routing to other microservices
-- Authentication middleware is applied globally except for public routes
-- MongoDB connection is established on server startup
-- All timestamps are stored in UTC
+This enables:
+- Automatic server restart on file changes
+- Detailed logging
+- Email verification links logged to console
 
-## Next Steps
+### Docker Support
+```bash
+# Build image
+docker build -t atoss-gpt-auth .
 
-1. Implement User Service with `/users/{userId}/verify` endpoint
-2. Set up Chatbot Service on port 4002
-3. Set up Learning Service on port 4003
-4. Configure production environment variables
-5. Add rate limiting for authentication endpoints
-6. Implement request logging and monitoring
+# Run container
+docker run -p 4000:4000 atoss-gpt-auth
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Email Verification Not Working**:
+   - Check SMTP configuration in `.env`
+   - Verify email credentials (use App Password for Gmail)
+   - Check console logs for verification links in development
+
+2. **JWT Token Errors**:
+   - Ensure JWT_SECRET is properly configured
+   - Check token expiration settings
+   - Verify Authorization header format: `Bearer <token>`
+
+3. **Database Connection Issues**:
+   - Verify MongoDB is running
+   - Check MONGODB_URI in `.env`
+   - Ensure database permissions are correct
+
+4. **Gateway Routing Issues**:
+   - Verify microservice URLs in `.env`
+   - Check if target services are running
+   - Review gateway middleware configuration
+
+For detailed troubleshooting guides:
+- `EMAIL_VERIFICATION_SETUP.md`
+- `POSTMAN_TESTING_GUIDE.md`
+
+## License
+
+This project is part of the ATOSS.GPT system for TUM Universitäts Klinikum.
 
