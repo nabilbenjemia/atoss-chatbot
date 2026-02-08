@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const videoController = require('../controllers/videoController');
 
+/**
+ * Video Routes - endpoints for video management and file operations
+ */
+
 // GET /api/videos
 router.get('/', videoController.getAllVideos);
 

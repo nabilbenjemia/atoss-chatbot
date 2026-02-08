@@ -5,6 +5,10 @@ const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 
+/**
+ * Video Controller - handles HTTP requests for video management and file uploads
+ */
+
 // Configure multer for video uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -70,7 +74,9 @@ const thumbnailStorage = multer.diskStorage({
 });
 const uploadThumbnail = multer({ storage: thumbnailStorage });
 
-// Helper function to get video duration
+/**
+ * Helper function to get video duration
+ */
 const getVideoDuration = (filePath) => {
     return new Promise((resolve, reject) => {
         ffmpeg.ffprobe(filePath, (err, metadata) => {
@@ -84,7 +90,9 @@ const getVideoDuration = (filePath) => {
     });
 };
 
-// Helper function to generate thumbnail
+/**
+ * Helper function to generate thumbnail
+ */
 const generateThumbnail = (videoPath, thumbnailPath) => {
     return new Promise((resolve, reject) => {
         ffmpeg(videoPath)

@@ -1,4 +1,3 @@
-# Use official Node.js LTS image
 FROM node:18
 
 # Set working directory
@@ -10,13 +9,13 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install --production
 
-# Install ffmpeg (includes ffprobe)
+# Install ffmpeg for video processing
 RUN apt-get update && apt-get install -y ffmpeg
 
 # Copy the rest of the application code
 COPY . .
 
-# Expose the port (change if your service uses a different port)
+# Expose the port
 EXPOSE 4005
 
 # Start the service

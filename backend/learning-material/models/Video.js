@@ -1,7 +1,8 @@
-// models/Video.js
-
 const mongoose = require('mongoose');
 
+/**
+ * Video Model - represents tutorial videos in the learning material system
+ */
 const videoSchema = new mongoose.Schema({
     title: {
         type: String,

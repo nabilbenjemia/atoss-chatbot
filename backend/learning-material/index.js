@@ -4,6 +4,10 @@ const path = require('path');
 const connectDB = require('./config/database');
 require('dotenv').config();
 
+/**
+ * Learning Material Microservice - handles video tutorials and educational content
+ */
+
 const app = express();
 
 // CORS Configuration

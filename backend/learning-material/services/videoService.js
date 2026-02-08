@@ -1,6 +1,12 @@
-// Video Service class
 const Video = require('../models/Video');
 
+/**
+ * Video Service - handles business logic for video management
+ */
+
+/**
+ * Get all videos with optional filtering
+ */
 const getAllVideos = async (filters = {}) => {
     try {
         console.log('videoService.getAllVideos called with filters:', filters);
@@ -34,15 +40,24 @@ const getAllVideos = async (filters = {}) => {
     }
 };
 
+/**
+ * Get video by ID
+ */
 const getVideoById = async (videoId) => {
     return await Video.findById(videoId);
 };
 
+/**
+ * Upload new video
+ */
 const uploadVideo = async (videoData) => {
     const video = await Video.create(videoData);
     return video;
 };
 
+/**
+ * Update video metadata
+ */
 const updateVideo = async (videoId, updateData) => {
     return await Video.findByIdAndUpdate(
         videoId,
@@ -51,10 +66,16 @@ const updateVideo = async (videoId, updateData) => {
     );
 };
 
+/**
+ * Delete video by ID
+ */
 const deleteVideo = async (videoId) => {
     return await Video.findByIdAndDelete(videoId);
 };
 
+/**
+ * Increment video view count
+ */
 const incrementViews = async (videoId) => {
     const video = await Video.findById(videoId);
     if (video) {
