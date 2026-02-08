@@ -1,6 +1,5 @@
 /**
- * Department enumeration
- * Based on UML diagram: Department 1, Department 2, Department 3
+ * Department enumeration - defines available departments in the system
  */
 const Department = {
 	DEPARTMENT_1: 'Department 1',

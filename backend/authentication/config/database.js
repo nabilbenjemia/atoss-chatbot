@@ -3,7 +3,7 @@ require('dotenv').config();
 
 /**
  * MongoDB connection configuration
- * Connects to UserCredentialsDB for the Authentication microservice
+ * Connects to database for the Authentication microservice
  */
 const connectDB = async () => {
 	try {
@@ -14,7 +14,7 @@ const connectDB = async () => {
 			useUnifiedTopology: true
 		});
 		
-		console.log('MongoDB connected successfully (UserCredentialsDB)');
+		console.log('MongoDB connected successfully (Authentication Service)');
 	} catch (error) {
 		console.error('MongoDB connection error:', error);
 		process.exit(1);

@@ -3,9 +3,7 @@ const Role = require('./Role');
 const Department = require('./Department');
 
 /**
- * UserCredentials Schema
- * Represents the UserCredentialsDB for the Authentication microservice
- * Based on the UML diagram User class structure
+ * UserCredentials Model - represents user authentication data and session management
  */
 const userCredentialsSchema = new mongoose.Schema({
 	id: {
@@ -40,12 +38,10 @@ const userCredentialsSchema = new mongoose.Schema({
 		type: String,
 		default: null
 	},
-	// Additional fields for session management
 	refreshToken: {
 		type: String,
 		default: null
 	},
-	// Email verification fields
 	emailVerified: {
 		type: Boolean,
 		default: false

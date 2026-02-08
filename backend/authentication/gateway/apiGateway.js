@@ -25,16 +25,13 @@ const createApiGateway = (app) => {
         '/api/health'
     ];
 
-    // Auth Service routes (local - handled by this service)
-    // These routes handle their own authentication logic
+    // Authentication service routes (handled locally)
     app.use('/auth', authRoutes);
 
-    // Apply gateway authentication middleware for proxied routes
-    // This middleware will protect /users/*, /chat/*, /learning/* routes
+    // Apply authentication middleware for protected routes
     app.use(gatewayAuthMiddleware(publicRoutes));
 
-    // User Service proxy
-    // Routes: /users/* -> User Service (same as authentication service)
+    // User service proxy
     const userServiceUrl = process.env.USER_SERVICE_URL || 'http://authentication:4003';
     app.use('/users', proxy(userServiceUrl, {
         proxyReqPathResolver: (req) => {
@@ -49,8 +46,7 @@ const createApiGateway = (app) => {
         }
     }));
 
-    // Chatbot Service proxy
-    // Routes: /chat/* -> LLM Service
+    // Chatbot service proxy
     const chatbotServiceUrl = process.env.CHATBOT_SERVICE_URL || 'http://llm:8000';
     app.use('/chat', proxy(chatbotServiceUrl, {
         proxyReqPathResolver: (req) => {
@@ -65,8 +61,7 @@ const createApiGateway = (app) => {
         }
     }));
 
-    // Learning Service proxy
-    // Routes: /learning/* -> Conversation Service
+    // Learning service proxy
     const learningServiceUrl = process.env.LEARNING_SERVICE_URL || 'http://conversation:4004';
     app.use('/learning', proxy(learningServiceUrl, {
         proxyReqPathResolver: (req) => {

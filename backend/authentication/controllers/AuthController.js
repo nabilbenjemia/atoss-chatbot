@@ -2,15 +2,10 @@ const authService = require('../services/AuthService');
 const { validateTUMEmail, validatePassword } = require('../utils/validation');
 
 /**
- * AuthController
- * Entry point for authentication HTTP requests
- * Based on UML diagram - handles incoming requests related to authentication
+ * Auth Controller - handles HTTP requests for authentication operations
  */
 class AuthController {
-	/**
-	 * Handle login request
-	 * POST /auth/login
-	 */
+	// POST /auth/login
 	async login(req, res) {
 		try {
 			const { email, password } = req.body;
@@ -46,10 +41,7 @@ class AuthController {
 		}
 	}
 
-	/**
-	 * Handle logout request
-	 * POST /auth/logout
-	 */
+	// POST /auth/logout
 	async logout(req, res) {
 		try {
 			const userId = req.user?.id;
@@ -75,10 +67,7 @@ class AuthController {
 		}
 	}
 
-	/**
-	 * Handle refresh token request
-	 * POST /auth/refresh
-	 */
+	// POST /auth/refresh
 	async refreshToken(req, res) {
 		try {
 			const { refreshToken } = req.body;
@@ -104,10 +93,7 @@ class AuthController {
 		}
 	}
 
-	/**
-	 * Handle registration request
-	 * POST /auth/register
-	 */
+	// POST /auth/register
 	async register(req, res) {
 		try {
 			const { email, password, role, department } = req.body;
@@ -152,10 +138,7 @@ class AuthController {
 		}
 	}
 
-	/**
-	 * Handle verify token request
-	 * GET /auth/verify
-	 */
+	// GET /auth/verify
 	async verifyToken(req, res) {
 		try {
 			const token = req.headers.authorization?.replace('Bearer ', '');
@@ -181,10 +164,7 @@ class AuthController {
 		}
 	}
 
-	/**
-	 * Handle email verification request
-	 * POST /auth/verify-email
-	 */
+	// POST /auth/verify-email
 	async verifyEmail(req, res) {
 		try {
 			const { token } = req.body;
@@ -210,10 +190,7 @@ class AuthController {
 		}
 	}
 
-	/**
-	 * Handle resend verification email request
-	 * POST /auth/resend-verification
-	 */
+	// POST /auth/resend-verification
 	async resendVerificationEmail(req, res) {
 		try {
 			const { email } = req.body;
@@ -241,10 +218,7 @@ class AuthController {
 		}
 	}
 
-	/**
-	 * Get user by ID (for user service)
-	 * GET /auth/user/:userId
-	 */
+	// GET /auth/user/:userId
 	async getUserById(req, res) {
 		try {
 			const { userId } = req.params;
@@ -272,11 +246,8 @@ class AuthController {
 		}
 	}
 
-	/**
-	 * Update user role (for user service)
-	 * PATCH /auth/user/:userId/role
-	 * Allows admins to update any user's role, or users to update their own role
-	 */
+	// PATCH /auth/user/:userId/role
+	// Allows admins to update any user's role, or users to update their own role
 	async updateUserRole(req, res) {
 		try {
 			const { userId } = req.params;
@@ -284,7 +255,7 @@ class AuthController {
 			const requestingUserId = req.user?.id;
 			const requestingUserRole = req.user?.role;
 
-			// Check if user is admin or updating their own role
+			// Check if user is admin 
 			if (requestingUserRole !== 'Admin' && requestingUserId !== userId) {
 				return res.status(403).json({
 					success: false,
@@ -314,10 +285,7 @@ class AuthController {
 		}
 	}
 
-	/**
-	 * Get user by email (for admin use)
-	 * GET /auth/user/email/:email
-	 */
+	// GET /auth/user/email/:email
 	async getUserByEmail(req, res) {
 		try {
 			const { email } = req.params;
@@ -345,10 +313,7 @@ class AuthController {
 		}
 	}
 
-	/**
-	 * Update user department (for user service)
-	 * PATCH /auth/user/:userId/department
-	 */
+	// PATCH /auth/user/:userId/department
 	async updateUserDepartment(req, res) {
 		try {
 			const { userId } = req.params;
@@ -392,10 +357,7 @@ class AuthController {
 		}
 	}
 
-	/**
-	 * Update user password (for user service)
-	 * PATCH /auth/user/:userId/password
-	 */
+	// PATCH /auth/user/:userId/password
 	async updateUserPassword(req, res) {
 		try {
 			const { userId } = req.params;
@@ -432,10 +394,7 @@ class AuthController {
 		}
 	}
 
-	/**
-	 * Delete user (for user service)
-	 * DELETE /auth/user/:userId
-	 */
+	// DELETE /auth/user/:userId
 	async deleteUser(req, res) {
 		try {
 			const { userId } = req.params;

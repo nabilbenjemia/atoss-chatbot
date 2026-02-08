@@ -1,11 +1,9 @@
 /**
- * Backend validation utilities
+ * Validation utilities for authentication data
  */
 
 /**
  * Validates TUM email format
- * @param {string} email - Email address to validate
- * @returns {Object} - { valid: boolean, message: string }
  */
 const validateTUMEmail = (email) => {
 	if (!email || typeof email !== 'string' || email.trim() === '') {
@@ -46,8 +44,6 @@ const validateTUMEmail = (email) => {
 
 /**
  * Validates password strength
- * @param {string} password - Password to validate
- * @returns {Object} - { valid: boolean, message: string }
  */
 const validatePassword = (password) => {
 	if (!password || typeof password !== 'string' || password.trim() === '') {

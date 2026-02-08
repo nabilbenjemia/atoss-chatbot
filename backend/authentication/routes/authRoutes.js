@@ -4,8 +4,7 @@ const authController = require('../controllers/AuthController');
 const authMiddleware = require('../middleware/authMiddleware');
 
 /**
- * Authentication routes
- * Base path: /auth
+ * Authentication Routes - handles user authentication and account management
  */
 
 // Public routes

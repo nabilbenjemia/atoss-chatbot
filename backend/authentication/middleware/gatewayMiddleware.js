@@ -1,9 +1,7 @@
 const authService = require('../services/AuthService');
 
 /**
- * API Gateway middleware
- * Handles authentication for protected routes
- * Allows public routes to pass through without authentication
+ * Gateway Authentication Middleware - handles authentication for protected routes at gateway level
  */
 const gatewayAuthMiddleware = (publicRoutes = []) => {
 	return async (req, res, next) => {

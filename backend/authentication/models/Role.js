@@ -1,6 +1,5 @@
 /**
- * Role enumeration
- * Based on UML diagram: Staff, Admin
+ * Role enumeration - defines available user roles in the system
  */
 const Role = {
 	STAFF: 'Staff',

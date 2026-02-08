@@ -6,9 +6,7 @@ const axios = require('axios');
 const emailService = require('./EmailService');
 
 /**
- * AuthService
- * Core business logic for authentication
- * Based on UML diagram - handles login, logout, and user verification
+ * AuthService - handles core authentication business logic
  */
 class AuthService {
 	constructor() {
@@ -19,12 +17,8 @@ class AuthService {
 	}
 
 	/**
-	 * Login method
-	 * Authenticates user credentials and generates JWT token
-	 * @param {string} email - User email
-	 * @param {string} password - User password
-	 * @returns {Promise<Object>} - Token and user information
-	 */
+     * Authenticate user and generate JWT token
+     */
 	async login(email, password) {
 		try {
 			// Find user credentials
@@ -75,11 +69,8 @@ class AuthService {
 	}
 
 	/**
-	 * Logout method
-	 * Invalidates user token
-	 * @param {string} userId - User ID
-	 * @returns {Promise<boolean>}
-	 */
+     * Invalidate user token
+     */
 	async logout(userId) {
 		try {
 			const userCredentials = await UserCredentials.findOne({ id: userId });
@@ -97,10 +88,8 @@ class AuthService {
 	}
 
 	/**
-	 * Verify user existence with User Service
-	 * @param {string} userId - User ID
-	 * @returns {Promise<boolean>}
-	 */
+     * Verify user existence with User Service
+     */
 	async verifyUserExistence(userId) {
 		try {
 			const response = await axios.get(`${this.userServiceUrl}/users/${userId}/verify`, {
@@ -117,10 +106,8 @@ class AuthService {
 	}
 
 	/**
-	 * Generate JWT token
-	 * @param {Object} userCredentials - User credentials object
-	 * @returns {string} - JWT token
-	 */
+     * Generate JWT token
+     */
 	generateToken(userCredentials) {
 		const payload = {
 			id: userCredentials.id,
@@ -135,10 +122,8 @@ class AuthService {
 	}
 
 	/**
-	 * Generate refresh token
-	 * @param {Object} userCredentials - User credentials object
-	 * @returns {string} - Refresh token
-	 */
+     * Generate refresh token
+     */
 	generateRefreshToken(userCredentials) {
 		const payload = {
 			id: userCredentials.id,
@@ -151,10 +136,8 @@ class AuthService {
 	}
 
 	/**
-	 * Verify JWT token
-	 * @param {string} token - JWT token
-	 * @returns {Object} - Decoded token payload
-	 */
+     * Verify JWT token
+     */
 	verifyToken(token) {
 		try {
 			return jwt.verify(token, this.jwtSecret);
@@ -164,10 +147,8 @@ class AuthService {
 	}
 
 	/**
-	 * Refresh access token using refresh token
-	 * @param {string} refreshToken - Refresh token
-	 * @returns {Promise<Object>} - New access token
-	 */
+     * Refresh access token using refresh token
+     */
 	async refreshAccessToken(refreshToken) {
 		try {
 			const decoded = jwt.verify(refreshToken, this.refreshTokenSecret);
@@ -191,10 +172,8 @@ class AuthService {
 	}
 
 	/**
-	 * Register new user credentials
-	 * @param {Object} userData - User registration data
-	 * @returns {Promise<Object>} - Created user credentials
-	 */
+     * Register new user credentials
+     */
 	async register(userData) {
 		try {
 			const { email, password, role, department } = userData;
@@ -232,7 +211,6 @@ class AuthService {
 				await emailService.sendVerificationEmail(email, verificationToken);
 			} catch (emailError) {
 				console.error('Failed to send verification email:', emailError);
-				// Don't fail registration if email fails, but log it
 			}
 
 			return {
@@ -249,10 +227,8 @@ class AuthService {
 	}
 
 	/**
-	 * Verify email address using verification token
-	 * @param {string} token - Email verification token
-	 * @returns {Promise<Object>}
-	 */
+     * Verify email address using verification token
+     */
 	async verifyEmail(token) {
 		try {
 			if (!token || token.trim() === '') {
@@ -325,10 +301,8 @@ class AuthService {
 	}
 
 	/**
-	 * Resend verification email
-	 * @param {string} email - User email
-	 * @returns {Promise<Object>}
-	 */
+     * Resend verification email
+     */
 	async resendVerificationEmail(email) {
 		try {
 			const userCredentials = await UserCredentials.findOne({ email: email.toLowerCase() });
@@ -366,10 +340,8 @@ class AuthService {
 	}
 
 	/**
-	 * Get user by ID
-	 * @param {string} userId - User ID
-	 * @returns {Promise<Object>} - User credentials
-	 */
+     * Get user by ID
+     */
 	async getUserById(userId) {
 		try {
 			const userCredentials = await UserCredentials.findOne({ id: userId });
@@ -394,10 +366,8 @@ class AuthService {
 	}
 
 	/**
-	 * Get user by email
-	 * @param {string} email - User email
-	 * @returns {Promise<Object>} - User credentials
-	 */
+     * Get user by email
+     */
 	async getUserByEmail(email) {
 		try {
 			const userCredentials = await UserCredentials.findOne({ email: email.toLowerCase() });
@@ -422,11 +392,8 @@ class AuthService {
 	}
 
 	/**
-	 * Update user role
-	 * @param {string} userId - User ID
-	 * @param {string} role - New role
-	 * @returns {Promise<Object>} - Updated user credentials
-	 */
+     * Update user role
+     */
 	async updateUserRole(userId, role) {
 		try {
 			if (!role || ![Role.STAFF, Role.ADMIN].includes(role)) {
@@ -455,11 +422,8 @@ class AuthService {
 	}
 
 	/**
-	 * Update user department
-	 * @param {string} userId - User ID
-	 * @param {string} department - New department
-	 * @returns {Promise<Object>} - Updated user credentials
-	 */
+     * Update user department
+     */
 	async updateUserDepartment(userId, department) {
 		try {
 			if (!department || typeof department !== 'string' || department.trim() === '') {
@@ -488,12 +452,8 @@ class AuthService {
 	}
 
 	/**
-	 * Update user password
-	 * @param {string} userId - User ID
-	 * @param {string} currentPassword - Current password
-	 * @param {string} newPassword - New password
-	 * @returns {Promise<Object>} - Success message
-	 */
+     * Update user password
+     */
 	async updateUserPassword(userId, currentPassword, newPassword) {
 		try {
 			const userCredentials = await UserCredentials.findOne({ id: userId });
@@ -532,10 +492,8 @@ class AuthService {
 	}
 
 	/**
-	 * Delete user by ID
-	 * @param {string} userId - User ID
-	 * @returns {Promise<boolean>} - Success status
-	 */
+     * Delete user by ID
+     */
 	async deleteUser(userId) {
 		try {
 			const result = await UserCredentials.deleteOne({ id: userId });

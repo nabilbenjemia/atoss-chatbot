@@ -1,8 +1,7 @@
 const authService = require('../services/AuthService');
 
 /**
- * Authentication middleware
- * Verifies JWT token and attaches user information to request
+ * Authentication Middleware - verifies JWT token and attaches user information to request
  */
 const authMiddleware = async (req, res, next) => {
 	try {

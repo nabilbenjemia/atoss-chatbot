@@ -2,8 +2,7 @@ const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
 /**
- * EmailService
- * Handles sending emails for email verification
+ * Email Service - handles sending emails for authentication and verification
  */
 class EmailService {
 	constructor() {
@@ -18,15 +17,13 @@ class EmailService {
 	 * Initialize nodemailer transporter
 	 */
 	init() {
-		// For development, use Gmail or other SMTP service
-		// For production, configure with your email service
 		const emailConfig = {
 			host: process.env.SMTP_HOST || 'smtp.gmail.com',
 			port: parseInt(process.env.SMTP_PORT || '587'),
-			secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+			secure: process.env.SMTP_SECURE === 'true', 
 			auth: {
 				user: process.env.SMTP_USER,
-				pass: process.env.SMTP_PASS, // Use App Password for Gmail
+				pass: process.env.SMTP_PASS,
 			},
 		};
 
@@ -41,7 +38,6 @@ class EmailService {
 
 	/**
 	 * Generate email verification token
-	 * @returns {string} - Random token
 	 */
 	generateVerificationToken() {
 		return crypto.randomBytes(32).toString('hex');
@@ -49,9 +45,6 @@ class EmailService {
 
 	/**
 	 * Send email verification email
-	 * @param {string} email - User email
-	 * @param {string} token - Verification token
-	 * @returns {Promise<Object>}
 	 */
 	async sendVerificationEmail(email, token) {
 		if (!this.transporter) {
@@ -125,10 +118,7 @@ class EmailService {
 	}
 
 	/**
-	 * Send password reset email (for future use)
-	 * @param {string} email - User email
-	 * @param {string} token - Reset token
-	 * @returns {Promise<Object>}
+	 * Send password reset email
 	 */
 	async sendPasswordResetEmail(email, token) {
 		if (!this.transporter) {
