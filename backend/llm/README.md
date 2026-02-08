@@ -170,7 +170,7 @@ Response:
 ```bash
 curl -X POST http://localhost:8000/api/ingestion/collection \
   -H "Content-Type: application/json" \
-  -d '{"collectionId": "my_new_db", "description": "My custom knowledge base"}'
+  -d '{"name": "my_new_db", "description": "My custom knowledge base"}'
 ```
 
 Response:
