@@ -22,9 +22,9 @@ const processQueries = async (req, res) => {
  */
 const getKeywordStats = async (req, res) => {
     try {
-        const { userId, limit } = req.query;
+        const { limit } = req.query;
         const stats = await analyticsService.getKeywordStats(
-            userId, 
+            null,
             limit ? parseInt(limit) : 20
         );
         res.json(stats);
@@ -39,8 +39,7 @@ const getKeywordStats = async (req, res) => {
  */
 const getCategoryStats = async (req, res) => {
     try {
-        const { userId } = req.query;
-        const stats = await analyticsService.getCategoryStats(userId);
+        const stats = await analyticsService.getCategoryStats(null);
         res.json(stats);
     } catch (error) {
         console.error('Error getting category stats:', error);
@@ -53,9 +52,9 @@ const getCategoryStats = async (req, res) => {
  */
 const getQueriesOverTime = async (req, res) => {
     try {
-        const { userId, days } = req.query;
+        const { days } = req.query;
         const stats = await analyticsService.getQueriesOverTime(
-            userId,
+            null,
             days ? parseInt(days) : 7
         );
         res.json(stats);
@@ -71,8 +70,7 @@ const getQueriesOverTime = async (req, res) => {
  */
 const getOverallStats = async (req, res) => {
     try {
-        const { userId } = req.query;
-        const stats = await analyticsService.getOverallStats(userId);
+        const stats = await analyticsService.getOverallStats(null);
         res.json(stats);
     } catch (error) {
         console.error('Error getting overall stats:', error);
@@ -89,11 +87,12 @@ const getDashboardData = async (req, res) => {
         console.log('[getDashboardData] Date range:', startDate, 'to', endDate);
         console.log('[getDashboardData] Query params:', req.query);
         const data = await analyticsService.getDashboardData(null, startDate, endDate);
-        console.log('[getDashboardData] Returning data:', JSON.stringify(data));
+        console.log('[getDashboardData] Successfully retrieved data');
         res.json(data);
     } catch (error) {
-        console.error('Error getting dashboard data:', error);
-        res.status(500).json({ error: error.message });
+        console.error('[getDashboardData] ❌ ERROR:', error);
+        console.error('[getDashboardData] Stack:', error.stack);
+        res.status(500).json({ error: error.message, stack: error.stack });
     }
 };
 
@@ -102,8 +101,8 @@ const getDashboardData = async (req, res) => {
  */
 const exportQueriesAsCSV = async (req, res) => {
     try {
-        const { userId, startDate, endDate } = req.query;
-        const csv = await analyticsService.exportQueriesAsCSV(userId, startDate, endDate);
+        const { startDate, endDate } = req.query;
+        const csv = await analyticsService.exportQueriesAsCSV(null, startDate, endDate);
         
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', 'attachment; filename="analyzed_queries.csv"');

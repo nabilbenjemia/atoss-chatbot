@@ -18,6 +18,29 @@ const AnalyticsDashboard = () => {
     const userId = currentUser?.id;
     const role = currentUser?.role;
 
+    const normalizeDateInput = (value) => {
+        if (!value) return '';
+        if (value.includes('-')) return value;
+
+        const dottedMatch = value.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+        if (dottedMatch) {
+            const day = dottedMatch[1].padStart(2, '0');
+            const month = dottedMatch[2].padStart(2, '0');
+            const year = dottedMatch[3];
+            return `${year}-${month}-${day}`;
+        }
+
+        const slashedMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (slashedMatch) {
+            const day = slashedMatch[1].padStart(2, '0');
+            const month = slashedMatch[2].padStart(2, '0');
+            const year = slashedMatch[3];
+            return `${year}-${month}-${day}`;
+        }
+
+        return value;
+    };
+
     // User preferences (theme, language)
     const { isDarkMode, language } = useUserPreferences(userId);
 
@@ -109,15 +132,30 @@ const AnalyticsDashboard = () => {
             setLoading(true);
             setError(null);
             let url = `${CONVERSATION_API}/api/analytics/dashboard`;
-            if (startDate) url += `&startDate=${startDate}`;
-            if (endDate) url += `&endDate=${endDate}`;
+            const params = [];
+            if (startDate) params.push(`startDate=${encodeURIComponent(startDate)}`);
+            if (endDate) params.push(`endDate=${encodeURIComponent(endDate)}`);
+            if (params.length > 0) url += `?${params.join('&')}`;
+            
+            console.log('[AnalyticsDashboard] Fetching from:', url);
+            console.log('[AnalyticsDashboard] Date values:', { startDate, endDate });
+            
             const response = await fetch(url);
-            if (!response.ok) throw new Error('Failed to fetch analytics data');
+            
+            console.log('[AnalyticsDashboard] Response status:', response.status);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[AnalyticsDashboard] Error response:', errorText);
+                throw new Error(`Failed to fetch analytics data: ${response.status} ${errorText}`);
+            }
+            
             const data = await response.json();
+            console.log('[AnalyticsDashboard] Received data successfully');
             setDashboardData(data);
         } catch (err) {
+            console.error('[AnalyticsDashboard] Error:', err);
             setError(err.message);
-            console.error('Error fetching dashboard data:', err);
         } finally {
             setLoading(false);
         }
@@ -152,8 +190,10 @@ const AnalyticsDashboard = () => {
     const downloadCSV = async () => {
         try {
             let url = `${CONVERSATION_API}/api/analytics/export?userId=${userId}`;
-            if (startDate) url += `&startDate=${startDate}`;
-            if (endDate) url += `&endDate=${endDate}`;
+            const params = [];
+            if (startDate) params.push(`startDate=${encodeURIComponent(startDate)}`);
+            if (endDate) params.push(`endDate=${encodeURIComponent(endDate)}`);
+            if (params.length > 0) url += `?${params.join('&')}`;
             
             const response = await fetch(url);
             if (!response.ok) throw new Error('Failed to export data');
@@ -289,7 +329,7 @@ const AnalyticsDashboard = () => {
                                 <input
                                     type="date"
                                     value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
+                                    onChange={(e) => setStartDate(normalizeDateInput(e.target.value))}
                                     className={`px-3 py-2 rounded-xl border focus:border-tum-blue-brand focus:ring-2 focus:ring-tum-blue-brand focus:outline-none
                                         ${isDarkMode 
                                             ? 'bg-tum-grey-3 text-white border-tum-grey-4'
@@ -303,7 +343,7 @@ const AnalyticsDashboard = () => {
                                 <input
                                     type="date"
                                     value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
+                                    onChange={(e) => setEndDate(normalizeDateInput(e.target.value))}
                                     className={`px-3 py-2 rounded-xl border focus:border-tum-blue-brand focus:ring-2 focus:ring-tum-blue-brand focus:outline-none
                                         ${isDarkMode 
                                             ? 'bg-tum-grey-3 text-white border-tum-grey-4'
