@@ -84,11 +84,11 @@ const getOverallStats = async (req, res) => {
  * Get dashboard data (all stats in one call)*/
 const getDashboardData = async (req, res) => {
     try {
-        const { userId, startDate, endDate } = req.query;
-        console.log('[getDashboardData] Received userId:', userId);
+        const { startDate, endDate } = req.query;
+        console.log('[getDashboardData] User filter disabled for dashboard');
         console.log('[getDashboardData] Date range:', startDate, 'to', endDate);
         console.log('[getDashboardData] Query params:', req.query);
-        const data = await analyticsService.getDashboardData(userId, startDate, endDate);
+        const data = await analyticsService.getDashboardData(null, startDate, endDate);
         console.log('[getDashboardData] Returning data:', JSON.stringify(data));
         res.json(data);
     } catch (error) {

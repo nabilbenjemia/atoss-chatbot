@@ -108,7 +108,7 @@ const AnalyticsDashboard = () => {
         try {
             setLoading(true);
             setError(null);
-            let url = `${CONVERSATION_API}/api/analytics/dashboard?userId=${userId}`;
+            let url = `${CONVERSATION_API}/api/analytics/dashboard`;
             if (startDate) url += `&startDate=${startDate}`;
             if (endDate) url += `&endDate=${endDate}`;
             const response = await fetch(url);
