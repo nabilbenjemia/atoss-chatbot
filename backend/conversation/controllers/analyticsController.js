@@ -83,16 +83,11 @@ const getOverallStats = async (req, res) => {
 const getDashboardData = async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
-        console.log('[getDashboardData] User filter disabled for dashboard');
-        console.log('[getDashboardData] Date range:', startDate, 'to', endDate);
-        console.log('[getDashboardData] Query params:', req.query);
         const data = await analyticsService.getDashboardData(null, startDate, endDate);
-        console.log('[getDashboardData] Successfully retrieved data');
         res.json(data);
     } catch (error) {
-        console.error('[getDashboardData] ❌ ERROR:', error);
-        console.error('[getDashboardData] Stack:', error.stack);
-        res.status(500).json({ error: error.message, stack: error.stack });
+        console.error('Error getting dashboard data:', error);
+        res.status(500).json({ error: error.message });
     }
 };
 

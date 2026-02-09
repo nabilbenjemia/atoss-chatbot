@@ -137,25 +137,13 @@ const AnalyticsDashboard = () => {
             if (endDate) params.push(`endDate=${encodeURIComponent(endDate)}`);
             if (params.length > 0) url += `?${params.join('&')}`;
             
-            console.log('[AnalyticsDashboard] Fetching from:', url);
-            console.log('[AnalyticsDashboard] Date values:', { startDate, endDate });
-            
             const response = await fetch(url);
-            
-            console.log('[AnalyticsDashboard] Response status:', response.status);
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('[AnalyticsDashboard] Error response:', errorText);
-                throw new Error(`Failed to fetch analytics data: ${response.status} ${errorText}`);
-            }
-            
+            if (!response.ok) throw new Error('Failed to fetch analytics data');
             const data = await response.json();
-            console.log('[AnalyticsDashboard] Received data successfully');
             setDashboardData(data);
         } catch (err) {
-            console.error('[AnalyticsDashboard] Error:', err);
             setError(err.message);
+            console.error('Error fetching dashboard data:', err);
         } finally {
             setLoading(false);
         }
@@ -189,7 +177,7 @@ const AnalyticsDashboard = () => {
 
     const downloadCSV = async () => {
         try {
-            let url = `${CONVERSATION_API}/api/analytics/export?userId=${userId}`;
+            let url = `${CONVERSATION_API}/api/analytics/export`;
             const params = [];
             if (startDate) params.push(`startDate=${encodeURIComponent(startDate)}`);
             if (endDate) params.push(`endDate=${encodeURIComponent(endDate)}`);

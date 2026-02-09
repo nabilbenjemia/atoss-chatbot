@@ -76,10 +76,6 @@ class AnalyticsService {
             match.messageId = { $in: messageIds };
         }
         
-        console.log('[getKeywordStats] Match filter:', JSON.stringify(match));
-        console.log('[getKeywordStats] Total docs:', await QueryAnalytics.countDocuments({}));
-        console.log('[getKeywordStats] Matching docs:', await QueryAnalytics.countDocuments(match));
-        
         const results = await QueryAnalytics.aggregate([
             { $match: match },
             { $unwind: '$keywords' },
@@ -102,8 +98,6 @@ class AnalyticsService {
             const messageIds = await this._getMessageIdsInDateRange(startDate, endDate);
             match.messageId = { $in: messageIds };
         }
-        
-        console.log('[getCategoryStats] Match filter:', JSON.stringify(match));
         
         const results = await QueryAnalytics.aggregate([
             { $match: match },
@@ -196,8 +190,6 @@ class AnalyticsService {
             id !== null && 
             id !== undefined
         );
-        console.log('[getOverallStats] Users with messages:', conversationsWithUserMessages.length);
-        console.log('[getOverallStats] Valid userIds:', validUserIds);
         const uniqueUsers = validUserIds.length;
         
         // Get active users (last 15 minutes)
@@ -236,41 +228,28 @@ class AnalyticsService {
      * Get all dashboard data in one call
      */
     async getDashboardData(userId = null, startDate = null, endDate = null) {
-        console.log('[getDashboardData] Starting with:', { userId, startDate, endDate });
+        const [overall, keywords, categories, timeline] = await Promise.all([
+            this.getOverallStats(userId, startDate, endDate),
+            this.getKeywordStats(userId, 15, startDate, endDate),
+            this.getCategoryStats(userId, startDate, endDate),
+            this.getQueriesOverTime(userId, 30, startDate, endDate)
+        ]);
         
-        try {
-            const [overall, keywords, categories, timeline] = await Promise.all([
-                this.getOverallStats(userId, startDate, endDate),
-                this.getKeywordStats(userId, 15, startDate, endDate),
-                this.getCategoryStats(userId, startDate, endDate),
-                this.getQueriesOverTime(userId, 30, startDate, endDate)
-            ]);
-            
-            console.log('[getDashboardData] All queries completed successfully');
-            
-            return {
-                overall,
-                keywords,
-                categories,
-                timeline
-            };
-        } catch (error) {
-            console.error('[getDashboardData] Error in service:', error);
-            throw error;
-        }
+        return {
+            overall,
+            keywords,
+            categories,
+            timeline
+        };
     }
     
     /**
      * Helper: Get message IDs within date range
      */
     async _getMessageIdsInDateRange(startDate, endDate) {
-        console.log('[_getMessageIdsInDateRange] Input:', { startDate, endDate });
-        
         const dateFilter = {};
         const parsedStart = this._parseDate(startDate);
         const parsedEnd = this._parseDate(endDate);
-        
-        console.log('[_getMessageIdsInDateRange] Parsed dates:', { parsedStart, parsedEnd });
         
         if (parsedStart) dateFilter.$gte = parsedStart;
         if (parsedEnd) dateFilter.$lte = parsedEnd;
@@ -279,17 +258,9 @@ class AnalyticsService {
         if (Object.keys(dateFilter).length > 0) {
             messageQuery.createdAt = dateFilter;
         }
-        
-        console.log('[_getMessageIdsInDateRange] Query:', JSON.stringify(messageQuery));
 
-        try {
-            const messages = await Message.find(messageQuery).select('_id');
-            console.log('[_getMessageIdsInDateRange] Found', messages.length, 'messages');
-            return messages.map(m => m._id);
-        } catch (error) {
-            console.error('[_getMessageIdsInDateRange] Error:', error);
-            throw error;
-        }
+        const messages = await Message.find(messageQuery).select('_id');
+        return messages.map(m => m._id);
     }
 
     /**
