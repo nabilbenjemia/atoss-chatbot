@@ -101,10 +101,14 @@ class VectorStoreManager:
             if not os.path.exists(persist_directory) or not os.listdir(
                 persist_directory
             ):
-                logger.error("Vector store not found at: %s", persist_directory)
-                raise RuntimeError(
-                    "Vector store not found. Please run ingest.py first."
+                logger.warning(
+                    "No default vector store found at: %s. "
+                    "RAG chat will be unavailable until a collection is ingested. "
+                    "You can still use ingestion endpoints to create and populate collections.",
+                    persist_directory
                 )
+                self._is_loaded = False
+                return False
 
             logger.info("Loading vector store from: %s", persist_directory)
 

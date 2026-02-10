@@ -78,8 +78,13 @@ class StartupService:
         await asyncio.to_thread(embedding_manager.load)
 
     async def _load_vectorstore(self):
-        """Load the vector store"""
-        await vectorstore_manager.load()
+        """Load the vector store (non-fatal if no default collection exists)"""
+        result = await vectorstore_manager.load()
+        if not result:
+            logger.warning(
+                "Default vector store not loaded - RAG chat unavailable. "
+                "Ingestion endpoints are still available."
+            )
 
     async def _load_llm(self):
         """Load the Ollama LLM"""
@@ -94,8 +99,14 @@ class StartupService:
         await asyncio.to_thread(reranker_manager.load)
 
     async def _load_rag_chain(self):
-        """Verify RAG chain is ready (Missing method fixed here)"""
+        """Verify RAG chain is ready (non-fatal if vector store is missing)"""
         if not rag_chain_service.is_ready:
+            if not vectorstore_manager.is_loaded:
+                logger.warning(
+                    "RAG chain not ready - no vector store loaded. "
+                    "Chat will be unavailable until a collection is ingested and loaded."
+                )
+                return
             raise RuntimeError("RAG Chain dependencies failed to load")
         logger.info("RAG chain check passed.")
 

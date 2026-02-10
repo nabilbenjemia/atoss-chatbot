@@ -264,28 +264,16 @@ class IngestionController:
                 result["totalImages"] = total_images
                 result["migratedImages"] = len(url_mapping) if total_images > 0 else 0
             
-            # Reload the default vector store if we ingested to the default collection
-            # This ensures the RAG chain uses the newly ingested documents
-            import os
-            from pathlib import Path
-            
-            default_collection_path = settings.CHROMA_PERSIST_DIRECTORY
-            chroma_base = Path(settings.CHROMA_DB_DIRECTORY)
-            ingested_collection_path = str(chroma_base / collection_id)
-            
-            # Normalize paths for comparison
-            default_normalized = os.path.normpath(os.path.abspath(default_collection_path))
-            ingested_normalized = os.path.normpath(os.path.abspath(ingested_collection_path))
-            
-            logger.info(f"[Ingest] Path comparison - Default: {default_normalized}")
-            logger.info(f"[Ingest] Path comparison - Ingested: {ingested_normalized}")
-            logger.info(f"[Ingest] Path comparison - Match: {default_normalized == ingested_normalized}")
-            
-            # Always reload after successful ingestion to ensure fresh data
-            # This is safer than path comparison which can fail due to relative paths
-            logger.info(f"[Ingest] Reloading default vector store after ingestion...")
-            await vectorstore_manager.reload()
-            logger.info(f"[Ingest] Default vector store reloaded successfully with {vectorstore_manager._default_collection.count() if vectorstore_manager._default_collection else 0} documents")
+            # After successful ingestion, switch the active vector store 
+            # to the collection we just ingested into, so the RAG chain
+            # immediately uses the new documents for chat queries.
+            logger.info(f"[Ingest] Switching active vector store to '{collection_id}'...")
+            switch_success = await vectorstore_manager.switch_collection(collection_id)
+            if switch_success:
+                doc_count = vectorstore_manager._default_collection.count() if vectorstore_manager._default_collection else 0
+                logger.info(f"[Ingest] Active vector store switched to '{collection_id}' with {doc_count} documents")
+            else:
+                logger.warning(f"[Ingest] Could not switch to '{collection_id}' - RAG chat may use stale data")
             
             return result
             
