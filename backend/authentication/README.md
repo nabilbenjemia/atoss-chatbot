@@ -80,43 +80,45 @@ The API Gateway routes requests based on URL paths:
 
 - `/auth/*` → Authentication Microservice (handled locally)
 - `/users/*` → User Service
-- `/chat/*` → LLM Service
-- `/api/conversations/*` → Conversation Service
-- `/api/analytics/*` → Conversation Service  
-- `/api/videos/*` → Learning Material Service
+- `/chat/*` → LLM Service (port 8000)
+- `/api/conversations/*` → Conversation Service (port 4004)
+- `/api/analytics/*` → Conversation Service (port 4004)
+- `/api/ingestion/*` → Ingestion Service (port 4005)
 
 ## Environment Configuration
 
 Create a `.env` file in the `backend/authentication` directory with the following variables:
 
 ```env
-# Server Configuration
-PORT=4000
-NODE_ENV=development
-FRONTEND_URL=http://localhost:5173
+# Environment Variables for ATOSS.GPT Backend
 
-# Database Configuration
-MONGODB_URI=mongodb://localhost:27017/atoss_gpt_auth
+# Server Configuration
+PORT=4003
+
+# MongoDB Configuration
+MONGODB_URI=mongodb+srv://admin:admin@atoss-gpt.5bgviqc.mongodb.net/?appName=atoss-gpt
 
 # JWT Configuration
-JWT_SECRET=your-super-secret-jwt-key-change-in-production
+JWT_SECRET=5aa9a87c6f5c37dd14342cb7e51e054ce4e08d9489841c8cd44c05d828a4ffb3
 JWT_EXPIRATION=24h
-REFRESH_TOKEN_SECRET=your-super-secret-refresh-key-change-in-production
+REFRESH_TOKEN_SECRET=8cc6735e232dbf289ce329f9db7c3f78fa1a725029a1e0161f2f05828353340d
 
-# Email Configuration (for verification)
+# Microservice URLs (use Docker service names)
+USER_SERVICE_URL=http://user:4001
+CHATBOT_SERVICE_URL=http://llm:8000
+LEARNING_SERVICE_URL=http://conversation:4004
+
+# Frontend Configuration
+FRONTEND_URL=http://localhost:5173  # CORS origin
+APP_URL=http://localhost:5173        # Email links
+
+# Email Configuration (optional)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_SECURE=false
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
+SMTP_USER=atossgpt@gmail.com
+SMTP_PASS=ziub vwkg ggdt kabc
 EMAIL_FROM=noreply@atoss-gpt.com
-APP_URL=http://localhost:5173
-
-# Microservice URLs (for gateway routing)
-USER_SERVICE_URL=http://user:4001
-CHATBOT_SERVICE_URL=http://llm:8000
-CONVERSATION_SERVICE_URL=http://conversation:4004
-LEARNING_MATERIAL_SERVICE_URL=http://learning-material:4005
 ```
 
 ## Installation & Setup
@@ -231,7 +233,7 @@ For detailed email setup instructions, see `EMAIL_VERIFICATION_SETUP.md`.
 
 ### Health Check
 ```bash
-curl http://localhost:4000/api/health
+curl http://localhost:4003/api/health
 ```
 
 ## Development
@@ -252,7 +254,7 @@ This enables:
 docker build -t atoss-gpt-auth .
 
 # Run container
-docker run -p 4000:4000 atoss-gpt-auth
+docker run -p 4003:4003 atoss-gpt-auth
 ```
 
 ## Troubleshooting
