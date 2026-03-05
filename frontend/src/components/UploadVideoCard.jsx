@@ -1,10 +1,10 @@
 import React from 'react';
 
-const UploadVideoCard = ({ onUploadClick }) => {
+const UploadVideoCard = ({ onUploadClick, isDarkMode }) => {
     return (
         <div 
             onClick={onUploadClick}
-            className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer border-2 border-dashed border-gray-300 hover:border-tum-blue flex items-center justify-center min-h-[280px]"
+            className={`rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer border-2 border-dashed flex items-center justify-center min-h-[280px] ${isDarkMode ? 'border-gray-600 bg-[#2f2f2f] hover:border-tum-blue' : 'border-gray-300 bg-white hover:border-tum-blue'}`}
         >
             <div className="text-center p-6">
                 <div className="text-6xl text-gray-300 mb-3">+</div>

@@ -21,7 +21,7 @@ from sentence_transformers import SentenceTransformer, util
 # ============================================================================
 
 # ChromaDB Configuration
-DB_PATH = "./chroma_db_snowflake_600chunks_300overlapping"
+DB_PATH = "./resources/chroma_db/chroma_db_snowflake_600chunks_300overlapping"
 COLLECTION_NAME = "tum_docs"
 
 # Embedding Model (Snowflake Arctic - optimized for multilingual/German text)

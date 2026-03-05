@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { userAPI, getCurrentUser } from '../services/api';
 import { validatePassword } from '../utils/validation';
+import Header from '../components/Header'; // or the correct path to your header component
 
 export default function UserProfilePage() {
   const navigate = useNavigate();
@@ -466,15 +467,12 @@ export default function UserProfilePage() {
 
   return (
     <div className={`min-h-screen py-8 ${isDarkMode ? 'bg-[#212121]' : 'bg-gray-50'}`}>
-      <div className="max-w-4xl mx-auto px-4">
-        {/* Header */}
+      {/* Add the header at the top */}
+      <Header role={role} isDarkMode={isDarkMode} language={language} />
+
+      <div className="max-w-4xl mx-auto px-4 pt-10">
+        {/* Header section: remove the back to chat button */}
         <div className="mb-8">
-          <button
-            onClick={() => navigate('/chatbot')}
-            className="px-4 py-2 bg-tum-blue text-white rounded-lg hover:bg-tum-dark-blue transition-colors mb-4 inline-flex items-center"
-          >
-            {t.backToChat}
-          </button>
           <h1 className={`text-3xl font-bold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>{t.userProfile}</h1>
           <p className={`mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{t.manageAccountSettings}</p>
         </div>

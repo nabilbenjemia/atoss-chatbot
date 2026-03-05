@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     # Ollama Configuration
     OLLAMA_BASE_URL: str = "http://ollama:11434"
     OLLAMA_MODEL: str = "qwen3:4b-instruct"
+    OLLAMA_VISION_MODEL: str = "granite3.2-vision:2b"  # IBM Granite Vision model for image understanding
     OLLAMA_TEMPERATURE: float = 0.3  # Balanced creativity
     OLLAMA_NUM_CTX: int = 20000  # Larger context window
     OLLAMA_REPEAT_PENALTY: float = 1.15  # Moderate repetition penalty
@@ -28,7 +29,8 @@ class Settings(BaseSettings):
     EMBEDDING_DEVICE: str = "auto"
 
     # ChromaDB Configuration
-    CHROMA_PERSIST_DIRECTORY: str = "./chroma_db_merged"
+    CHROMA_DB_DIRECTORY: str = "./resources/chroma_db"  # Parent directory containing all collections
+    CHROMA_PERSIST_DIRECTORY: str = "./resources/chroma_db/test"  # Default collection
     CHROMA_COLLECTION_NAME: str = "tum_docs"
 
     # RAG Configuration

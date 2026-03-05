@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 import MessageInput from '../components/MessageInput'
 import Conversation from '../components/Conversation'
-import { getCurrentUser, userAPI } from '../services/api'
+import Header from '../components/Header'
+import { getCurrentUser } from '../services/api'
+import useUserPreferences from '../hooks/useUserPreferences'
 
 const CONVERSATION_API = import.meta.env.VITE_CONVERSATION_URL || 'http://localhost:4004';
 
@@ -11,14 +13,15 @@ export default function ChatbotPage() {
     const navigate = useNavigate();
     const currentUser = getCurrentUser();
     const userId = currentUser?.id;
+    const userRole = currentUser?.role; 
 
     // Existing state
     const [conversationId, setConversationId] = useState(null);
     const [messages, setMessages] = useState([]);
     const [conversationTitles, setConversationTitles] = useState([]);
 
-    // Theme state
-    const [theme, setTheme] = useState('auto');
+    // User preferences (theme, language)
+    const { isDarkMode, language } = useUserPreferences(userId);
 
     // NEW: Streaming states
     const [isStreaming, setIsStreaming] = useState(false);
@@ -93,31 +96,6 @@ export default function ChatbotPage() {
         }
     };
 
-    // Load user preferences for theme
-    useEffect(() => {
-        const loadPreferences = async () => {
-            try {
-                const response = await userAPI.getProfile();
-                if (response.success && response.data.preferences) {
-                    const userTheme = response.data.preferences.theme;
-                    // Handle 'auto' theme - use system preference
-                    if (userTheme === 'auto') {
-                        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                        setTheme(prefersDark ? 'dark' : 'light');
-                    } else {
-                        setTheme(userTheme);
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to load preferences:', error);
-            }
-        };
-
-        if (userId) {
-            loadPreferences();
-        }
-    }, [userId]);
-
     // Redirect to login if user is not authenticated
     useEffect(() => {
         if (!userId) {
@@ -125,9 +103,6 @@ export default function ChatbotPage() {
             navigate('/');
         }
     }, [userId, navigate]);
-
-    // Determine if dark mode should be applied
-    const isDarkMode = theme === 'dark';
 
     const fetchMessages = useCallback(async () => {
         try {
@@ -282,29 +257,44 @@ export default function ChatbotPage() {
     }
 
     return (
-        <div className={`flex h-screen ${isDarkMode ? 'bg-[#212121]' : 'bg-white'}`}>
-            <Sidebar
-                conversationTitles={conversationTitles}
-                setConversationTitles={setConversationTitles}
-                setConversationId={setConversationId}
-                conversationId={conversationId}
-                userId={userId}
-                onNewChat={handleNewChat}
-                isDarkMode={isDarkMode}
-            />
-            <div className="flex flex-col flex-1 overflow-hidden">
-                <Conversation
-                    messages={messages}
-                    streamingMessage={streamingMessage}
-                    isStreaming={isStreaming}
+        <div className={`h-screen flex flex-col overflow-hidden ${isDarkMode ? 'bg-[#212121] text-gray-200' : 'bg-gray-50 text-black'}`}>
+            {/* Header - fixed height */}
+            <div className="flex-shrink-0 h-14">
+                <Header 
+                    role={userRole}
                     isDarkMode={isDarkMode}
+                    language={language}
                 />
-                <MessageInput
-                    onSendMessage={handleSendMessage}
-                    onInterrupt={handleInterrupt}
-                    isStreaming={isStreaming}
-                    isDarkMode={isDarkMode}
-                />
+            </div>
+
+            {/* Main area: sidebar + content - takes remaining space */}
+            <div className="flex flex-1 min-h-0 h-[calc(100vh-3.5rem)]">
+                <div className="flex-shrink-0">
+                    <Sidebar
+                        conversationTitles={conversationTitles}
+                        setConversationTitles={setConversationTitles}
+                        setConversationId={setConversationId}
+                        conversationId={conversationId}
+                        userId={userId}
+                        onNewChat={handleNewChat}
+                        isDarkMode={isDarkMode}
+                    />
+                </div>
+
+                <div className={`flex flex-col flex-1 min-w-0 overflow-hidden ${isDarkMode ? 'bg-[#212121]' : 'bg-white'}`}>
+                    <Conversation
+                        messages={messages}
+                        streamingMessage={streamingMessage}
+                        isStreaming={isStreaming}
+                        isDarkMode={isDarkMode}
+                    />
+                    <MessageInput
+                        onSendMessage={handleSendMessage}
+                        onInterrupt={handleInterrupt}
+                        isStreaming={isStreaming}
+                        isDarkMode={isDarkMode}
+                    />
+                </div>
             </div>
         </div>
     )

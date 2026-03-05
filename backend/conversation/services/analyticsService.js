@@ -68,17 +68,13 @@ class AnalyticsService {
      * Get keyword frequency statistics
      */
     async getKeywordStats(userId = null, limit = 20, startDate = null, endDate = null) {
-        const match = (userId && userId !== 'null') ? { userId } : {};
+        const match = {};
         
         // Filter by message creation time if dates provided
         if (startDate || endDate) {
             const messageIds = await this._getMessageIdsInDateRange(startDate, endDate);
             match.messageId = { $in: messageIds };
         }
-        
-        console.log('[getKeywordStats] Match filter:', JSON.stringify(match));
-        console.log('[getKeywordStats] Total docs:', await QueryAnalytics.countDocuments({}));
-        console.log('[getKeywordStats] Matching docs:', await QueryAnalytics.countDocuments(match));
         
         const results = await QueryAnalytics.aggregate([
             { $match: match },
@@ -95,15 +91,13 @@ class AnalyticsService {
      * Get category distribution
      */
     async getCategoryStats(userId = null, startDate = null, endDate = null) {
-        const match = (userId && userId !== 'null') ? { userId } : {};
+        const match = {};
         
         // Filter by message creation time if dates provided
         if (startDate || endDate) {
             const messageIds = await this._getMessageIdsInDateRange(startDate, endDate);
             match.messageId = { $in: messageIds };
         }
-        
-        console.log('[getCategoryStats] Match filter:', JSON.stringify(match));
         
         const results = await QueryAnalytics.aggregate([
             { $match: match },
@@ -118,7 +112,7 @@ class AnalyticsService {
      * Get queries over time
      */
     async getQueriesOverTime(userId = null, days = 7, startDate = null, endDate = null) {
-        const match = (userId && userId !== 'null') ? { userId } : {};
+        const match = {};
         
         // Filter by message creation time if dates provided
         if (startDate || endDate) {
@@ -159,7 +153,7 @@ class AnalyticsService {
      * Get overall statistics
      */
     async getOverallStats(userId = null, startDate = null, endDate = null) {
-        const match = (userId && userId !== 'null') ? { userId } : {};
+        const match = {};
         
         // Filter by message creation time if dates provided
         if (startDate || endDate) {
@@ -173,13 +167,13 @@ class AnalyticsService {
         const messageFilter = { sender: 'user' };
         if (startDate || endDate) {
             const dateFilter = {};
-            if (startDate) dateFilter.$gte = new Date(startDate);
-            if (endDate) dateFilter.$lte = new Date(endDate);
-            messageFilter.createdAt = dateFilter;
-        }
-        if (userId && userId !== 'null') {
-            const userConversations = await Conversation.find({ userId }).distinct('_id');
-            messageFilter.conversationId = { $in: userConversations };
+            const parsedStart = this._parseDate(startDate);
+            const parsedEnd = this._parseDate(endDate);
+            if (parsedStart) dateFilter.$gte = parsedStart;
+            if (parsedEnd) dateFilter.$lte = parsedEnd;
+            if (Object.keys(dateFilter).length > 0) {
+                messageFilter.createdAt = dateFilter;
+            }
         }
         const totalQueriesIncludingOneWord = await Message.countDocuments(messageFilter);
         
@@ -196,8 +190,6 @@ class AnalyticsService {
             id !== null && 
             id !== undefined
         );
-        console.log('[getOverallStats] Users with messages:', conversationsWithUserMessages.length);
-        console.log('[getOverallStats] Valid userIds:', validUserIds);
         const uniqueUsers = validUserIds.length;
         
         // Get active users (last 15 minutes)
@@ -256,22 +248,64 @@ class AnalyticsService {
      */
     async _getMessageIdsInDateRange(startDate, endDate) {
         const dateFilter = {};
-        if (startDate) dateFilter.$gte = new Date(startDate);
-        if (endDate) dateFilter.$lte = new Date(endDate);
+        const parsedStart = this._parseDate(startDate);
+        const parsedEnd = this._parseDate(endDate);
         
-        const messages = await Message.find({
-            sender: 'user',
-            createdAt: dateFilter
-        }).select('_id');
+        if (parsedStart) dateFilter.$gte = parsedStart;
+        if (parsedEnd) dateFilter.$lte = parsedEnd;
         
+        const messageQuery = { sender: 'user' };
+        if (Object.keys(dateFilter).length > 0) {
+            messageQuery.createdAt = dateFilter;
+        }
+
+        const messages = await Message.find(messageQuery).select('_id');
         return messages.map(m => m._id);
+    }
+
+    /**
+     * Helper: Parse a date string safely
+     */
+    _parseDate(value) {
+        if (!value) return null;
+
+        if (typeof value === 'string') {
+            const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (isoMatch) {
+                const parsed = new Date(value);
+                return Number.isNaN(parsed.getTime()) ? null : parsed;
+            }
+
+            const dottedMatch = value.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+            if (dottedMatch) {
+                const day = dottedMatch[1].padStart(2, '0');
+                const month = dottedMatch[2].padStart(2, '0');
+                const year = dottedMatch[3];
+                const iso = `${year}-${month}-${day}`;
+                const parsed = new Date(iso);
+                return Number.isNaN(parsed.getTime()) ? null : parsed;
+            }
+
+            const slashedMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            if (slashedMatch) {
+                const day = slashedMatch[1].padStart(2, '0');
+                const month = slashedMatch[2].padStart(2, '0');
+                const year = slashedMatch[3];
+                const iso = `${year}-${month}-${day}`;
+                const parsed = new Date(iso);
+                return Number.isNaN(parsed.getTime()) ? null : parsed;
+            }
+        }
+
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
     }
 
     /**
      * Export analyzed queries as CSV
      */
     async exportQueriesAsCSV(userId = null, startDate = null, endDate = null) {
-        const match = (userId && userId !== 'null') ? { userId } : {};
+        const match = {};
         
         // Filter by message creation time if dates provided
         if (startDate || endDate) {

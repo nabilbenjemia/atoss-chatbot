@@ -1,6 +1,6 @@
 import React from 'react';
 
-const VideoCard = ({ video, onVideoClick, apiBaseUrl }) => {
+const VideoCard = ({ video, onVideoClick, apiBaseUrl, isDarkMode }) => {
     const formatDuration = (seconds) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
@@ -8,7 +8,7 @@ const VideoCard = ({ video, onVideoClick, apiBaseUrl }) => {
     };
 
     return (
-        <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer h-72 flex flex-col">
+        <div className={`rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer h-72 flex flex-col ${isDarkMode ? 'bg-[#2f2f2f]' : 'bg-white'}`}>
             {/* Thumbnail - smaller height */}
             <div className="relative">
                 <img
@@ -28,17 +28,17 @@ const VideoCard = ({ video, onVideoClick, apiBaseUrl }) => {
             <div className="p-3 flex flex-col h-full">
                 {/* Top: title + description */}
                 <div className="flex-1">
-                    <h3 className="font-semibold text-sm mb-1 line-clamp-1 overflow-hidden text-ellipsis">
+                    <h3 className={`font-semibold text-sm mb-1 line-clamp-1 overflow-hidden text-ellipsis ${isDarkMode ? 'text-gray-100' : 'text-black'}`}>
                         {video.title}
                     </h3>
-                    <p className="text-gray-600 text-xs mb-1 line-clamp-1 overflow-hidden text-ellipsis min-h-[1.5rem]">
+                    <p className={`text-xs mb-1 line-clamp-1 overflow-hidden text-ellipsis min-h-[1.5rem] ${isDarkMode ? 'text-gray-200' : 'text-gray-600'}`}>
                         {video.description || '\u00A0'}
                     </p>
                 </div>
 
                 {/* Category row */}
-                <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-                    <span className="bg-gray-100 px-2 py-0.5 rounded">
+                <div className={`flex items-center justify-between text-xs mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <span className={`px-2 py-0.5 rounded ${isDarkMode ? 'bg-tum-grey-3 text-tum-grey-1' : 'bg-gray-100'}`}>
                         {video.category}
                     </span>
                     <span>{video.views} views</span>

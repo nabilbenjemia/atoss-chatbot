@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const VideoUploadModal = ({ isOpen, onClose, onSuccess, editVideo = null }) => {
+const VideoUploadModal = ({ isOpen, onClose, onSuccess, editVideo = null, isDarkMode }) => {
     const [formData, setFormData] = useState({
         title: '',
         description: '',
@@ -147,15 +147,23 @@ const VideoUploadModal = ({ isOpen, onClose, onSuccess, editVideo = null }) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg w-[600px] h-[85vh] flex flex-col overflow-hidden">
-                <div className="flex justify-between items-center p-4 border-b flex-shrink-0">
+        <div className={`fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4`}>
+            <div
+                className={`rounded-lg w-[600px] h-[85vh] flex flex-col overflow-hidden
+                    ${isDarkMode ? 'bg-tum-grey-2 text-white' : 'bg-white text-black'}`}
+            >
+                <div className={`flex justify-between items-center p-4 border-b flex-shrink-0
+                    ${isDarkMode ? 'border-tum-grey-4' : ''}`}>
                     <h2 className="text-xl font-bold">
                         {editVideo ? 'Edit Video' : 'Upload New Video'}
                     </h2>
                     <button
                         onClick={onClose}
-                        className="text-gray-200 text-xl h-8 w-8 bg-tum-blue flex items-center justify-center hover:bg-tum-blue-dark"
+                        className={`text-xl h-8 w-8 flex items-center justify-center rounded
+                            ${isDarkMode
+                                ? 'bg-tum-grey-4 text-white hover:bg-tum-grey-3'
+                                : 'bg-tum-blue text-gray-200 hover:bg-tum-blue-dark'}
+                        `}
                         disabled={uploading}
                     >
                         ×
@@ -171,7 +179,7 @@ const VideoUploadModal = ({ isOpen, onClose, onSuccess, editVideo = null }) => {
                                     type="file"
                                     accept="video/*"
                                     onChange={handleFileChange}
-                                    className="w-full px-3 py-2 border rounded-lg"
+                                    className={`w-full px-3 py-2 border rounded-lg ${isDarkMode ? 'bg-tum-grey-3 text-white border-tum-grey-4' : ''}`}
                                     disabled={uploading}
                                     required
                                 />
@@ -185,7 +193,7 @@ const VideoUploadModal = ({ isOpen, onClose, onSuccess, editVideo = null }) => {
                                 name="title"
                                 value={formData.title}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-tum-blue"
+                                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-tum-blue ${isDarkMode ? 'bg-tum-grey-3 text-white border-tum-grey-4' : ''}`}
                                 disabled={uploading}
                                 required
                             />
@@ -198,7 +206,7 @@ const VideoUploadModal = ({ isOpen, onClose, onSuccess, editVideo = null }) => {
                                 value={formData.description}
                                 onChange={handleChange}
                                 rows="3"
-                                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-tum-blue"
+                                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-tum-blue ${isDarkMode ? 'bg-tum-grey-3 text-white border-tum-grey-4' : ''}`}
                                 disabled={uploading}
                             />
                         </div>
@@ -210,7 +218,7 @@ const VideoUploadModal = ({ isOpen, onClose, onSuccess, editVideo = null }) => {
                                     name="category"
                                     value={formData.category}
                                     onChange={handleChange}
-                                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-tum-blue"
+                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-tum-blue ${isDarkMode ? 'bg-tum-grey-3 text-white border-tum-grey-4' : ''}`}
                                     disabled={uploading}
                                     required
                                 >
@@ -232,7 +240,7 @@ const VideoUploadModal = ({ isOpen, onClose, onSuccess, editVideo = null }) => {
                                     value={formData.tags}
                                     onChange={handleChange}
                                     placeholder="e.g., beginner, advanced"
-                                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-tum-blue"
+                                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-tum-blue ${isDarkMode ? 'bg-tum-grey-3 text-white border-tum-grey-4' : ''}`}
                                     disabled={uploading}
                                 />
                             </div>
@@ -245,7 +253,7 @@ const VideoUploadModal = ({ isOpen, onClose, onSuccess, editVideo = null }) => {
                                     type="file"
                                     accept="image/*"
                                     onChange={e => setThumbnailFile(e.target.files[0])}
-                                    className="w-full px-3 py-2 border rounded-lg"
+                                    className={`w-full px-3 py-2 border rounded-lg ${isDarkMode ? 'bg-tum-grey-3 text-white border-tum-grey-4' : ''}`}
                                     disabled={uploading}
                                 />
                             </div>
@@ -253,37 +261,37 @@ const VideoUploadModal = ({ isOpen, onClose, onSuccess, editVideo = null }) => {
 
                         {uploading && (
                             <div className="pt-4">
-                                <div className="w-full bg-gray-200 rounded-full h-3">
+                                <div className={`w-full bg-gray-200 rounded-full h-3 ${isDarkMode ? 'bg-tum-grey-4' : ''}`}>
                                     <div 
-                                        className="bg-tum-blue h-3 rounded-full transition-all duration-300" 
+                                        className={`bg-tum-blue h-3 rounded-full transition-all duration-300`} 
                                         style={{ width: `${uploadProgress}%` }}
                                     />
                                 </div>
-                                <p className="text-sm text-gray-600 mt-2 text-center">
+                                <p className={`text-sm mt-2 text-center ${isDarkMode ? 'text-tum-grey-4' : 'text-gray-600'}`}>
                                     {uploadProgress}% uploaded...
                                 </p>
                             </div>
                         )}
 
                         {error && (
-                            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                            <div className={`px-4 py-3 rounded ${isDarkMode ? 'bg-red-900 border border-red-400 text-red-200' : 'bg-red-100 border border-red-400 text-red-700'}`}>
                                 {error}
                             </div>
                         )}
                     </div>
 
-                    <div className="flex gap-3 p-4 border-t flex-shrink-0">
+                    <div className={`flex gap-3 p-4 border-t flex-shrink-0 ${isDarkMode ? 'border-tum-grey-4' : ''}`}>
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 px-4 py-2 border bg-white rounded-lg border-tum-blue hover:bg-gray-100 disabled:bg-gray-200"
+                            className={`flex-1 px-4 py-2 border rounded-lg ${isDarkMode ? 'bg-tum-grey-3 border-tum-grey-4 text-white hover:bg-tum-grey-4' : 'bg-white border-tum-blue hover:bg-gray-100 disabled:bg-gray-200'}`}
                             disabled={uploading}
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="flex-1 px-4 py-2 bg-tum-blue text-white rounded-lg hover:bg-tum-blue-dark disabled:bg-gray-400"
+                            className={`flex-1 px-4 py-2 rounded-lg ${isDarkMode ? 'bg-tum-blue text-white hover:bg-tum-blue-dark' : 'bg-tum-blue text-white hover:bg-tum-blue-dark disabled:bg-gray-400'}`}
                             disabled={uploading}
                         >
                             {uploading ? 'Uploading...' : editVideo ? 'Update' : 'Upload'}

@@ -21,7 +21,7 @@ load_dotenv()
 
 # Configuration
 PDF_FILES = ["20251104_ATOSS FAQs_SEBA Lab.pdf", "ASES_Referenzhandbuch.pdf"]
-DB_PATH = "./chroma_db_snowflake_600chunks_400overlapping"
+DB_PATH = "./resources/chroma_db/chroma_db_snowflake_600chunks_400overlapping"
 COLLECTION_NAME = "tum_docs"
 
 # Use the embedding model from .env, with a default fallback

@@ -201,7 +201,7 @@ export const userAPI = {
 
   // Add admin - promote a staff user to admin by email (admin only)
   addAdmin: async (email) => {
-    const response = await api.post('/users/add-admin', { email });
+    const response = await userApi.post('/add-admin', { email });
     return response.data;
   },
 };

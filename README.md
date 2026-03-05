@@ -11,73 +11,157 @@ An AI-powered chatbot for ATOSS Workforce Management documentation using RAG (Re
 │  (React/Vite)   │     │    Service      │     │   (FastAPI)     │
 │   Port 5173     │     │   Port 4004     │     │   Port 8000     │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
-                               │
-                               ▼
-                        ┌─────────────────┐
-                        │ Authentication  │
-                        │    Service      │
-                        │   Port 4003     │
+                               │                        │
+                               ▼                        ▼
+                        ┌─────────────────┐     ┌─────────────────┐
+                        │ Authentication  │     │     Ollama      │
+                        │    Service      │     │   Port 11434    │
+                        │   Port 4003     │     └─────────────────┘
                         └─────────────────┘
 ```
 
 ## Prerequisites
 
-- **Node.js** v18+
-- **Python** 3.10+
-- **Ollama** running locally (`ollama serve` in background)
-- **MongoDB** running locally
-- **qwen2.5:7b-instruct-q4_0** model pulled and available in Ollama
+- **Docker** & **Docker Compose** (recommended)
+- Or for manual setup:
+  - **Node.js** v18+
+  - **Python** 3.10+
+  - **Ollama** running locally
+  - **MongoDB** running locally
 
-### Install Ollama Model
+### Ollama Model
+
+The project uses **qwen3:4b-instruct** as the default LLM model.
 
 ```bash
-ollama pull qwen2.5:7b-instruct-q4_0
+ollama pull qwen3:4b-instruct
 ```
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Docker - Recommended)
+
+Docker Compose profiles are available for different environments:
+
+### 🍎 macOS (Apple Silicon / Intel)
+
+On macOS, the LLM service runs **on your host machine** (not in Docker) for better performance with Metal acceleration.
+
+```bash
+# Step 1: Build Docker images (first time or after code changes)
+docker-compose --profile macos build
+
+# Step 2: Start core services + ingestion (in Docker)
+docker-compose --profile macos up -d
+
+# Step 2: Run LLM service manually on host (separate terminal)
+cd backend/llm
+source .venv/bin/activate
+python main.py
+
+# Step 3: Make sure Ollama is running on host
+ollama serve  # If not already running
+```
+
+**Why this setup?** macOS Docker doesn't support GPU passthrough. Running the LLM on the host allows Ollama to use Metal acceleration on Apple Silicon.
+
+### 🖥️ Windows/Linux with NVIDIA GPU
+
+For machines with NVIDIA GPUs, all services including Ollama run in Docker with GPU acceleration.
+
+**Prerequisites:**
+- NVIDIA GPU with CUDA support
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed
+- Docker Desktop with WSL2 backend (Windows) or Docker Engine (Linux)
+
+```bash
+# Build Docker images (first time or after code changes)
+docker-compose --profile gpu build
+
+# Start all services with GPU support
+docker-compose --profile gpu up -d
+
+# View logs (Ollama takes ~90s to pull model on first run)
+docker-compose --profile gpu logs -f
+
+# Stop all services
+docker-compose --profile gpu down
+```
+
+### 🐳 Docker Profile Summary
+
+| Profile | Command | LLM Location | GPU Support |
+|---------|---------|--------------|-------------|
+| `macos` | `docker-compose --profile macos up -d` | Host machine | Metal (host) |
+| `gpu` | `docker-compose --profile gpu up -d` | Docker container | NVIDIA CUDA |
+
+### Core Services (Always Started)
+
+These services start with **any** profile:
+- **Frontend** (port 5173) - React UI
+- **Authentication** (port 4003) - User auth
+- **Conversation** (port 4004) - Chat management
+- **User** (port 4001) - User profiles
+- **Learning Material** (port 4005) - Course content
+
+### Profile-Specific Services
+
+| Service | `macos` Profile | `gpu` Profile |
+|---------|-----------------|---------------|
+| Ingestion (4006) | ✅ Connects to `host.docker.internal:8000` | ✅ Connects to `llm:8000` |
+| LLM (8000) | ❌ Run manually on host | ✅ In Docker |
+| Ollama (11434) | ❌ Run manually on host | ✅ In Docker with GPU |
+
+### 🌐 Access the App
+
+Open your browser: **http://localhost:5173**
+
+---
+
+## 🔧 Manual Start (Development)
+
+If you prefer running services manually:
 
 **Prerequisites Check:**
 - Ensure MongoDB is running: `mongod`
-- Ensure Ollama is running in background: `ollama serve`
+- Ensure Ollama is running: `ollama serve`
+- Pull the model: `ollama pull qwen3:4b-instruct`
 
 Open **4 terminal windows** and run each command:
 
 ### 1. LLM Server (Python - Port 8000)
 
-```powershell
+```bash
 cd backend/llm
-.\.venv\Scripts\Activate.ps1
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 python main.py
 ```
 
 ### 2. Authentication Service (Node.js - Port 4003)
 
-```powershell
+```bash
 cd backend/authentication
-npm start 
-or
+npm install
 npm run dev
 ```
 
 ### 3. Conversation Service (Node.js - Port 4004)
 
-```powershell
+```bash
 cd backend/conversation
+npm install
 npm run dev
 ```
 
 ### 4. Frontend (Vite - Port 5173)
 
-```powershell
+```bash
 cd frontend
+npm install
 npm run dev
 ```
-
-### 🌐 Access the App
-
-Open your browser: **http://localhost:5173**
 
 ---
 
@@ -88,34 +172,37 @@ Open your browser: **http://localhost:5173**
 | Frontend | 5173 | React + Vite | User interface |
 | Conversation | 4004 | Node.js/Express | Chat & message management |
 | Authentication | 4003 | Node.js/Express | User auth & sessions |
+| User | 4001 | Node.js/Express | User profiles & preferences |
+| Learning Material | 4005 | Node.js/Express | Course content management |
+| Ingestion | 4006 | Node.js/Express | Document upload & processing |
 | LLM Server | 8000 | Python/FastAPI | RAG + Ollama integration |
+| Ollama | 11434 | Ollama | Local LLM inference |
 
 ---
 
 ## Chatbot Strategy 
 
-qwen2.5:7b-instruct-q4_0 (89% Accuracy, 3.8s latency). It is the most reliable model for understanding internal hospital queries
+**qwen3:4b-instruct** - Fast and efficient model for understanding internal hospital queries
 
-Snowflake/snowflake-arctic-embed-l-v2.0 will serve as the embedding model with the best result 
+**Snowflake/snowflake-arctic-embed-l-v2.0** - Embedding model with excellent multilingual support 
 
 ### AI Strategy
 
-Implement a strictly on-premise Retrieval-Augmented Generation (RAG) system pairing Qwen 2.5 for German text generation with Snowflake Arctic Embed L v2.0 for high-precision document retrieval. This "dual-model" approach ensures that all hospital data remains offline while leveraging Snowflake's superior multilingual understanding to find the exact paragraph needed from handbooks before Qwen answers.
+Implement a strictly on-premise Retrieval-Augmented Generation (RAG) system pairing Qwen 3 for German text generation with Snowflake Arctic Embed L v2.0 for high-precision document retrieval. This "dual-model" approach ensures that all hospital data remains offline while leveraging Snowflake's superior multilingual understanding to find the exact paragraph needed from handbooks before Qwen answers.
 
 
 ### Software Stack 
 
-1. Engine Ollama
-   * Run `ollama serve` in background
-   * Pull model: `ollama pull qwen2.5:7b-instruct-q4_0`
+1. **LLM Engine: Ollama**
+   * Default model: `qwen3:4b-instruct`
    * SentenceTransformers for embeddings: `Snowflake/snowflake-arctic-embed-l-v2.0`
 
-2. Vector Database 
-   * ChromaDB (v0.4+) -> stores embeddings created by Snowflake model
-   * Persistent storage at `./chroma_db_snowflake_600chunks_300overlapping`
+2. **Vector Database: ChromaDB**
+   * ChromaDB (v0.4+) stores embeddings created by Snowflake model
+   * Persistent storage at `./chroma_db_merged`
    * PDF parsing with PyMuPDF for document ingestion
 
-3. Frontend & Backend Services
+3. **Frontend & Backend Services**
    * React (Vite) frontend for user interface
    * Node.js/Express microservices (Authentication, Conversation)
    * FastAPI server for RAG pipeline
@@ -123,7 +210,7 @@ Implement a strictly on-premise Retrieval-Augmented Generation (RAG) system pair
 ### Why Ollama?
 
 * **Data Sovereignty**: Operates entirely offline - all models run on-premise
-* **Hardware Efficiency**: Quantized models (q4_0) run efficiently on modest hardware
+* **Hardware Efficiency**: Quantized models run efficiently on modest hardware
 * **Easy Deployment**: Eliminates complexity of raw model management
 * **Safety**: No data leaves your infrastructure
 
@@ -139,18 +226,19 @@ HOST=0.0.0.0
 PORT=8000
 
 # Ollama Configuration
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5:7b-instruct-q4_0
+OLLAMA_BASE_URL=http://localhost:11434  # Use http://ollama:11434 for Docker
+OLLAMA_MODEL=qwen3:4b-instruct
 OLLAMA_TEMPERATURE=0.3
-OLLAMA_NUM_CTX=5000
-OLLAMA_NUM_PREDICT=500
+OLLAMA_NUM_CTX=20000
+OLLAMA_NUM_PREDICT=1000
+OLLAMA_KEEP_ALIVE=-1
 
 # Embedding Configuration
 EMBEDDING_MODEL=Snowflake/snowflake-arctic-embed-l-v2.0
 EMBEDDING_DEVICE=auto
 
 # ChromaDB Configuration
-CHROMA_PERSIST_DIRECTORY=./chroma_db_snowflake_600chunks_300overlapping
+CHROMA_PERSIST_DIRECTORY=./resources/chroma_db/chroma_db_merged
 CHROMA_COLLECTION_NAME=tum_docs
 CHUNK_SIZE=600
 CHUNK_OVERLAP=300
@@ -160,7 +248,7 @@ MAX_CONTEXT_LENGTH=10000
 
 # Reranking Configuration (Optional - improves relevance)
 ENABLE_RERANKING=False
-RERANKING_MODEL=cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+RERANKING_MODEL=jinaai/jina-reranker-v3
 RERANKING_TOP_K=5
 
 # Debug Mode (Optional)
@@ -176,9 +264,41 @@ JWT_SECRET=your-secret-key
 
 ---
 
-## Install Dependencies
+## Docker Compose Services
 
-```powershell
+The `docker-compose.yml` uses **profiles** to support different environments:
+
+### Core Services (No Profile Required)
+
+| Service | Port | Description |
+|---------|------|-------------|
+| frontend | 5173 | React app served via nginx |
+| authentication | 4003 | Auth microservice |
+| conversation | 4004 | Chat microservice |
+| user | 4001 | User profile service |
+| learning-material | 4005 | Course content service |
+
+### macOS Profile (`--profile macos`)
+
+| Service | Port | Description |
+|---------|------|-------------|
+| ingestion | 4006 | Document ingestion (connects to host LLM) |
+
+> **Note:** LLM and Ollama run manually on host for Metal acceleration.
+
+### GPU Profile (`--profile gpu`)
+
+| Service | Port | Description |
+|---------|------|-------------|
+| ingestion-gpu | 4006 | Document ingestion (connects to Docker LLM) |
+| llm | 8000 | FastAPI RAG server |
+| ollama | 11434 | Ollama with NVIDIA GPU support |
+
+---
+
+## Install Dependencies (Manual Setup)
+
+```bash
 # Frontend
 cd frontend
 npm install
@@ -194,7 +314,7 @@ npm install
 # LLM service
 cd backend/llm
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+source .venv/bin/activate  # On Windows: .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
@@ -224,11 +344,3 @@ pip install -r requirements.txt
 ## License
 
 Proprietary - ATOSS Software AG
-
-
-
-
-
-
-
-
