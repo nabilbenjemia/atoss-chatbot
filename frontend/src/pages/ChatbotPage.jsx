@@ -27,6 +27,7 @@ export default function ChatbotPage() {
     const [isStreaming, setIsStreaming] = useState(false);
     const [streamingMessage, setStreamingMessage] = useState("");
     const eventSourceRef = useRef(null);
+    const streamingConversationRef = useRef(null); // Track which conversation the stream belongs to
 
     // NEW: Cleanup on unmount
     useEffect(() => {
@@ -43,6 +44,7 @@ export default function ChatbotPage() {
             eventSourceRef.current.close();
             eventSourceRef.current = null;
         }
+        streamingConversationRef.current = null;
         setIsStreaming(false);
 
         // Save the partial response if there's content
@@ -146,8 +148,17 @@ export default function ChatbotPage() {
         fetchMessages();
     }, [conversationId, fetchMessages]);
 
-
-
+    // Abort stream and clear streaming state when conversation changes
+    useEffect(() => {
+        // If there's an active stream for a different conversation, abort it
+        if (eventSourceRef.current && streamingConversationRef.current !== conversationId) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+            streamingConversationRef.current = null;
+            setIsStreaming(false);
+            setStreamingMessage("");
+        }
+    }, [conversationId]);
 
     // MODIFIED: handleSendMessage with streaming
     const handleSendMessage = async (messageText) => {
@@ -189,17 +200,24 @@ export default function ChatbotPage() {
 
             const eventSource = new EventSource(url);
             eventSourceRef.current = eventSource;
+            streamingConversationRef.current = convId; // Track which conversation this stream is for
 
             let fullResponse = "";
 
             eventSource.onmessage = (event) => {
+                // Check if we're still on the same conversation
+                if (streamingConversationRef.current !== convId) {
+                    eventSource.close();
+                    return;
+                }
+
                 try {
                     const parsed = JSON.parse(event.data);
 
                     if (parsed.done) {
-                        // Python sends {"done": true} when complete
                         eventSource.close();
                         eventSourceRef.current = null;
+                        streamingConversationRef.current = null;
                         setIsStreaming(false);
 
                         // Add final AI message to state
@@ -218,6 +236,7 @@ export default function ChatbotPage() {
                         console.error('Stream error:', parsed.error);
                         eventSource.close();
                         eventSourceRef.current = null;
+                        streamingConversationRef.current = null;
                         setIsStreaming(false);
 
                     } else if (parsed.content !== undefined) {
@@ -235,6 +254,7 @@ export default function ChatbotPage() {
                 console.error('EventSource error:', error);
                 eventSource.close();
                 eventSourceRef.current = null;
+                streamingConversationRef.current = null;
                 setIsStreaming(false);
             };
 
@@ -246,6 +266,13 @@ export default function ChatbotPage() {
 
     // NEW: Handle new chat
     const handleNewChat = () => {
+        // Abort any active stream
+        if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+        }
+        streamingConversationRef.current = null;
+        setIsStreaming(false);
         setConversationId(null);
         setMessages([]);
         setStreamingMessage("");
