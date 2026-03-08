@@ -19,7 +19,7 @@ This is a RAG-based chatbot with 5 microservices communicating via REST/SSE:
 ```
 Frontend (React/Vite:5173) → Conversation Service (Node:4004) → LLM Service (FastAPI:8000) → Ollama:11434
                           ↘ Authentication Service (Node:4003)
-                          ↘ Ingestion Service (Node:4005) → LLM Service (FastAPI:8000)
+                          ↘ Ingestion Service (Node:4006) → LLM Service (FastAPI:8000)
 ```
 
 - **Frontend**: React 19 + Vite, Tailwind CSS, react-markdown for AI responses
@@ -38,7 +38,7 @@ docker-compose up -d
 cd backend/llm && source .venv/bin/activate && python main.py      # Port 8000
 cd backend/authentication && npm run dev                            # Port 4003
 cd backend/conversation && npm run dev                              # Port 4004
-cd backend/ingestion && npm run dev                                 # Port 4005
+cd backend/ingestion && npm run dev                                 # Port 4006
 cd frontend && npm run dev                                          # Port 5173
 ```
 
@@ -58,7 +58,7 @@ Upload → Process → Edit → Preview → Ingest: `IngestionPage.jsx` → `ing
 - See `doc/ingestion/API_CONTRACTS.md` for endpoint specifications
 - See `doc/ingestion/FEATURE_INGESTION_PAGE.md` for complete documentation
 
-### Ingestion API Endpoints (Port 4005 → Proxy to 8000)
+### Ingestion API Endpoints (Port 4006 → Proxy to 8000)
 | Endpoint | Status | LLM Proxy Target |
 |----------|--------|------------------|
 | `GET /api/ingestion/config` | ✅ Implemented | Fetches from `/api/ingestion/config` + local config |

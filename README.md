@@ -1,4 +1,3 @@
-
 # ATOSS.GPT
 
 An AI-powered chatbot for ATOSS Workforce Management documentation using RAG (Retrieval-Augmented Generation).
@@ -11,12 +10,31 @@ An AI-powered chatbot for ATOSS Workforce Management documentation using RAG (Re
 │  (React/Vite)   │     │    Service      │     │   (FastAPI)     │
 │   Port 5173     │     │   Port 4004     │     │   Port 8000     │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
-                               │                        │
-                               ▼                        ▼
-                        ┌─────────────────┐     ┌─────────────────┐
-                        │ Authentication  │     │     Ollama      │
-                        │    Service      │     │   Port 11434    │
-                        │   Port 4003     │     └─────────────────┘
+        │                       │                        │
+        │                       ▼                        ▼
+        │               ┌─────────────────┐     ┌─────────────────┐
+        │               │    MongoDB      │     │     Ollama      │
+        │               │  (Atlas/Local)  │     │   Port 11434    │
+        │               └─────────────────┘     └─────────────────┘
+        │
+        ├──────────────▶┌─────────────────┐
+        │               │ Authentication  │
+        │               │   Port 4003     │
+        │               └─────────────────┘
+        │
+        ├──────────────▶┌─────────────────┐
+        │               │  User Service   │
+        │               │   Port 4001     │
+        │               └─────────────────┘
+        │
+        ├──────────────▶┌─────────────────┐     ┌─────────────────┐
+        │               │   Ingestion     │────▶│   LLM Server    │
+        │               │   Port 4006     │     │   Port 8000     │
+        │               └─────────────────┘     └─────────────────┘
+        │
+        └──────────────▶┌─────────────────┐
+                        │Learning Material│
+                        │   Port 4005     │
                         └─────────────────┘
 ```
 
@@ -167,16 +185,16 @@ npm run dev
 
 ## Services Overview
 
-| Service | Port | Technology | Description |
-|---------|------|------------|-------------|
-| Frontend | 5173 | React + Vite | User interface |
-| Conversation | 4004 | Node.js/Express | Chat & message management |
-| Authentication | 4003 | Node.js/Express | User auth & sessions |
-| User | 4001 | Node.js/Express | User profiles & preferences |
-| Learning Material | 4005 | Node.js/Express | Course content management |
-| Ingestion | 4006 | Node.js/Express | Document upload & processing |
-| LLM Server | 8000 | Python/FastAPI | RAG + Ollama integration |
-| Ollama | 11434 | Ollama | Local LLM inference |
+| Service | Port | Technology | Database | Description |
+|---------|------|------------|----------|-------------|
+| Frontend | 5173 | React + Vite | - | User interface |
+| Authentication | 4003 | Node.js/Express | MongoDB | User auth & sessions |
+| User | 4001 | Node.js/Express | MongoDB | User profiles & preferences |
+| Conversation | 4004 | Node.js/Express | MongoDB | Chat & message management |
+| Learning Material | 4005 | Node.js/Express | MongoDB | Video content management |
+| Ingestion | 4006 | Node.js/Express | - | Document upload & processing |
+| LLM Server | 8000 | Python/FastAPI | ChromaDB | RAG + Ollama integration |
+| Ollama | 11434 | Ollama | - | Local LLM inference |
 
 ---
 
