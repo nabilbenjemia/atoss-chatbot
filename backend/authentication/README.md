@@ -78,12 +78,12 @@ backend/authentication/
 
 The API Gateway routes requests based on URL paths:
 
-- `/auth/*` → Authentication Microservice (handled locally)
-- `/users/*` → User Service
-- `/chat/*` → LLM Service (port 8000)
+- `/api/auth/*` → Authentication Microservice (handled locally)
+- `/api/users/*` → User Service (port 4001)
+- `/api/chat/*` → LLM Service (port 8000)
 - `/api/conversations/*` → Conversation Service (port 4004)
 - `/api/analytics/*` → Conversation Service (port 4004)
-- `/api/ingestion/*` → Ingestion Service (port 4005)
+- `/api/ingestion/*` → Ingestion Service (port 4006)
 
 ## Environment Configuration
 
@@ -149,43 +149,28 @@ EMAIL_FROM=noreply@atoss-gpt.com
 
 ### Public Endpoints (No Authentication Required)
 
-#### POST `/auth/register`
-Register a new user account.
-
-#### POST `/auth/login`
-Authenticate user and receive JWT token.
-
-#### POST `/auth/refresh`
-Refresh access token using refresh token.
-
-#### GET `/auth/verify`
-Verify JWT token validity.
-
-#### POST `/auth/verify-email`
-Verify email address using token from email.
-
-#### POST `/auth/resend-verification`
-Resend verification email.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/register` | Register new user |
+| POST | `/api/auth/login` | Authenticate & get JWT |
+| POST | `/api/auth/refresh-token` | Refresh access token |
+| GET | `/api/auth/verify-email/:token` | Verify email address |
+| POST | `/api/auth/resend-verification` | Resend verification email |
 
 ### Protected Endpoints (Authentication Required)
 
-#### POST `/auth/logout`
-Invalidate user session.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/auth/me` | Get current user info |
+| POST | `/api/auth/logout` | Invalidate session |
 
-#### GET `/auth/user/:userId`
-Get user profile by ID.
+### Admin Endpoints (Admin Role Required)
 
-#### PATCH `/auth/user/:userId/role`
-Update user role.
-
-#### PATCH `/auth/user/:userId/department`
-Update user department.
-
-#### PATCH `/auth/user/:userId/password`
-Update user password.
-
-#### DELETE `/auth/user/:userId`
-Delete user account.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/auth/users` | List all users |
+| PUT | `/api/auth/users/:id/role` | Update user role |
+| DELETE | `/api/auth/users/:id` | Delete user |
 
 For detailed API documentation with request/response examples, see `POSTMAN_TESTING_GUIDE.md`.
 

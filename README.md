@@ -255,12 +255,16 @@ npm install && npm run dev
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/auth/login` | User login |
-| POST | `/auth/register` | User registration |
-| POST | `/auth/refresh` | Refresh JWT token |
-| GET | `/auth/verify` | Verify token |
-| POST | `/auth/verify-email` | Email verification |
-| POST | `/auth/logout` | Logout |
+| POST | `/api/auth/register` | User registration |
+| POST | `/api/auth/login` | User login |
+| POST | `/api/auth/logout` | Logout |
+| POST | `/api/auth/refresh-token` | Refresh JWT token |
+| GET | `/api/auth/verify-email/:token` | Email verification |
+| POST | `/api/auth/resend-verification` | Resend verification email |
+| GET | `/api/auth/me` | Get current user info |
+| GET | `/api/auth/users` | List all users (Admin only) |
+| PUT | `/api/auth/users/:id/role` | Update user role (Admin only) |
+| DELETE | `/api/auth/users/:id` | Delete user (Admin only) |
 
 ### User (Port 4001)
 
