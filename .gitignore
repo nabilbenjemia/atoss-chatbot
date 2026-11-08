@@ -1,0 +1,113 @@
+# Root level gitignore
+
+# Frontend
+frontend/.env
+frontend/.env.local
+frontend/node_modules
+frontend/dist
+
+# Backend
+backend/**/.env
+backend/**/node_modules
+
+# Learning Material Service
+backend/learning-material/.env
+backend/learning-material/uploads/videos/*
+backend/learning-material/uploads/thumbnails/*
+!backend/learning-material/uploads/videos/.gitkeep
+!backend/learning-material/uploads/thumbnails/.gitkeep
+
+# Authentication Service
+backend/authentication/.env
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+*/node_modules
+dist
+build
+.tmp
+outputs
+out
+.env
+*/.env
+.env.local
+.env.*.local
+.cache
+.next
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Python
+venv/
+.venv/
+*.pyc
+__pycache__/
+
+# VS Code
+.vscode/
+!.vscode/extensions.json
+
+# Chroma DB files
+backend/llm/chroma_db_snowflake_600chunks_300overlapping/chroma.sqlite3
+backend/llm/chroma_db_snowflake_600chunks_300overlapping/*.sqlite3
+
+# Or more generally, ignore all sqlite files
+*.sqlite3
+*.db
+
+# Chroma DB directories (if there are other files)
+**/chroma_db*/
+
+# Chroma DB files
+backend/llm/chroma_db_snowflake_600chunks_300overlapping/chroma.sqlite3
+backend/llm/chroma_db_snowflake_600chunks_300overlapping/*.sqlite3
+
+# Or more generally, ignore all sqlite files
+*.sqlite3
+*.db
+
+# Chroma DB directories (if there are other files)
+**/chroma_db*/
+
+
+*storybook.log
+storybook-static
+
+# ChromaDB
+**/chroma.sqlite3
+
+# Testing & Development (not for production)
+frontend/.storybook/
+frontend/tests/
+pyrightconfig.json
+backend/llm/docling/
+
+# LLM static images (generated at runtime)
+backend/llm/static/images/
+
+
+# Speckit - AI spec generation
+.specify/
+**/.specify/
+.github/prompts/speckit.*
+**/.github/prompts/speckit.*
+.github/agents/
+**/.github/agents/

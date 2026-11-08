@@ -1,93 +1,346 @@
+
 # ATOSS.GPT
 
+An AI-powered chatbot for ATOSS Workforce Management documentation using RAG (Retrieval-Augmented Generation).
 
-
-## Getting started
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Architecture
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.lrz.de/seba-master-lab/atoss.gpt.git
-git branch -M main
-git push -uf origin main
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│    Frontend     │────▶│  Conversation   │────▶│   LLM Server    │
+│  (React/Vite)   │     │    Service      │     │   (FastAPI)     │
+│   Port 5173     │     │   Port 4004     │     │   Port 8000     │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                               │                        │
+                               ▼                        ▼
+                        ┌─────────────────┐     ┌─────────────────┐
+                        │ Authentication  │     │     Ollama      │
+                        │    Service      │     │   Port 11434    │
+                        │   Port 4003     │     └─────────────────┘
+                        └─────────────────┘
 ```
 
-## Integrate with your tools
+## Prerequisites
 
-- [ ] [Set up project integrations](https://gitlab.lrz.de/seba-master-lab/atoss.gpt/-/settings/integrations)
+- **Docker** & **Docker Compose** (recommended)
+- Or for manual setup:
+  - **Node.js** v18+
+  - **Python** 3.10+
+  - **Ollama** running locally
+  - **MongoDB** running locally
 
-## Collaborate with your team
+### Ollama Model
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+The project uses **qwen3:4b-instruct** as the default LLM model.
 
-## Test and Deploy
+```bash
+ollama pull qwen3:4b-instruct
+```
 
-Use the built-in continuous integration in GitLab.
+---
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+## 🚀 Quick Start (Docker - Recommended)
 
-***
+Docker Compose profiles are available for different environments:
 
-# Editing this README
+### 🍎 macOS (Apple Silicon / Intel)
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+On macOS, the LLM service runs **on your host machine** (not in Docker) for better performance with Metal acceleration.
 
-## Suggestions for a good README
+```bash
+# Step 1: Build Docker images (first time or after code changes)
+docker-compose --profile macos build
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+# Step 2: Start core services + ingestion (in Docker)
+docker-compose --profile macos up -d
 
-## Name
-Choose a self-explaining name for your project.
+# Step 2: Run LLM service manually on host (separate terminal)
+cd backend/llm
+source .venv/bin/activate
+python main.py
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+# Step 3: Make sure Ollama is running on host
+ollama serve  # If not already running
+```
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+**Why this setup?** macOS Docker doesn't support GPU passthrough. Running the LLM on the host allows Ollama to use Metal acceleration on Apple Silicon.
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+### 🖥️ Windows/Linux with NVIDIA GPU
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+For machines with NVIDIA GPUs, all services including Ollama run in Docker with GPU acceleration.
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+**Prerequisites:**
+- NVIDIA GPU with CUDA support
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed
+- Docker Desktop with WSL2 backend (Windows) or Docker Engine (Linux)
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+```bash
+# Build Docker images (first time or after code changes)
+docker-compose --profile gpu build
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+# Start all services with GPU support
+docker-compose --profile gpu up -d
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+# View logs (Ollama takes ~90s to pull model on first run)
+docker-compose --profile gpu logs -f
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+# Stop all services
+docker-compose --profile gpu down
+```
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+### 🐳 Docker Profile Summary
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+| Profile | Command | LLM Location | GPU Support |
+|---------|---------|--------------|-------------|
+| `macos` | `docker-compose --profile macos up -d` | Host machine | Metal (host) |
+| `gpu` | `docker-compose --profile gpu up -d` | Docker container | NVIDIA CUDA |
+
+### Core Services (Always Started)
+
+These services start with **any** profile:
+- **Frontend** (port 5173) - React UI
+- **Authentication** (port 4003) - User auth
+- **Conversation** (port 4004) - Chat management
+- **User** (port 4001) - User profiles
+- **Learning Material** (port 4005) - Course content
+
+### Profile-Specific Services
+
+| Service | `macos` Profile | `gpu` Profile |
+|---------|-----------------|---------------|
+| Ingestion (4006) | ✅ Connects to `host.docker.internal:8000` | ✅ Connects to `llm:8000` |
+| LLM (8000) | ❌ Run manually on host | ✅ In Docker |
+| Ollama (11434) | ❌ Run manually on host | ✅ In Docker with GPU |
+
+### 🌐 Access the App
+
+Open your browser: **http://localhost:5173**
+
+---
+
+## 🔧 Manual Start (Development)
+
+If you prefer running services manually:
+
+**Prerequisites Check:**
+- Ensure MongoDB is running: `mongod`
+- Ensure Ollama is running: `ollama serve`
+- Pull the model: `ollama pull qwen3:4b-instruct`
+
+Open **4 terminal windows** and run each command:
+
+### 1. LLM Server (Python - Port 8000)
+
+```bash
+cd backend/llm
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python main.py
+```
+
+### 2. Authentication Service (Node.js - Port 4003)
+
+```bash
+cd backend/authentication
+npm install
+npm run dev
+```
+
+### 3. Conversation Service (Node.js - Port 4004)
+
+```bash
+cd backend/conversation
+npm install
+npm run dev
+```
+
+### 4. Frontend (Vite - Port 5173)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+---
+
+## Services Overview
+
+| Service | Port | Technology | Description |
+|---------|------|------------|-------------|
+| Frontend | 5173 | React + Vite | User interface |
+| Conversation | 4004 | Node.js/Express | Chat & message management |
+| Authentication | 4003 | Node.js/Express | User auth & sessions |
+| User | 4001 | Node.js/Express | User profiles & preferences |
+| Learning Material | 4005 | Node.js/Express | Course content management |
+| Ingestion | 4006 | Node.js/Express | Document upload & processing |
+| LLM Server | 8000 | Python/FastAPI | RAG + Ollama integration |
+| Ollama | 11434 | Ollama | Local LLM inference |
+
+---
+
+## Chatbot Strategy 
+
+**qwen3:4b-instruct** - Fast and efficient model for understanding internal hospital queries
+
+**Snowflake/snowflake-arctic-embed-l-v2.0** - Embedding model with excellent multilingual support 
+
+### AI Strategy
+
+Implement a strictly on-premise Retrieval-Augmented Generation (RAG) system pairing Qwen 3 for German text generation with Snowflake Arctic Embed L v2.0 for high-precision document retrieval. This "dual-model" approach ensures that all hospital data remains offline while leveraging Snowflake's superior multilingual understanding to find the exact paragraph needed from handbooks before Qwen answers.
+
+
+### Software Stack 
+
+1. **LLM Engine: Ollama**
+   * Default model: `qwen3:4b-instruct`
+   * SentenceTransformers for embeddings: `Snowflake/snowflake-arctic-embed-l-v2.0`
+
+2. **Vector Database: ChromaDB**
+   * ChromaDB (v0.4+) stores embeddings created by Snowflake model
+   * Persistent storage at `./chroma_db_merged`
+   * PDF parsing with PyMuPDF for document ingestion
+
+3. **Frontend & Backend Services**
+   * React (Vite) frontend for user interface
+   * Node.js/Express microservices (Authentication, Conversation)
+   * FastAPI server for RAG pipeline
+
+### Why Ollama?
+
+* **Data Sovereignty**: Operates entirely offline - all models run on-premise
+* **Hardware Efficiency**: Quantized models run efficiently on modest hardware
+* **Easy Deployment**: Eliminates complexity of raw model management
+* **Safety**: No data leaves your infrastructure
+
+---
+
+## Environment Variables
+
+### Backend LLM (`backend/llm/.env`)
+
+```env
+# Server Configuration
+HOST=0.0.0.0
+PORT=8000
+
+# Ollama Configuration
+OLLAMA_BASE_URL=http://localhost:11434  # Use http://ollama:11434 for Docker
+OLLAMA_MODEL=qwen3:4b-instruct
+OLLAMA_TEMPERATURE=0.3
+OLLAMA_NUM_CTX=20000
+OLLAMA_NUM_PREDICT=1000
+OLLAMA_KEEP_ALIVE=-1
+
+# Embedding Configuration
+EMBEDDING_MODEL=Snowflake/snowflake-arctic-embed-l-v2.0
+EMBEDDING_DEVICE=auto
+
+# ChromaDB Configuration
+CHROMA_PERSIST_DIRECTORY=./resources/chroma_db/chroma_db_merged
+CHROMA_COLLECTION_NAME=tum_docs
+CHUNK_SIZE=600
+CHUNK_OVERLAP=300
+
+# RAG Configuration
+MAX_CONTEXT_LENGTH=10000
+
+# Reranking Configuration (Optional - improves relevance)
+ENABLE_RERANKING=False
+RERANKING_MODEL=jinaai/jina-reranker-v3
+RERANKING_TOP_K=5
+
+# Debug Mode (Optional)
+DEBUG=False
+```
+
+### Backend Services (`backend/authentication/.env`, `backend/conversation/.env`)
+
+```env
+MONGODB_URI=mongodb://localhost:27017/atoss_gpt
+JWT_SECRET=your-secret-key
+```
+
+---
+
+## Docker Compose Services
+
+The `docker-compose.yml` uses **profiles** to support different environments:
+
+### Core Services (No Profile Required)
+
+| Service | Port | Description |
+|---------|------|-------------|
+| frontend | 5173 | React app served via nginx |
+| authentication | 4003 | Auth microservice |
+| conversation | 4004 | Chat microservice |
+| user | 4001 | User profile service |
+| learning-material | 4005 | Course content service |
+
+### macOS Profile (`--profile macos`)
+
+| Service | Port | Description |
+|---------|------|-------------|
+| ingestion | 4006 | Document ingestion (connects to host LLM) |
+
+> **Note:** LLM and Ollama run manually on host for Metal acceleration.
+
+### GPU Profile (`--profile gpu`)
+
+| Service | Port | Description |
+|---------|------|-------------|
+| ingestion-gpu | 4006 | Document ingestion (connects to Docker LLM) |
+| llm | 8000 | FastAPI RAG server |
+| ollama | 11434 | Ollama with NVIDIA GPU support |
+
+---
+
+## Install Dependencies (Manual Setup)
+
+```bash
+# Frontend
+cd frontend
+npm install
+
+# Authentication service
+cd backend/authentication
+npm install
+
+# Conversation service
+cd backend/conversation
+npm install
+
+# LLM service
+cd backend/llm
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+---
+
+## API Endpoints
+
+### Chat API (LLM Server - Port 8000)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/chat/stream` | Stream chat response (SSE) |
+| POST | `/api/chat/generate` | Generate complete response |
+| GET | `/api/chat/status` | Check service health |
+
+### Conversation API (Port 4004)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/conversations/user/:userId` | Get user conversations |
+| POST | `/api/conversations` | Create new conversation |
+| GET | `/api/conversations/:id/stream` | Stream AI response |
+| POST | `/api/conversations/:id/messages/batch` | Save messages |
+
+---
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Proprietary - ATOSS Software AG

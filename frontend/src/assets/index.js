@@ -1,0 +1,17 @@
+export { default as new_chat_logo } from './new_chat_logo.png';
+export { default as search_logo } from './search_logo.png';
+export { default as tum_klinikum_logo } from './tum_klinikum_logo.png';
+export { default as tum_logo_darkmode } from './tum-logo-darkmode.png';
+export { default as minimize_logo } from './minimize_logo.png';
+export { default as maximize_logo } from './maximize_logo.png';
+export { default as profile_photo_mock } from './profile_photo_mock.jpg';
+export { default as expand_up_logo } from './expand_up_logo.png';
+export { default as expand_down_logo } from './expand_down_logo.png';
+export { default as delete_logo } from './delete_logo.png';
+export {default as new_chat_logo_white} from './new_chat_logo_white.png';
+export {default as search_logo_white} from "./search_logo_white.png";
+export { default as minimize_logo_white } from './minimize_logo_white.png';
+export { default as maximize_logo_white } from './maximize_logo_white.png';
+export { default as expand_up_logo_white } from './expand_up_logo_white.png';
+export { default as expand_down_logo_white } from './expand_down_logo_white.png';
+export { default as delete_logo_white } from './delete_logo_white.png';

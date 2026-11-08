@@ -1,0 +1,122 @@
+timestamp,query,response,duration_ms,status,error,ollama_base_url,ollama_model,ollama_temperature,ollama_top_p,ollama_num_ctx,embedding_model,embedding_device,chroma_persist_directory,chroma_collection_name,reranker_model,reranker_top_k,reranker_max_chars_per_doc,retriever_k,max_context_length,chunk_size,chunk_overlap
+2025-12-09T18:23:51.976756,Wie beantrage ich Urlaub / Freizeitausgleich?,"Um Ihre Antrag auf Urlaub oder Freizeitausgleich zu beantragen, folgen Sie diesen Schritten:  
+
+1. **Turnus für Urlaubstage**:  
+   Füllen Sie die Felder **Turnus für Urlaubstage (numerisch, 3)** und **Einsprung (numerisch, 3)** aus.  
+   Beim Eintragen der Werte beginnt der Turnus ab dem **Einsprung (numerisch, 2)**, wobei ""1"" das Startdatum der Urlaubstage im Dialog ""Urlaubstage"" (V ACDAY) festlegt.  
+
+2. **Einsprung für die Definition**:  
+   Füllen Sie das Feld **Einsprung (numerisch, 16)** mit dem Anfang des Turnus für Urlaubstage aus dem Tabelle ""Urlaubstage"" im Dialog ""Turnus für Urlaubstage"" (VACDAYCYC).  
+
+3. **Länge der Urlaubstage**:  
+   Setzen Sie die Felder **Länge (numerisch, 2)** ein, wobei ""2"" die Standardlänge der Urlaubstage darstellt. Falls Sie die Länge anpassen möchten, geben Sie den Wert ein.  
+
+4. **Zusatzanspruch**:  
+   Füllen Sie das Feld **Zusatzanspruch** aus, wenn ein Urlaubssaldo in dem Bedienelement ""Anspruchssaldo Zusatzurlaub"" angegeben ist.  
+
+5. **Übertrag**:  
+   Füllen Sie das Feld **Übertrag** ein, wenn ein Urlaubssaldo in dem Bedienelement ""Anspruchssaldo Übertrag"" angegeben ist.  
+
+6. **Gesamte Urlaubsanspruch**:  
+   Füllen Sie das Feld **Anspruch gesamt** aus, wobei ""2"" die Standardlänge der gesamten Urlaubsanspruch darstellt.  
+
+**Zitiere**:  
+> „Nach 6 Stunden erfolgt ein Pausenabzug von 30 Minuten, nach 9 Stunden werden weitere 15 Minuten abgezogen.“  
+Das bedeutet: **Setzen Sie die Werte der Turnus und der Länge ein, wobei ""2"" die Standardlänge der Urlaubstage darstellt.**  
+
+Diese Schritte ermöglichen Sie dem Antrag auf Urlaub oder Freizeitausgleich zu bearbeiten.",7393.37,success,,http://localhost:11434,qwen3:0.6b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T18:23:59.370125,Wie erstelle oder ändere ich einen Dienstplan?,"Um einen Dienstplan zu erstellen oder anpassen, folge diesen Schritten:  
+
+1. **Einfache Anpassung**:  
+   - Füge eine **klare, praxisnahe Antwort** ein, z.B. „Fügen Sie die folgenden Bedienelemente ein: Datum von 10.01.2025 bis 15.01.2025 und ein Arbeitsmuster mit Kennzeichen „Teamprojekt“ ein.“  
+
+2. **Prüfung der Felder**:  
+   - Beachgehen Sie, ob Felder wie „Kennzeichen“ (Alternative) mit einem festgeschriebenen Arbeitsmuster verknüpft sind.  
+   - Falls man **manuell** eine Änderung vornehmen muss, prüfen Sie, ob das Feld mit einem „Alternativwunsch“ verknüpft ist.  
+
+3. **Dynamische Berechnung**:  
+   - Bei Änderungen des Schichtzyklus (CYCLE) oder dynamischen Berechnungen im Plan wird automatisch der Arbeitsmuster aktualisiert.  
+
+4. **Prüfung der Warnungen**:  
+   - Wenn man **unwollte Änderungen** im Schichtzyklus vornehmen, wird eine Warnung ausgegeben.  
+
+**Zusammenfassung**:  
+- Nutzen Sie die Dialogeignung `Flexibler Mitarbeiterdienstplan` und `Tagesdienstplan` für Anpassungen.  
+- Prüfen Sie manuell, ob Felder mit einem festgeschriebenen Arbeitsmuster verknüpft sind.  
+
+**Falls weitere Details**:  
+- Wenn keine relevanten Informationen im Kontext vorhanden sind, antworten Sie: „Auf diese Frage habe ich leider keine Antwort. Bitte wenden Sie sich an Ihre Personalabteilung oder den internen ATOSS-Support.“",4328.36,success,,http://localhost:11434,qwen3:0.6b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T18:24:03.698487,Was ist bei Schichtzuschlägen / Pausenregelungen zu beachten?,"Bei Schichtzuschlägen oder Pausenregelungen zu beachten:
+
+1. **Definiere Grenzen der Normalzeit**: Setze klare Zeitlimits (z. B. 6–9 Stunden) und beachte, ob Pausen aus dem alten oder neuen Arbeitsmuster berechnet werden (z. B. mit ""ja"" werden festen Pausen übernommen, nicht außerhalb der Rahmenzeit).
+
+2. **Konvertionsregelung**:  
+   - Bei Änderung eines Arbeitsmusters:  
+     - Pausen aus dem alten Schichtzyklus übernommen (falls festen Pausen vorhanden).  
+     - Pausen aus dem neuen Arbeitsmuster berücksichtigen.  
+     - Automatische Pausen bei Fehlgrundzeiten berücksichtigen (falls ""ja"" in der Conversionstabelle aktiviert).  
+
+3. **Planpausenregelung**:  
+   - Wenn die Regelung im Modus ""Planpausen mit Auswirkung auf Zeitwirtschaft"" aktiviert ist:  
+     - Automatische Pause übernommen (falls automatisch).  
+     - Feste unbezahlte Pause übernommen (falls automatisch).  
+     - Feste bezahlte Pause übernommen (falls automatisch).  
+     - Automatische Pause soll feste Pause löschen (z. B. im Dialog ""Arbeitsregel"" ignoriert).  
+
+4. **Zustandssicherung**:  
+   - Prüfe, ob Pausen aus dem Schichtzyklus oder dem Arbeitsmuster berechnet werden.  
+   - Überprüfe, ob die Regeln in der Conversionstabelle aktiviert sind.  
+
+Diese Schritte ermöglichen eine praxisnahe Umsetzung der Regelungen.",3854.1,success,,http://localhost:11434,qwen3:0.6b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T18:24:07.553085,Wofür stehen die Abkürzungen PLAN und MPDATA?,"Die Abkürzungen **PLAN** und **MPDATA** stehen für spezifische Planungen oder Arbeitsverfahren im ATOSS-System. Hier ist eine klare, praxisnahe Antwort:
+
+1. **PLAN** bezieht sich auf spezifische Planungsstrukturen oder Gruppen für die Voreinstellungen in den **Plandaten Automatischen Dienstplan (PDASCH)**. Sie interpretieren Kontrollkästchen (* als Zeichen) und ? als Zeichen, um Berechtigungen anzupassen.  
+2. **MPDATA** bezieht sich auf die **Tageskorrekturen** oder **Planungen** im Bereich der Arbeitsverhältnisse, wo Abkürzungen mit Kennzeichen definiert sind. Sie werden in Dialogfelder wie ""Tageskorrekturen"" (MPDATA) oder ""Planungen"" eingegeben, um spezifische Arbeitsverfahren zu definiern.  
+
+Diese Abkürzungen ermöglichen die Automatisierung von Berechtigungen und die Definition von Gruppen für spezifische Aufgaben.",4109.08,success,,http://localhost:11434,qwen3:0.6b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T18:24:11.662169,Welchem Funktionsbereich ist der Dialog 'Korrektur von Kontierungen' (CRCOST) zugeordnet und welche Hauptaufgabe erfüllt er?,"**Schritt-für-Schritt-Anleitung zur Korrektur von Kontierungen (CRCOST):**
+
+1. **Registrierung des Dialogs**:  
+   Der Registerkarte **""Allgemein"" (CRCOST)** auf Seite 683 ist der Hauptelement der Korrektur von Kontierungen. Dieser Register ermöglicht die Korrektur von Tages- oder Zeitkonten, Kostenstellen-Buchungen und Lohnart-Korrekturen.  
+
+2. **Hauptfunktion des Dialogs**:  
+   Der Dialog **""Korrektur von Kontierungen"" (CRCOST)** korrigiert über die Uhrzeit erfasste Daten, insbesondere die Kontierungen (z. B. Tages- oder Lohnart) und die Buchungen.  
+   - **Zitierbare Aussage**:  
+     *""Die Korrektur von Kontierungen zeigt an, dass die Buchung durch Änderung oder Nacherfassung im Dialog 'Korrektur von Kontierungen' (CRCOST) entstanden ist.""* (Referenz [2]).  
+
+3. **Bedienelemente**:  
+   - **Kennzeichen 'o'**: Verhindert die Korrekturen bei Tageskonten.  
+   - **Kennzeichen 'k'**: Erkennzeichnet Kontierungen, die in der Uhrzeit erstellt wurden.  
+   - **Kennzeichen 'x'**: Für Korrekturen mit Auftragsbedarf.  
+
+4. **Praxisnahe Anweisung**:  
+   - Korrigiere die korrekte Zeit- oder Lohnart-Daten.  
+   - Füge die korrekte Pausen- oder Abzüge in die korrekte Zeit- oder Lohnart-Liste.  
+
+**Zusammenfassung**:  
+Der Dialog **""Korrektur von Kontierungen"" (CRCOST)** korrigiert korrekte Tages- oder Lohnart-Daten und ermöglicht die Erstellung von Pausen- oder Abzüge. Diese Korrekturen sind wichtig für die korrekten Auswertungen der Daten.",4396.57,success,,http://localhost:11434,qwen3:0.6b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T18:24:16.059235,Welche Exportformate sind standardmäßig für das Drucken von Reports freigegeben und wie verhält es sich mit den übrigen Formaten?,"Hier ist eine klare, praxisnahe Antwort:  
+
+1. **Standard-Exportformat**:  
+   Der ATOSS-Report wird automatisch als PDF (*.pdf*) ausgewählt, falls keine Berechtigungen für PDF-Ausgabe vorhanden sind.  
+   **Zitiere**: „Wenn keine Berechtigungen für PDF-Ausgabe haben, wird der Report als PDF exported.“  
+
+2. **Export-Optionen**:  
+   - **Papierformat**: Wählen Sie zwischen Hoch- und Querformat.  
+   - **Seitengröße**: Wählen Sie die Seitengröße aus.  
+   - **Seitenausrichtung**: Hoch- oder Querformat.  
+   - **Seitennäherender**: Angabe der Seitenränder in Millimetern.  
+   - **Layout**: Nur bei Listenüberschriften wird ein Layout ausgewählt.  
+
+3. **Export-Optionen**:  
+   - **Exportformate**:  
+     - Excel: Exportiert die Datensätze.  
+     - HTML: Ausgibt die Dateien mit HTML-Text.  
+     - CSV: Exportiert die Daten in CSV-Dateien.  
+
+4. **Zusammenfassung**:  
+   Der Standard-Export ist PDF, und Sie können auch andere Format-Optionen wie Excel, HTML oder CSV auswählen.  
+   **Zitiere**: „Die Standard-Option für die Exportformate ist PDF, und Sie können andere Format-Optionen wie Excel, HTML oder CSV auswählen.“  
+
+Bitte wenden Sie sich an Ihre Personalabteilung oder den ATOSS-Support, wenn Sie Fragen zu den Export-Optionen haben.",3957.79,success,,http://localhost:11434,qwen3:0.6b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200
+2025-12-09T18:24:20.017022,Wie heißt Spongebobs bester Freund?,Auf diese Frage habe ich leider keine Antwort. Bitte wenden Sie sich an Ihre Personalabteilung oder den internen ATOSS-Support.,1856.33,success,,http://localhost:11434,qwen3:0.6b,0.7,0.7,2048,Qwen/Qwen3-Embedding-0.6B,cuda,./Chroma_ASES_Referenzhandbuch_db2,ASES_Referenzhandbuch,jinaai/jina-reranker-v3,5,256,16,10000,1000,200

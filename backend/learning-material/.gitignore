@@ -1,0 +1,15 @@
+# dependencies
+node_modules
+
+# environment variables
+.env
+.env.local
+
+# uploaded files
+uploads/videos/*
+uploads/thumbnails/*
+!uploads/videos/.gitkeep
+!uploads/thumbnails/.gitkeep
+
+# logs
+*.log

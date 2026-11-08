@@ -1,0 +1,247 @@
+"""
+RAG Chain Service
+Implements the Retrieval-Augmented Generation chain for question answering
+"""
+
+import json
+import logging
+from typing import Optional, AsyncIterator, List, Any
+
+from models.vectorstore import vectorstore_manager
+from models.llm_model import llm_manager
+from models.reranker_model import reranker_manager
+
+from config.settings import settings
+from models.llm_model import llm_manager
+
+logger = logging.getLogger(__name__)
+
+ERROR_RAG_NOT_INITIALIZED = "RAG chain not initialized"
+
+
+CONTEXT_CHATBOT = """This is the context from the provided documents:\n{context}\n
+                     This is the chat history so far:\n{chat_history}\n"""
+
+
+class RAGChainService:
+    """Service for RAG-based question answering with streaming support"""
+
+    _instance: Optional["RAGChainService"] = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def _extract_image_path(self, metadata: dict) -> str:
+        """
+        Extract image path from document metadata.
+        
+        Supports multiple formats:
+        1. image_path: Direct string path (legacy)
+        2. images: JSON array with imageUrl fields (new format from ingestion)
+        
+        Returns the first image path found, or empty string if none.
+        """
+        # Try direct image_path first (legacy format)
+        if metadata.get("image_path"):
+            return metadata["image_path"]
+        
+        # Try images array (new format from ingestion service)
+        images_data = metadata.get("images")
+        if not images_data:
+            return ""
+        
+        try:
+            # Parse JSON if it's a string (ChromaDB stores arrays as JSON strings)
+            if isinstance(images_data, str):
+                images = json.loads(images_data)
+            else:
+                images = images_data
+            
+            # Get the first image's URL
+            if images and isinstance(images, list) and len(images) > 0:
+                first_image = images[0]
+                if isinstance(first_image, dict):
+                    return first_image.get("imageUrl", "")
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.debug(f"Failed to parse images metadata: {e}")
+        
+        return ""
+
+    def _format_docs(self, docs: List[Any]) -> str:
+        """Format retrieved documents into a context string"""
+        if not docs:
+            return "No relevant context found."
+
+        context_str = ""
+        for doc in docs:
+            source = doc.metadata.get("source", "Unknown")
+            # Support both "page" (old) and "page_num" (new) metadata keys
+            page = doc.metadata.get("page_num") or doc.metadata.get("page", "?")
+            image_path = self._extract_image_path(doc.metadata)
+            
+            # Debug: Log extracted image path
+            if image_path:
+                logger.info(f"[RAG] Extracted image_path: {image_path} from page {page}")
+            
+            source_info = f"{source} (Seite {page})"
+            if image_path:
+                source_info += f", image_path: {image_path}"
+
+            content = doc.page_content.replace("\n", " ").strip()
+
+            context_str += f"--- Zitat aus: {source_info} ---\n{content}\n\n"
+        
+        # Debug: Log final context being sent to LLM
+        logger.debug(f"[RAG] Formatted context:\n{context_str[:500]}...")
+
+        return context_str
+
+    def _rerank_documents(self, question: str, docs: List[Any]) -> List[Any]:
+        """Rerank documents based on relevance to the question"""
+        if not docs:
+            return docs
+
+        # Extract document texts
+        doc_texts = [doc.page_content for doc in docs]
+
+        # Get reranked indices and scores
+        ranked_indices = reranker_manager.rerank(question, doc_texts)
+
+        # Reorder documents based on reranked indices
+        reranked_docs = [docs[idx] for idx, _ in ranked_indices]
+
+        return reranked_docs
+
+    async def generate_response(self, question: str, chat_history: str = "") -> str:
+        """Generate a complete response for a question"""
+        if not self.is_ready:
+            raise RuntimeError(ERROR_RAG_NOT_INITIALIZED)
+
+        try:
+            # Retrieve relevant documents
+            docs = await vectorstore_manager.search(question, k=8)
+
+            # Rerank documents if enabled
+            if settings.ENABLE_RERANKING:
+                docs = self._rerank_documents(question, docs)
+
+            context = self._format_docs(docs)
+
+            # Format the context
+            full_context = CONTEXT_CHATBOT.format(
+                context=context, chat_history=chat_history
+            )
+
+            # Generate response
+            raw_response = await llm_manager.generate(
+                context=full_context, question=question
+            )
+            cleaned_response = raw_response.strip()
+
+            fallback_trigger = "Auf diese Frage habe ich leider keine Antwort"
+
+            # Check if it starts with the trigger OR contains it in the first 100 chars
+            if (
+                cleaned_response.startswith(fallback_trigger)
+                or fallback_trigger in cleaned_response[:100]
+            ):
+
+                logger.info("Fallback trigger detected. Overwriting response.")
+                return "Auf diese Frage habe ich leider keine Antwort. Bitte wenden Sie sich an ATOSS.pa@mri.tum.de."
+
+            return cleaned_response
+
+        except Exception as e:
+            logger.error("Error in RAG generation: %s", e)
+            return "Entschuldigung, es ist ein Fehler aufgetreten."
+
+        except (RuntimeError, OSError, ValueError) as e:
+            logger.error("Error generating response: %s", e)
+            raise
+
+    async def stream_response(
+        self, question: str, chat_history: str = ""
+    ) -> AsyncIterator[str]:
+        """Stream the response token by token"""
+        if not self.is_ready:
+            raise RuntimeError("RAG Service not ready.")
+
+        try:
+            # 1. Retrieve & Format (Same as above)
+            docs = await vectorstore_manager.search(question, k=8)
+
+            # Rerank documents if enabled
+            if settings.ENABLE_RERANKING:
+                docs = self._rerank_documents(question, docs)
+
+            context_str = self._format_docs(docs)
+
+            # 2. Build Prompt
+            full_context = CONTEXT_CHATBOT.format(
+                context=context_str, chat_history=chat_history
+            )
+
+            fallback_trigger = "Auf diese Frage habe ich leider keine Antwort"
+            fallback_msg = "Auf diese Frage habe ich leider keine Antwort. Bitte wenden Sie sich an ATOSS.pa@mri.tum.de."
+
+            buffer = ""
+            check_complete = False
+
+            # 3. Stream (Native LLM Stream)
+            async for chunk in llm_manager.stream_generate(
+                context=full_context, question=question
+            ):
+                if check_complete:
+                    yield chunk
+                    continue
+
+                buffer += chunk
+
+                # Check for 65 characters
+                if len(buffer) > 65:
+                    cleaned_buffer = buffer.strip()
+
+                    # Found Trigger?
+                    if (
+                        cleaned_buffer.startswith(fallback_trigger)
+                        or fallback_trigger in cleaned_buffer[:100]
+                    ):
+                        logger.info("Fallback trigger detected in stream. Overwriting.")
+                        yield fallback_msg
+                        return  # break stream
+                    else:
+                        yield buffer
+                        check_complete = True
+
+            # 4. Edge Case: Stream shorter than 65 chars
+            if not check_complete and buffer:
+                cleaned_buffer = buffer.strip()
+                if (
+                    cleaned_buffer.startswith(fallback_trigger)
+                    or fallback_trigger in cleaned_buffer
+                ):
+                    yield fallback_msg
+                else:
+                    yield buffer
+
+        except Exception as e:
+            logger.error("Error in RAG streaming: %s", e)
+            yield "Error in RAG streaming."
+
+    async def get_relevant_documents(self, question: str) -> List[Any]:
+        """Get relevant documents for a question (for debugging/inspection)"""
+        if not self._is_ready:
+            raise RuntimeError(ERROR_RAG_NOT_INITIALIZED)
+
+        return await vectorstore_manager.search(question, k=8)
+
+    @property
+    def is_ready(self) -> bool:
+        """Check if RAG chain service is ready"""
+        return vectorstore_manager.is_loaded and llm_manager.is_loaded
+
+
+# Singleton instance
+rag_chain_service = RAGChainService()
